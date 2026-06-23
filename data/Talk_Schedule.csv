@@ -1,0 +1,30 @@
+,,,,,,,
+,Block 1,,,,,,
+,,Servant,Location,Talk,,SPLIT,
+,11:00 AM,,Main Hall,Marla,Shady,Youssef,Kirmina
+,11:30 AM,,Main Hall,Karine,Karen,Youssef,Kirmina
+,12:00 PM,,Main Hall,Philo,Roberto,Jason,Gin
+,12:30 PM,,Main Hall,Maria,Sherry,Jason,Gin
+,,,,,,,
+,Block 2,,,,,,
+,,Servant,Location,Talk,,SPLIT,
+,5:00 PM,,Main Hall,Jason,Sherry,Philo,Roberto
+,5:30 PM,,Main Hall,Maria,Gin,Philo,Roberto
+,6:00 PM,,Main Hall,Marla,Karen,Karine,Shady
+,6:30 PM,,Main Hall,Youssef,Kirmina,Karine,Shady
+,,,,,,,
+,Block 3,,,,,,
+,,Servant,Location,Talk 1,,Split 1,
+,7:15 PM,,Main Hall,Youssef,Shady,Marla,Karen
+,7:45 PM,,?,Karine,Kirmina,Marla,Karen
+,,,,,,,
+,,Servant,Location,Talk 2,,Split 2,
+,7:15 PM,,Main Hall,Philo,Gin,Maria,Sherry
+,7:45 PM,,?,Jason,Roberto,Maria,Sherry
+,,,,,,,
+,Block 4,,,,,,
+,,Servant,Location,Talk 1,,,
+,11:30 AM,,Main Hall,Youssef,Marla,Shady,Karen
+,,,,,,,
+,,,,Talk 2,,,
+,11:30 AM,,?,Philo,Maria,Gin,Sherry

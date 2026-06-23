@@ -1,0 +1,344 @@
+/* VBT Sports Camp Web App - Custom Design System */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --vbt-blue: #1441a1;
+  --vbt-sky: #29b6f6;
+  --bg-dark: #070a13;
+  --bg-surface: rgba(13, 20, 38, 0.65);
+  --bg-surface-hover: rgba(20, 30, 58, 0.85);
+  --border-glow: rgba(41, 182, 246, 0.15);
+  --border-light: rgba(255, 255, 255, 0.06);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  /* Team Colors */
+  --color-shakes: #00b0ff;
+  --color-shakes-rgb: 0, 176, 255;
+  --color-fries: #ff9100;
+  --color-fries-rgb: 255, 145, 0;
+  --color-tie: #a855f7;
+  
+  --gradient-vbt: linear-gradient(135deg, #1441a1 0%, #29b6f6 100%);
+  --gradient-shakes: linear-gradient(135deg, #00b0ff 0%, #0077c2 100%);
+  --gradient-fries: linear-gradient(135deg, #ff9100 0%, #e65100 100%);
+  --gradient-card: linear-gradient(135deg, rgba(20, 30, 58, 0.4) 0%, rgba(13, 20, 38, 0.6) 100%);
+  
+  --shadow-glow-shakes: 0 0 15px rgba(0, 176, 255, 0.25);
+  --shadow-glow-fries: 0 0 15px rgba(255, 145, 0, 0.25);
+  --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  
+  --font-title: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(20, 65, 161, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(41, 182, 246, 0.08) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(41, 182, 246, 0.4)); }
+}
+
+.animate-fade {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Glassmorphism primitives */
+.glass-panel {
+  background: var(--bg-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+}
+
+.glass-panel:hover {
+  background: var(--bg-surface-hover);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.glass-card-shakes {
+  border-left: 4px solid var(--color-shakes);
+}
+
+.glass-card-fries {
+  border-left: 4px solid var(--color-fries);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Scoreboard Tug-of-War Progress Bar */
+.tug-of-war-container {
+  position: relative;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tug-of-war-bar-shakes {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--gradient-shakes);
+  box-shadow: var(--shadow-glow-shakes);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tug-of-war-bar-fries {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--gradient-fries);
+  box-shadow: var(--shadow-glow-fries);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tug-of-war-center {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: #ffffff;
+  transform: translateX(-50%);
+  z-index: 5;
+  box-shadow: 0 0 10px #ffffff;
+}
+
+/* Tabs Toggle Button Group */
+.toggle-group {
+  display: flex;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.toggle-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Winner Toggle Button Group for Scoreboard Matches */
+.winner-selector {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  width: 100%;
+}
+
+.winner-option {
+  flex: 1;
+  padding: 7px 4px;
+  border-radius: 7px;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--font-title);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.winner-option.active-shakes {
+  background: var(--gradient-shakes);
+  color: #ffffff;
+  box-shadow: var(--shadow-glow-shakes);
+}
+
+.winner-option.active-fries {
+  background: var(--gradient-fries);
+  color: #ffffff;
+  box-shadow: var(--shadow-glow-fries);
+}
+
+.winner-option.active-tie {
+  background: var(--color-tie);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+}
+
+/* Accordions for Blocks */
+.block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.block-content {
+  border-top: 1px solid var(--border-light);
+  padding: 16px;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mobile Responsive Utility Classes */
+.mobile-nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 68px;
+  background: rgba(13, 20, 38, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 60px;
+  height: 50px;
+  gap: 4px;
+}
+
+.mobile-nav-item.active {
+  color: var(--vbt-sky);
+}
+
+.mobile-nav-item.active svg {
+  filter: drop-shadow(0 0 5px rgba(41, 182, 246, 0.5));
+}
+
+.content-area {
+  padding: 16px;
+  padding-bottom: 90px; /* offset for bottom navbar */
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.badge {
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-shakes {
+  background: rgba(0, 176, 255, 0.15);
+  color: var(--color-shakes);
+  border: 1px solid rgba(0, 176, 255, 0.3);
+}
+
+.badge-fries {
+  background: rgba(255, 145, 0, 0.15);
+  color: var(--color-fries);
+  border: 1px solid rgba(255, 145, 0, 0.3);
+}
+
+/* Dynamic Live dot indicators */
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulse-glow 1.5s infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

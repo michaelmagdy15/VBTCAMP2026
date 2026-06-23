@@ -1,0 +1,21 @@
+{
+  "name": "VBT Sports Camp '26",
+  "short_name": "VBT Camp",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070a13",
+  "theme_color": "#1441a1",
+  "icons": [
+    {
+      "src": "/Final VBT Re-Branding 2026-02 (3).png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/Final VBT Re-Branding 2026-02 (3).png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
