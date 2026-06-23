@@ -25,7 +25,8 @@ import {
   ThumbsUp,
   Flame,
   Award,
-  BarChart3
+  BarChart3,
+  BookOpen
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -34,6 +35,13 @@ import {
   addAnnouncement,
   updateAnnouncementReactions,
   subscribeToScheduleData,
+  subscribeToEventConfig,
+  updateEventConfig,
+  createEvent,
+  checkEventExists,
+  subscribeToEventRegistry,
+  subscribeToServiceData,
+  updateServiceData,
   registerDevicePushToken
 } from './firebase';
 import { setupPushNotifications } from './push_service';
@@ -52,6 +60,21 @@ const defaultCampState = {
   isTimerPaused: false,
   timerPausedAt: null,
   appsScriptWebappUrl: ''
+};
+
+// Default event config for VBT 2026 Camp (backward compatibility)
+const VBT_2026_EVENT_CODE = 'vbt_2026_camp';
+const defaultEventConfig = {
+  eventName: 'VBT Sports Camp',
+  description: 'Live scoring, schedule & team management',
+  eventDate: '',
+  side1Name: 'Shakes',
+  side2Name: 'Fries',
+  primaryColor: '#1441a1',
+  logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
+  passcodeCoordinator: 'VBTADMIN',
+  passcodeGameLeader: 'VBTREF',
+  passcodeTeamLeader: 'VBT2026'
 };
 
 // Map Location Key data
@@ -239,20 +262,55 @@ const triggerRemotePushNotification = async (title, body, targetUrl = '/') => {
 };
 
 export default function App() {
+  // ─── EVENT SELECTION STATE ────────────────────────────────────────────────
+  const [currentEventCode, setCurrentEventCode] = useState(() => {
+    return localStorage.getItem('vbt_current_event') || '';
+  });
+  const [eventConfig, setEventConfig] = useState(defaultEventConfig);
+  const [eventJoinInput, setEventJoinInput] = useState('');
+  const [eventJoinError, setEventJoinError] = useState('');
+  const [eventJoinLoading, setEventJoinLoading] = useState(false);
+  const [eventRegistry, setEventRegistry] = useState([]);
+
+  // New event creation state
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [newEventCode, setNewEventCode] = useState('');
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventSide1, setNewEventSide1] = useState('Team A');
+  const [newEventSide2, setNewEventSide2] = useState('Team B');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventPassCoord, setNewEventPassCoord] = useState('');
+  const [newEventPassGame, setNewEventPassGame] = useState('');
+  const [newEventPassTeam, setNewEventPassTeam] = useState('');
+  const [createEventError, setCreateEventError] = useState('');
+  const [createEventLoading, setCreateEventLoading] = useState(false);
+
+  // Event setup edit state (for existing event)
+  const [editEventConfig, setEditEventConfig] = useState(null);
+  const [savingEventConfig, setSavingEventConfig] = useState(false);
+
+  // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
+  const side1Name = eventConfig.side1Name || 'Shakes';
+  const side2Name = eventConfig.side2Name || 'Fries';
+
+  // ─── CAMP DATA (SCHEDULE) ─────────────────────────────────────────────────
   // Dynamic Camp Schedule/Matchup data from Firestore or local fallback
   const [campData, setCampData] = useState(() => {
-    const local = localStorage.getItem('vbt_camp_schedule_data');
+    if (!currentEventCode) return initialStaticCampData;
+    const local = localStorage.getItem(`vbt_schedule_${currentEventCode}`);
     return local ? JSON.parse(local) : initialStaticCampData;
   });
 
   // Memoized lists dependent on the dynamic schedule data
+  // Dynamic leader roster — built from eventConfig.leaderRoster (set by coordinator per service)
   const leadersList = useMemo(() => {
-    return Object.entries(campData.teams).map(([code, team]) => ({
-      code,
-      fullName: team.leaders,
-      side: team.side,
+    const roster = eventConfig?.leaderRoster || [];
+    return roster.map((entry, idx) => ({
+      code: entry.id || `leader_${idx}`,
+      fullName: entry.name,
+      groupLabel: entry.groupLabel || '',
     }));
-  }, [campData]);
+  }, [eventConfig]);
 
   const uniqueGames = useMemo(() => {
     return Array.from(new Set(
@@ -269,7 +327,9 @@ export default function App() {
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('vbt_user');
+    const evCode = localStorage.getItem('vbt_current_event');
+    if (!evCode) return null;
+    const saved = localStorage.getItem(`vbt_user_${evCode}`);
     return saved ? JSON.parse(saved) : null;
   });
   const [loginRole, setLoginRole] = useState('leader'); // 'leader' | 'admin' | 'referee'
@@ -286,16 +346,19 @@ export default function App() {
   const [firebaseConnected, setFirebaseConnected] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [appsScriptWebappUrl, setAppsScriptWebappUrl] = useState(() => {
-    return localStorage.getItem('vbt_apps_script_webapp_url') || '';
+    const evCode = localStorage.getItem('vbt_current_event');
+    return evCode ? (localStorage.getItem(`vbt_apps_url_${evCode}`) || '') : '';
   });
 
   useEffect(() => {
-    localStorage.setItem('vbt_apps_script_webapp_url', appsScriptWebappUrl);
-  }, [appsScriptWebappUrl]);
+    if (currentEventCode) {
+      localStorage.setItem(`vbt_apps_url_${currentEventCode}`, appsScriptWebappUrl);
+    }
+  }, [appsScriptWebappUrl, currentEventCode]);
 
   // UI state
-  const [currentTab, setCurrentTab] = useState('scoreboard'); // 'scoreboard' | 'myteam' | 'schedule' | 'timeline' | 'deductions' | 'info'
-  const [infoSubTab, setInfoSubTab] = useState('map'); // 'map' | 'timeline' | 'faq'
+  const [currentTab, setCurrentTab] = useState('scoreboard');
+  const [infoSubTab, setInfoSubTab] = useState('map');
   const [expandedBlocks, setExpandedBlocks] = useState({ 1: true, 2: false, 3: false, 4: false });
   const [selectedMapLocation, setSelectedMapLocation] = useState(null);
   const [expandedFaqs, setExpandedFaqs] = useState({});
@@ -306,6 +369,23 @@ export default function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uploadImage, setUploadImage] = useState(null);
+
+  // ─── SERVICE MODE STATE ───────────────────────────────────────────────
+  // Live service data from Firestore (brief + groups + games)
+  const [serviceData, setServiceData] = useState({ serviceBrief: '', groups: [], games: [] });
+  // Edit drafts (only used by Coordinator)
+  const [editServiceBrief, setEditServiceBrief] = useState('');
+  const [editGroups, setEditGroups] = useState([]);
+  const [editGames, setEditGames] = useState([]);
+  const [serviceEditMode, setServiceEditMode] = useState(false);
+  const [savingService, setSavingService] = useState(false);
+  const [expandedServiceGame, setExpandedServiceGame] = useState({});
+
+  // ─── LEADER ROSTER STATE (coordinator setup dashboard) ────────────────
+  // editRoster: [{id, name, groupLabel}] — typed in by coordinator, saved to eventConfig.leaderRoster
+  const [editRoster, setEditRoster] = useState([]);
+  const [rosterEditMode, setRosterEditMode] = useState(false);
+  const [savingRoster, setSavingRoster] = useState(false);
 
   // Sync live updates (scores, tokens, deductions) back to the Google Sheet
   const syncToGoogleSheet = async (updateData) => {
@@ -519,23 +599,105 @@ export default function App() {
     }
   }, [scheduleDayFilter]);
 
+  // Subscribe to event registry (always, to allow joining events)
+  useEffect(() => {
+    const unsub = subscribeToEventRegistry((list) => setEventRegistry(list));
+    return () => unsub();
+  }, []);
+
+  // Subscribe to event config when an event is selected
+  useEffect(() => {
+    if (!currentEventCode) return;
+    const unsub = subscribeToEventConfig(currentEventCode, (cfg) => {
+      if (cfg) {
+        setEventConfig({ ...defaultEventConfig, ...cfg });
+        setEditEventConfig({ ...defaultEventConfig, ...cfg });
+      }
+    });
+    return () => unsub();
+  }, [currentEventCode]);
+
+  // Subscribe to service data when an event is selected
+  useEffect(() => {
+    if (!currentEventCode) return;
+    const unsub = subscribeToServiceData(currentEventCode, (data) => {
+      if (data) {
+        setServiceData({ serviceBrief: data.serviceBrief || '', groups: data.groups || [], games: data.games || [] });
+        setEditServiceBrief(data.serviceBrief || '');
+        setEditGroups(data.groups || []);
+        setEditGames(data.games || []);
+      }
+    });
+    return () => unsub();
+  }, [currentEventCode]);
+
+  // Save service data to Firestore
+  const handleSaveServiceData = async () => {
+    if (!currentEventCode) return;
+    setSavingService(true);
+    try {
+      await updateServiceData(currentEventCode, {
+        serviceBrief: editServiceBrief,
+        groups: editGroups,
+        games: editGames
+      });
+      setServiceEditMode(false);
+    } catch (err) {
+      alert('Failed to save service data: ' + err.message);
+    } finally {
+      setSavingService(false);
+    }
+  };
+
+  // Group helpers
+  const handleAddGroup = () => setEditGroups(prev => [...prev, { leaderName: '', kidCount: '' }]);
+  const handleRemoveGroup = (idx) => setEditGroups(prev => prev.filter((_, i) => i !== idx));
+  const handleGroupChange = (idx, field, val) => setEditGroups(prev => prev.map((g, i) => i === idx ? { ...g, [field]: val } : g));
+  const totalKids = editGroups.reduce((sum, g) => sum + (parseInt(g.kidCount) || 0), 0);
+
+  // Game helpers
+  const handleAddGame = () => setEditGames(prev => [...prev, { name: '', howToPlay: '', lesson: '' }]);
+  const handleRemoveGame = (idx) => setEditGames(prev => prev.filter((_, i) => i !== idx));
+  const handleGameChange = (idx, field, val) => setEditGames(prev => prev.map((g, i) => i === idx ? { ...g, [field]: val } : g));
+
+  // ─── LEADER ROSTER helpers ────────────────────────────────────────────
+  const handleOpenRosterEdit = () => {
+    setEditRoster((eventConfig?.leaderRoster || []).map(e => ({ ...e })));
+    setRosterEditMode(true);
+  };
+  const handleAddRosterEntry = () => setEditRoster(prev => [...prev, { id: `l_${Date.now()}`, name: '', groupLabel: '' }]);
+  const handleRemoveRosterEntry = (idx) => setEditRoster(prev => prev.filter((_, i) => i !== idx));
+  const handleRosterEntryChange = (idx, field, val) => setEditRoster(prev => prev.map((e, i) => i === idx ? { ...e, [field]: val } : e));
+  const handleSaveRoster = async () => {
+    if (!currentEventCode) return;
+    setSavingRoster(true);
+    try {
+      // Filter out blank entries before saving
+      const cleaned = editRoster.filter(e => e.name.trim());
+      await updateEventConfig(currentEventCode, { leaderRoster: cleaned });
+      setRosterEditMode(false);
+    } catch (err) {
+      alert('Failed to save roster: ' + err.message);
+    } finally {
+      setSavingRoster(false);
+    }
+  };
+
   // Initialize and Sync state
   useEffect(() => {
+    if (!currentEventCode) return;
+
     if (isOfflineMode) {
       setFirebaseConnected(false);
-      const local = localStorage.getItem('vbt_camp_state');
-      if (local) {
-        setCampState(JSON.parse(local));
-      }
-      const localSchedule = localStorage.getItem('vbt_camp_schedule_data');
-      if (localSchedule) {
-        setCampData(JSON.parse(localSchedule));
-      }
+      const local = localStorage.getItem(`vbt_state_${currentEventCode}`);
+      if (local) setCampState(JSON.parse(local));
+      const localSchedule = localStorage.getItem(`vbt_schedule_${currentEventCode}`);
+      if (localSchedule) setCampData(JSON.parse(localSchedule));
       return;
     }
 
     // Subscribe to Firestore for camp state
-    const unsubscribeCamp = subscribeToCampState((data) => {
+    const unsubscribeCamp = subscribeToCampState(currentEventCode, (data) => {
       if (data) {
         const normalized = {
           blockScores: data.blockScores || {},
@@ -548,10 +710,8 @@ export default function App() {
           appsScriptWebappUrl: data.appsScriptWebappUrl || ''
         };
         setCampState(normalized);
-        localStorage.setItem('vbt_camp_state', JSON.stringify(normalized));
-        if (data.appsScriptWebappUrl) {
-          setAppsScriptWebappUrl(data.appsScriptWebappUrl);
-        }
+        localStorage.setItem(`vbt_state_${currentEventCode}`, JSON.stringify(normalized));
+        if (data.appsScriptWebappUrl) setAppsScriptWebappUrl(data.appsScriptWebappUrl);
       } else {
         setCampState(defaultCampState);
       }
@@ -559,15 +719,15 @@ export default function App() {
     });
 
     // Subscribe to Firestore for schedule/matchup data
-    const unsubscribeSchedule = subscribeToScheduleData((data) => {
+    const unsubscribeSchedule = subscribeToScheduleData(currentEventCode, (data) => {
       if (data) {
         setCampData(data);
-        localStorage.setItem('vbt_camp_schedule_data', JSON.stringify(data));
+        localStorage.setItem(`vbt_schedule_${currentEventCode}`, JSON.stringify(data));
       }
     });
 
     // Subscribe to announcements
-    const unsubscribeAnnouncements = subscribeToAnnouncements((list) => {
+    const unsubscribeAnnouncements = subscribeToAnnouncements(currentEventCode, (list) => {
       setAnnouncements(list);
     });
 
@@ -576,17 +736,17 @@ export default function App() {
       unsubscribeSchedule();
       unsubscribeAnnouncements();
     };
-  }, [isOfflineMode]);
+  }, [isOfflineMode, currentEventCode]);
 
   // Handle updates to camp state
   const handleUpdateCampState = async (updatedFields) => {
     const newState = { ...campState, ...updatedFields };
     setCampState(newState);
-    localStorage.setItem('vbt_camp_state', JSON.stringify(newState));
+    if (currentEventCode) localStorage.setItem(`vbt_state_${currentEventCode}`, JSON.stringify(newState));
 
-    if (firebaseConnected && !isOfflineMode) {
+    if (firebaseConnected && !isOfflineMode && currentEventCode) {
       try {
-        await updateCampState(updatedFields);
+        await updateCampState(currentEventCode, updatedFields);
       } catch (error) {
         console.error("Firebase update failed, falling back to local:", error);
       }
@@ -626,18 +786,21 @@ export default function App() {
     }
   };
 
-  // Login Handler
+  // Login Handler — uses dynamic per-event passcodes from eventConfig
   const handleLogin = (e) => {
     e.preventDefault();
     const normalizedPassword = loginPassword.trim().toUpperCase();
+    const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
+    const gamePass = (eventConfig.passcodeGameLeader || 'VBTREF').toUpperCase();
+    const teamPass = (eventConfig.passcodeTeamLeader || 'VBT2026').toUpperCase();
 
     if (loginRole === 'leader') {
       if (!loginName) {
         setLoginError('Please select your name.');
         return;
       }
-      if (normalizedPassword !== 'VBT2026') {
-        setLoginError('Incorrect passcode for Team Leader. Hint: VBT2026');
+      if (normalizedPassword !== teamPass) {
+        setLoginError(`Incorrect passcode for Team Leader.`);
         return;
       }
 
@@ -650,65 +813,150 @@ export default function App() {
         grade: leaderObj.grade
       };
       setCurrentUser(user);
-      localStorage.setItem('vbt_user', JSON.stringify(user));
+      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
       setLoginError('');
       setLoginPassword('');
       setCurrentTab('myteam');
-      
       if (!isOfflineMode) {
-        addAnnouncement(`${user.name} logged in as team leader of ${user.teamCode}`, 'System', 'system');
+        addAnnouncement(currentEventCode, `${user.name} logged in as team leader of ${user.teamCode}`, 'System', 'system');
       }
     } else if (loginRole === 'admin') {
-      if (normalizedPassword !== 'VBTADMIN') {
+      if (normalizedPassword !== coordPass) {
         setLoginError('Incorrect passcode for Coordinator.');
         return;
       }
       const user = {
         role: 'admin',
-        name: 'VBT Coordinator',
+        name: 'Coordinator',
         teamCode: 'ADMIN',
         side: 'System',
         grade: 'All'
       };
       setCurrentUser(user);
-      localStorage.setItem('vbt_user', JSON.stringify(user));
+      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
       setLoginError('');
       setLoginPassword('');
       setCurrentTab('scoreboard');
-      
       if (!isOfflineMode) {
-        addAnnouncement(`VBT Coordinator signed in`, 'System', 'system');
+        addAnnouncement(currentEventCode, `Coordinator signed in`, 'System', 'system');
       }
     } else if (loginRole === 'referee') {
-      if (normalizedPassword !== 'VBTREF') {
+      if (normalizedPassword !== gamePass) {
         setLoginError('Incorrect passcode for Game Leader.');
         return;
       }
       const user = {
         role: 'referee',
-        name: 'VBT Game Leader',
+        name: 'Game Leader',
         teamCode: 'REF',
         side: 'System',
         grade: 'All'
       };
       setCurrentUser(user);
-      localStorage.setItem('vbt_user', JSON.stringify(user));
+      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
       setLoginError('');
       setLoginPassword('');
       setCurrentTab('scoreboard');
-      
       if (!isOfflineMode) {
-        addAnnouncement(`VBT Game Leader signed in`, 'System', 'system');
+        addAnnouncement(currentEventCode, `Game Leader signed in`, 'System', 'system');
       }
     }
   };
 
   const handleLogout = () => {
     if (currentUser && !isOfflineMode) {
-      addAnnouncement(`${currentUser.name} signed out`, 'System', 'system');
+      addAnnouncement(currentEventCode, `${currentUser.name} signed out`, 'System', 'system');
     }
     setCurrentUser(null);
-    localStorage.removeItem('vbt_user');
+    if (currentEventCode) localStorage.removeItem(`vbt_user_${currentEventCode}`);
+  };
+
+  // Leave Event — returns to event selection screen
+  const handleLeaveEvent = () => {
+    if (currentUser) handleLogout();
+    setCurrentEventCode('');
+    setEventConfig(defaultEventConfig);
+    setCampState(defaultCampState);
+    setCampData(initialStaticCampData);
+    setFirebaseConnected(false);
+    localStorage.removeItem('vbt_current_event');
+  };
+
+  // Join Event Handler — validates the code exists before accepting
+  const handleJoinEvent = async (e) => {
+    e.preventDefault();
+    const code = eventJoinInput.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!code) { setEventJoinError('Please enter an event code.'); return; }
+    setEventJoinLoading(true);
+    setEventJoinError('');
+
+    try {
+      // Verify the event actually exists in Firestore before joining
+      const exists = await checkEventExists(code);
+      if (!exists) {
+        setEventJoinError('Event not found. Double-check the code with your coordinator.');
+        setEventJoinLoading(false);
+        return;
+      }
+      // Event verified — safe to join
+      setCurrentEventCode(code);
+      localStorage.setItem('vbt_current_event', code);
+    } catch (err) {
+      setEventJoinError('Could not verify event. Check your connection and try again.');
+    } finally {
+      setEventJoinLoading(false);
+      setEventJoinInput('');
+    }
+  };
+
+  // Create New Event Handler
+  const handleCreateEvent = async (e) => {
+    e.preventDefault();
+    const code = newEventCode.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!code) { setCreateEventError('Event code is required.'); return; }
+    if (!newEventName.trim()) { setCreateEventError('Event name is required.'); return; }
+    if (!newEventPassCoord.trim()) { setCreateEventError('Coordinator passcode is required.'); return; }
+    setCreateEventLoading(true);
+    setCreateEventError('');
+    try {
+      await createEvent(code, {
+        eventName: newEventName.trim(),
+        description: '',
+        eventDate: newEventDate,
+        side1Name: newEventSide1 || 'Team A',
+        side2Name: newEventSide2 || 'Team B',
+        primaryColor: '#1441a1',
+        logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
+        passcodeCoordinator: newEventPassCoord.trim().toUpperCase(),
+        passcodeGameLeader: newEventPassGame.trim().toUpperCase() || 'GAMEREF',
+        passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER'
+      });
+      // Auto-join the new event
+      setCurrentEventCode(code);
+      localStorage.setItem('vbt_current_event', code);
+      setShowCreateEvent(false);
+      setNewEventCode(''); setNewEventName(''); setNewEventDate('');
+      setNewEventSide1('Team A'); setNewEventSide2('Team B');
+      setNewEventPassCoord(''); setNewEventPassGame(''); setNewEventPassTeam('');
+    } catch (err) {
+      setCreateEventError('Failed to create event: ' + err.message);
+    } finally {
+      setCreateEventLoading(false);
+    }
+  };
+
+  // Save event config changes from Controls tab
+  const handleSaveEventConfig = async () => {
+    if (!editEventConfig || !currentEventCode) return;
+    setSavingEventConfig(true);
+    try {
+      await updateEventConfig(currentEventCode, editEventConfig);
+      setEventConfig({ ...defaultEventConfig, ...editEventConfig });
+    } catch (err) {
+      alert('Failed to save event config: ' + err.message);
+    } finally {
+      setSavingEventConfig(false);
+    }
   };
 
   // Score Calculator Logic (Excel formula compliance)
@@ -816,7 +1064,7 @@ export default function App() {
     const actionText = newIsPaused ? 'PAUSED ⏸️' : 'RESUMED ▶️';
     const msg = `${actionText} the schedule timer (Current Delay: +${newShift}m)`;
     if (!isOfflineMode) {
-      await addAnnouncement(msg, currentUser.name, 'system');
+      await addAnnouncement(currentEventCode, msg, currentUser.name, 'system');
     }
   };
 
@@ -835,7 +1083,7 @@ export default function App() {
 
     const msg = `adjusted schedule delay by ${amount > 0 ? '+' : ''}${amount}m (Total Delay: +${newShift}m)`;
     if (!isOfflineMode) {
-      await addAnnouncement(msg, currentUser.name, 'system');
+      await addAnnouncement(currentEventCode, msg, currentUser.name, 'system');
     }
   };
 
@@ -851,7 +1099,7 @@ export default function App() {
         timerPausedAt: null
       });
       if (!isOfflineMode) {
-        await addAnnouncement("reset schedule delay to 0m (On Schedule)", currentUser.name, 'system');
+        await addAnnouncement(currentEventCode, "reset schedule delay to 0m (On Schedule)", currentUser.name, 'system');
       }
     }
   };
@@ -876,7 +1124,7 @@ export default function App() {
 
     if (currentUser) {
       const msg = `updated ${game} (Block ${block}, Rd ${round}) winner to ${newWinner.toUpperCase()}`;
-      await addAnnouncement(msg, currentUser.name, 'score');
+      await addAnnouncement(currentEventCode, msg, currentUser.name, 'score');
     }
   };
 
@@ -905,7 +1153,7 @@ export default function App() {
       const action = amount > 0 ? 'added' : 'removed';
       const pointsStr = Math.abs(amount) === 1 ? 'point' : 'points';
       const msg = `${action} ${Math.abs(amount)} deduction ${pointsStr} to ${teamCode} (Total: ${newVal})`;
-      await addAnnouncement(msg, currentUser.name, 'deduction');
+      await addAnnouncement(currentEventCode, msg, currentUser.name, 'deduction');
     }
   };
 
@@ -927,11 +1175,11 @@ export default function App() {
     await syncToGoogleSheet({ tokens: newTokensState });
 
     if (currentUser) {
-      const sideText = side === 'shakes' ? 'Shakes' : 'Fries';
+      const sideText = side === 'shakes' ? side1Name : side2Name;
       const action = amount > 0 ? 'added' : 'removed';
       const tokenStr = Math.abs(amount) === 1 ? 'token' : 'tokens';
       const msg = `${action} ${Math.abs(amount)} ${tokenStr} to ${sideText} (Total: ${newTokens})`;
-      await addAnnouncement(msg, currentUser.name, 'score');
+      await addAnnouncement(currentEventCode, msg, currentUser.name, 'score');
     }
   };
 
@@ -984,6 +1232,7 @@ export default function App() {
     if ((!announcementText.trim() && !uploadImage) || !currentUser) return;
     
     await addAnnouncement(
+      currentEventCode,
       announcementText.trim(),
       currentUser.name,
       'announcement',
@@ -992,7 +1241,7 @@ export default function App() {
     
     // Trigger remote push notification to all leaders/coordinators
     await triggerRemotePushNotification(
-      `VBT Alert: ${currentUser.name}`,
+      `${eventConfig.eventName}: ${currentUser.name}`,
       announcementText.trim() || "📷 Shared a new photo in the live feed."
     );
     
@@ -1036,7 +1285,7 @@ export default function App() {
     
     if (!isOfflineMode) {
       try {
-        await updateAnnouncementReactions(feedId, updatedReactions);
+        await updateAnnouncementReactions(currentEventCode, feedId, updatedReactions);
       } catch (err) {
         console.error("Failed to update reactions in firestore:", err);
       }
@@ -1091,6 +1340,161 @@ export default function App() {
     setExpandedFaqs(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
+  // ─── EVENT SELECTION SCREEN ──────────────────────────────────────────────
+  if (!currentEventCode) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        background: 'radial-gradient(circle at center, #0d1633 0%, #070a13 100%)'
+      }}>
+        <div className="glass-panel animate-fade" style={{ width: '100%', maxWidth: '420px', padding: '32px' }}>
+          {/* Logo & Title */}
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+            <img
+              src="/Final VBT Re-Branding 2026-02 (3).png"
+              alt="VBT Logo"
+              style={{ width: '130px', height: 'auto', marginBottom: '14px' }}
+            />
+            <h1 style={{ fontSize: '1.6rem', color: '#ffffff', marginBottom: '4px', fontFamily: 'var(--font-title)' }}>VBT Sports Platform</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Enter your event code to get started</p>
+          </div>
+
+          {/* Join Event Form */}
+          {!showCreateEvent ? (
+            <form onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {eventJoinError && (
+                <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 12px', borderRadius: '8px', color: '#ef4444', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={14} /><span>{eventJoinError}</span>
+                </div>
+              )}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Event Code</label>
+                <input
+                  type="text"
+                  value={eventJoinInput}
+                  onChange={(e) => setEventJoinInput(e.target.value)}
+                  placeholder="e.g. vbt_2026_camp"
+                  autoCapitalize="none"
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: '10px',
+                    background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                    color: '#ffffff', fontSize: '0.95rem', outline: 'none', fontFamily: 'monospace'
+                  }}
+                />
+              </div>
+
+              {/* Quick-join from registry */}
+              {eventRegistry.filter(ev => ev.active).length > 0 && (
+                <div>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Or tap to join:</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {eventRegistry.filter(ev => ev.active).map(ev => (
+                      <button
+                        key={ev.code}
+                        type="button"
+                        onClick={() => { setEventJoinInput(ev.code); }}
+                        style={{
+                          padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)',
+                          background: 'rgba(255,255,255,0.04)', color: '#ffffff', cursor: 'pointer',
+                          textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '2px'
+                        }}
+                      >
+                        <span style={{ fontWeight: '700' }}>{ev.name}</span>
+                        {ev.date && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{ev.date}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={eventJoinLoading}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '10px',
+                  background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
+                  fontFamily: 'var(--font-title)', fontWeight: '600', fontSize: '1rem',
+                  cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 15px rgba(20,65,161,0.4)', marginTop: '4px',
+                  opacity: eventJoinLoading ? 0.7 : 1
+                }}
+              >
+                {eventJoinLoading ? 'Joining...' : 'Join Event →'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowCreateEvent(true)}
+                style={{
+                  width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-light)',
+                  background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.85rem', cursor: 'pointer'
+                }}
+              >
+                + Create a New Event
+              </button>
+            </form>
+          ) : (
+            /* Create New Event Form */
+            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <button type="button" onClick={() => setShowCreateEvent(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>← Back</button>
+                <h3 style={{ color: '#ffffff', fontSize: '1rem', margin: 0 }}>Create New Event</h3>
+              </div>
+              {createEventError && (
+                <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 12px', borderRadius: '8px', color: '#ef4444', fontSize: '0.8rem' }}>
+                  {createEventError}
+                </div>
+              )}
+              {[['Event Code', newEventCode, setNewEventCode, 'e.g. summer_2026', 'monospace'],
+                ['Event Name', newEventName, setNewEventName, 'e.g. VBT Summer Camp', ''],
+                ['Event Date', newEventDate, setNewEventDate, 'e.g. July 12, 2026', ''],
+                ['Side 1 Name', newEventSide1, setNewEventSide1, 'e.g. Shakes, Red, Lions...', ''],
+                ['Side 2 Name', newEventSide2, setNewEventSide2, 'e.g. Fries, Blue, Tigers...', ''],
+                ['Coordinator Passcode', newEventPassCoord, setNewEventPassCoord, 'e.g. CAMP2026ADMIN', ''],
+                ['Game Leader Passcode', newEventPassGame, setNewEventPassGame, 'e.g. GAMEREF2026', ''],
+                ['Team Leader Passcode', newEventPassTeam, setNewEventPassTeam, 'e.g. LEADER2026', '']
+              ].map(([label, val, setter, ph, ff]) => (
+                <div key={label}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px' }}>{label}</label>
+                  <input
+                    type="text"
+                    value={val}
+                    onChange={(e) => setter(e.target.value)}
+                    placeholder={ph}
+                    style={{
+                      width: '100%', padding: '10px', borderRadius: '8px',
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                      color: '#ffffff', fontSize: '0.875rem', outline: 'none',
+                      fontFamily: ff || 'inherit'
+                    }}
+                  />
+                </div>
+              ))}
+              <button
+                type="submit"
+                disabled={createEventLoading}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: '10px',
+                  background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
+                  fontFamily: 'var(--font-title)', fontWeight: '700', fontSize: '0.9rem',
+                  cursor: createEventLoading ? 'not-allowed' : 'pointer', opacity: createEventLoading ? 0.7 : 1,
+                  marginTop: '4px'
+                }}
+              >
+                {createEventLoading ? 'Creating...' : '🚀 Create & Join Event'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────
   if (!currentUser) {
     return (
       <div style={{
@@ -1104,12 +1508,19 @@ export default function App() {
         <div className="glass-panel animate-fade" style={{ width: '100%', maxWidth: '400px', padding: '32px' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <img 
-              src="/Final VBT Re-Branding 2026-02 (3).png" 
-              alt="VBT Logo" 
-              style={{ width: '150px', height: 'auto', marginBottom: '16px' }} 
+              src={eventConfig.logoUrl || '/Final VBT Re-Branding 2026-02 (3).png'}
+              alt="Event Logo" 
+              style={{ width: '120px', height: 'auto', marginBottom: '16px' }} 
             />
-            <h1 style={{ fontSize: '1.75rem', color: '#ffffff', marginBottom: '4px' }}>VBT SPORTS CAMP</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Leader Portal & Live Scoring</p>
+            <h1 style={{ fontSize: '1.6rem', color: '#ffffff', marginBottom: '4px', fontFamily: 'var(--font-title)' }}>{eventConfig.eventName || 'VBT SPORTS CAMP'}</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{eventConfig.description || 'Leader Portal & Live Scoring'}</p>
+            <button
+              type="button"
+              onClick={handleLeaveEvent}
+              style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              ← Change event
+            </button>
           </div>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1160,28 +1571,28 @@ export default function App() {
             {loginRole === 'leader' && (
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Team Leader Name</label>
-                <select 
-                  value={loginName}
-                  onChange={(e) => setLoginName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '10px',
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid var(--border-light)',
-                    color: '#ffffff',
-                    fontSize: '0.95rem',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">-- Choose Name --</option>
-                  {leadersList.sort((a,b) => a.fullName.localeCompare(b.fullName)).map((l) => (
-                    <option key={l.code} value={l.code}>
-                      {l.fullName} ({l.code})
-                    </option>
-                  ))}
-                </select>
+                {leadersList.length === 0 ? (
+                  <p style={{ fontSize: '0.8rem', color: '#f59e0b', padding: '10px', borderRadius: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                    ⚠️ No leaders set up yet. Ask your coordinator to add names in the Controls tab.
+                  </p>
+                ) : (
+                  <select
+                    value={loginName}
+                    onChange={(e) => setLoginName(e.target.value)}
+                    style={{
+                      width: '100%', padding: '12px', borderRadius: '10px',
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                      color: '#ffffff', fontSize: '0.95rem', outline: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">-- Choose Name --</option>
+                    {leadersList.sort((a,b) => a.fullName.localeCompare(b.fullName)).map((l) => (
+                      <option key={l.code} value={l.code}>
+                        {l.fullName}{l.groupLabel ? ` (${l.groupLabel})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
 
@@ -1291,9 +1702,9 @@ export default function App() {
           alignItems: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/Final VBT Re-Branding 2026-02 (3).png" alt="Logo" style={{ height: '32px', width: 'auto' }} />
+            <img src={eventConfig.logoUrl || '/Final VBT Re-Branding 2026-02 (3).png'} alt="Logo" style={{ height: '32px', width: 'auto' }} />
             <div>
-              <h2 style={{ fontSize: '1rem', color: '#ffffff', lineHeight: 1.1 }}>VBT CAMP '26</h2>
+              <h2 style={{ fontSize: '0.95rem', color: '#ffffff', lineHeight: 1.1 }}>{eventConfig.eventName || 'VBT CAMP'}</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span className={`live-dot`} />
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Syncing</span>
@@ -1371,7 +1782,7 @@ export default function App() {
 
           <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
             <div>
-              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>Shakes</p>
+              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>{side1Name}</p>
               <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
                 {scoreCalculations.shakesFinal}
               </p>
@@ -1380,7 +1791,7 @@ export default function App() {
               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>VS</span>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>Fries</p>
+              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>{side2Name}</p>
               <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
                 {scoreCalculations.friesFinal}
               </p>
@@ -3447,7 +3858,7 @@ function getScoreCell(block, round, gameName) {
                     if (window.confirm("Are you sure you want to reset ALL scoreboard entries?")) {
                       await handleUpdateCampState(defaultCampState);
                       if (!isOfflineMode) {
-                        await addAnnouncement("reset the scoreboard to default", currentUser.name, 'system');
+                        await addAnnouncement(currentEventCode, "reset the scoreboard to default", currentUser.name, 'system');
                       }
                     }
                   }}
@@ -3468,8 +3879,546 @@ function getScoreCell(block, round, gameName) {
                 </button>
               </div>
             )}
+
+            {/* ── LEADER ROSTER CARD ──────────────────────────────────────────── */}
+            {currentUser.role === 'admin' && (
+              <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', marginBottom: '2px' }}>👥 Leader Roster</h3>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Names that appear in the login dropdown — update before each service.</p>
+                  </div>
+                  {!rosterEditMode && (
+                    <button
+                      onClick={handleOpenRosterEdit}
+                      style={{ padding: '7px 12px', borderRadius: '8px', border: 'none', background: 'rgba(167,139,250,0.2)', color: '#a78bfa', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </div>
+
+                {/* VIEW MODE — compact list */}
+                {!rosterEditMode && (
+                  (eventConfig?.leaderRoster || []).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(eventConfig.leaderRoster).map((entry, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)' }}>
+                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: `hsl(${(idx * 53) % 360}, 55%, 40%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '800', color: '#fff', flexShrink: 0 }}>{idx + 1}</div>
+                          <span style={{ fontSize: '0.85rem', color: '#ffffff', flex: 1 }}>{entry.name}</span>
+                          {entry.groupLabel && <span style={{ fontSize: '0.7rem', color: '#a78bfa', background: 'rgba(167,139,250,0.15)', padding: '2px 8px', borderRadius: '10px' }}>{entry.groupLabel}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No leaders added yet. Tap Edit to add names for this service.</p>
+                  )
+                )}
+
+                {/* EDIT MODE */}
+                {rosterEditMode && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {editRoster.map((entry, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `hsl(${(idx * 53) % 360}, 55%, 40%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: '800', color: '#fff', flexShrink: 0 }}>{idx + 1}</div>
+                        <input
+                          type="text"
+                          value={entry.name}
+                          onChange={e => handleRosterEntryChange(idx, 'name', e.target.value)}
+                          placeholder="Full name (e.g. Shady Shahir / Mary F.)"
+                          style={{ flex: 2, padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.82rem', outline: 'none' }}
+                        />
+                        <input
+                          type="text"
+                          value={entry.groupLabel}
+                          onChange={e => handleRosterEntryChange(idx, 'groupLabel', e.target.value)}
+                          placeholder="Group (e.g. F5.2)"
+                          style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#a78bfa', fontSize: '0.82rem', outline: 'none', textAlign: 'center' }}
+                        />
+                        <button onClick={() => handleRemoveRosterEntry(idx)} style={{ padding: '7px', borderRadius: '6px', border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', flexShrink: 0 }}>
+                          <Minus size={11} />
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: '8px', paddingTop: '4px' }}>
+                      <button onClick={handleAddRosterEntry} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px dashed rgba(167,139,250,0.4)', background: 'transparent', color: '#a78bfa', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                        <Plus size={12} /> Add Leader
+                      </button>
+                      <button onClick={handleSaveRoster} disabled={savingRoster} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontSize: '0.8rem', fontWeight: '700', cursor: savingRoster ? 'not-allowed' : 'pointer', opacity: savingRoster ? 0.7 : 1 }}>
+                        {savingRoster ? 'Saving...' : '💾 Save Roster'}
+                      </button>
+                      <button onClick={() => setRosterEditMode(false)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── EVENT SETUP CARD ────────────────────────────────────────── */}
+
+            {currentUser.role === 'admin' && editEventConfig && (
+              <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(41,182,246,0.2)', background: 'rgba(41,182,246,0.03)' }}>
+                <h3 style={{ fontSize: '0.9rem', color: '#29b6f6', marginBottom: '4px' }}>⚙️ Event Setup</h3>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Customize this event's branding, team names, and access passcodes.</p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {[['Event Name', 'eventName', 'e.g. VBT Summer Camp 2027'],
+                    ['Description', 'description', 'e.g. Live scoring & team management'],
+                    ['Event Date', 'eventDate', 'e.g. June 20, 2027'],
+                    ['Side 1 Name (left team)', 'side1Name', 'e.g. Shakes, Red, Lions'],
+                    ['Side 2 Name (right team)', 'side2Name', 'e.g. Fries, Blue, Tigers'],
+                    ['Coordinator Passcode', 'passcodeCoordinator', 'Admin passcode'],
+                    ['Game Leader Passcode', 'passcodeGameLeader', 'Referee passcode'],
+                    ['Team Leader Passcode', 'passcodeTeamLeader', 'Leader passcode']
+                  ].map(([label, field, ph]) => (
+                    <div key={field}>
+                      <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px' }}>{label}</label>
+                      <input
+                        type="text"
+                        value={editEventConfig[field] || ''}
+                        onChange={(e) => setEditEventConfig(prev => ({ ...prev, [field]: e.target.value }))}
+                        placeholder={ph}
+                        style={{
+                          width: '100%', padding: '9px 12px', borderRadius: '8px',
+                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                          color: '#ffffff', fontSize: '0.85rem', outline: 'none'
+                        }}
+                      />
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={handleSaveEventConfig}
+                    disabled={savingEventConfig}
+                    style={{
+                      padding: '11px', background: 'var(--gradient-vbt)', border: 'none',
+                      borderRadius: '8px', color: '#ffffff', fontFamily: 'var(--font-title)',
+                      fontWeight: '700', fontSize: '0.85rem', cursor: savingEventConfig ? 'not-allowed' : 'pointer',
+                      opacity: savingEventConfig ? 0.7 : 1, width: '100%'
+                    }}
+                  >
+                    {savingEventConfig ? 'Saving...' : '💾 Save Event Config'}
+                  </button>
+
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Current Event Code (share this with your staff):</p>
+                    <code style={{ display: 'block', background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '6px', color: '#29b6f6', fontSize: '0.85rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                      {currentEventCode}
+                    </code>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLeaveEvent}
+                    style={{
+                      padding: '10px', background: 'transparent', border: '1px solid var(--border-light)',
+                      borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', width: '100%'
+                    }}
+                  >
+                    🔀 Switch to a Different Event
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
+
+        {/* Tab: Service */}
+        {currentTab === 'service' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* ── COORDINATOR EDIT BAR ─────────────────────────────── */}
+            {currentUser && currentUser.role === 'admin' && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => {
+                    setEditServiceBrief(serviceData.serviceBrief);
+                    setEditGroups([...serviceData.groups]);
+                    setEditGames(serviceData.games.map(g => ({ ...g })));
+                    setServiceEditMode(true);
+                  }}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
+                    background: serviceEditMode ? 'rgba(255,255,255,0.08)' : 'var(--gradient-vbt)',
+                    color: '#ffffff', fontFamily: 'var(--font-title)', fontWeight: '700',
+                    fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                  }}
+                >
+                  <Settings size={14} /> {serviceEditMode ? 'Editing...' : 'Edit Service Info'}
+                </button>
+                {serviceEditMode && (
+                  <>
+                    <button
+                      onClick={handleSaveServiceData}
+                      disabled={savingService}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
+                        background: 'rgba(34,197,94,0.25)', color: '#4ade80',
+                        fontFamily: 'var(--font-title)', fontWeight: '700', fontSize: '0.8rem',
+                        cursor: savingService ? 'not-allowed' : 'pointer', opacity: savingService ? 0.7 : 1
+                      }}
+                    >
+                      {savingService ? 'Saving...' : '💾 Save'}
+                    </button>
+                    <button
+                      onClick={() => setServiceEditMode(false)}
+                      style={{
+                        padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)',
+                        background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── SECTION 1: SERVICE BRIEF ─────────────────────────── */}
+            <div className="glass-panel" style={{ padding: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ width: '4px', height: '20px', background: 'var(--gradient-vbt)', borderRadius: '2px' }} />
+                <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0 }}>📋 Service Brief</h3>
+              </div>
+
+              {serviceEditMode ? (
+                <textarea
+                  value={editServiceBrief}
+                  onChange={(e) => setEditServiceBrief(e.target.value)}
+                  placeholder="Describe the service: what it's about, the theme, what to expect..."
+                  rows={5}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: '10px',
+                    background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                    color: '#ffffff', fontSize: '0.875rem', outline: 'none',
+                    fontFamily: 'inherit', lineHeight: '1.6', resize: 'vertical'
+                  }}
+                />
+              ) : serviceData.serviceBrief ? (
+                <p style={{
+                  fontSize: '0.875rem', color: 'var(--text-secondary)',
+                  lineHeight: '1.7', whiteSpace: 'pre-wrap', margin: 0
+                }}>
+                  {serviceData.serviceBrief}
+                </p>
+              ) : (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  {currentUser?.role === 'admin' ? 'Tap "Edit Service Info" above to add a service brief.' : 'No service brief posted yet.'}
+                </p>
+              )}
+            </div>
+
+            {/* ── SECTION 2: GROUPS / KIDS SPLIT ───────────────────── */}
+            <div className="glass-panel" style={{ padding: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '4px', height: '20px', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', borderRadius: '2px' }} />
+                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0 }}>👥 Groups</h3>
+                </div>
+                {/* Total kids badge */}
+                {(serviceEditMode ? totalKids : serviceData.groups.reduce((s, g) => s + (parseInt(g.kidCount) || 0), 0)) > 0 && (
+                  <span style={{
+                    background: 'rgba(41,182,246,0.15)', border: '1px solid rgba(41,182,246,0.3)',
+                    color: '#29b6f6', fontSize: '0.75rem', fontWeight: '700',
+                    padding: '3px 10px', borderRadius: '20px'
+                  }}>
+                    {serviceEditMode ? totalKids : serviceData.groups.reduce((s, g) => s + (parseInt(g.kidCount) || 0), 0)} kids total
+                  </span>
+                )}
+              </div>
+
+              {/* VIEW MODE */}
+              {!serviceEditMode && (
+                serviceData.groups.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {serviceData.groups.map((group, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        background: 'rgba(255,255,255,0.04)', borderRadius: '10px',
+                        padding: '12px 14px', border: '1px solid var(--border-light)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '34px', height: '34px', borderRadius: '50%',
+                            background: `hsl(${(idx * 47) % 360}, 60%, 40%)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.75rem', fontWeight: '800', color: '#fff', flexShrink: 0
+                          }}>
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '0.875rem', color: '#ffffff', fontWeight: '600', margin: 0 }}>
+                              {group.leaderName || `Group ${idx + 1}`}
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>Leader</p>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', margin: 0, lineHeight: 1 }}>
+                            {group.kidCount || '—'}
+                          </p>
+                          <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: '1px 0 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>kids</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    {currentUser?.role === 'admin' ? 'Tap "Edit Service Info" to assign groups.' : 'No groups assigned yet.'}
+                  </p>
+                )
+              )}
+
+              {/* EDIT MODE */}
+              {serviceEditMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {editGroups.map((group, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex', gap: '8px', alignItems: 'center',
+                      background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px'
+                    }}>
+                      <div style={{
+                        width: '28px', height: '28px', borderRadius: '50%',
+                        background: `hsl(${(idx * 47) % 360}, 60%, 40%)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.7rem', fontWeight: '800', color: '#fff', flexShrink: 0
+                      }}>{idx + 1}</div>
+                      <input
+                        type="text"
+                        value={group.leaderName}
+                        onChange={(e) => handleGroupChange(idx, 'leaderName', e.target.value)}
+                        placeholder="Leader name"
+                        style={{
+                          flex: 1, padding: '8px 10px', borderRadius: '8px',
+                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                          color: '#ffffff', fontSize: '0.85rem', outline: 'none'
+                        }}
+                      />
+                      <input
+                        type="number"
+                        value={group.kidCount}
+                        onChange={(e) => handleGroupChange(idx, 'kidCount', e.target.value)}
+                        placeholder="# kids"
+                        min="0"
+                        style={{
+                          width: '70px', padding: '8px 10px', borderRadius: '8px',
+                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                          color: '#ffffff', fontSize: '0.85rem', outline: 'none', textAlign: 'center'
+                        }}
+                      />
+                      <button
+                        onClick={() => handleRemoveGroup(idx)}
+                        style={{
+                          padding: '8px', borderRadius: '6px', border: 'none',
+                          background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', flexShrink: 0
+                        }}
+                      >
+                        <Minus size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
+                    <button
+                      onClick={handleAddGroup}
+                      style={{
+                        padding: '8px 14px', borderRadius: '8px', border: '1px dashed rgba(41,182,246,0.4)',
+                        background: 'transparent', color: '#29b6f6', fontSize: '0.8rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px'
+                      }}
+                    >
+                      <Plus size={12} /> Add Group
+                    </button>
+                    {editGroups.length > 0 && (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                        {totalKids} kids total
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── SECTION 3: GAMES + BIBLE STUDY ───────────────────── */}
+            <div className="glass-panel" style={{ padding: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '4px', height: '20px', background: 'linear-gradient(135deg, #a78bfa, #ec4899)', borderRadius: '2px' }} />
+                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0 }}>🎮 Games & Bible Study</h3>
+                </div>
+                {!serviceEditMode && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Tap a game to expand</span>
+                )}
+              </div>
+
+              {/* VIEW MODE — accordion */}
+              {!serviceEditMode && (
+                serviceData.games.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {serviceData.games.map((game, idx) => {
+                      const isOpen = !!expandedServiceGame[idx];
+                      return (
+                        <div key={idx} style={{
+                          borderRadius: '12px', border: '1px solid var(--border-light)',
+                          overflow: 'hidden', background: isOpen ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'
+                        }}>
+                          {/* Accordion header */}
+                          <button
+                            onClick={() => setExpandedServiceGame(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                            style={{
+                              width: '100%', padding: '13px 14px', background: 'none', border: 'none',
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              cursor: 'pointer', color: '#ffffff'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{
+                                width: '26px', height: '26px', borderRadius: '8px',
+                                background: `linear-gradient(135deg, hsl(${(idx * 60 + 200) % 360}, 70%, 50%), hsl(${(idx * 60 + 240) % 360}, 60%, 40%))`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.7rem', fontWeight: '800', flexShrink: 0
+                              }}>{idx + 1}</span>
+                              <span style={{ fontSize: '0.9rem', fontWeight: '700', textAlign: 'left' }}>
+                                {game.name || `Game ${idx + 1}`}
+                              </span>
+                            </div>
+                            <span style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }}>▾</span>
+                          </button>
+
+                          {/* Accordion body */}
+                          {isOpen && (
+                            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {game.howToPlay && (
+                                <div>
+                                  <p style={{
+                                    fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em',
+                                    color: '#29b6f6', fontWeight: '700', marginBottom: '6px'
+                                  }}>🎯 How to Play</p>
+                                  <p style={{
+                                    fontSize: '0.85rem', color: 'var(--text-secondary)',
+                                    lineHeight: '1.65', whiteSpace: 'pre-wrap', margin: 0
+                                  }}>{game.howToPlay}</p>
+                                </div>
+                              )}
+                              {game.lesson && (
+                                <div style={{
+                                  background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)',
+                                  borderRadius: '10px', padding: '12px'
+                                }}>
+                                  <p style={{
+                                    fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em',
+                                    color: '#a78bfa', fontWeight: '700', marginBottom: '6px'
+                                  }}>📖 Lesson Learned</p>
+                                  <p style={{
+                                    fontSize: '0.875rem', color: '#c4b5fd',
+                                    lineHeight: '1.65', whiteSpace: 'pre-wrap', margin: 0
+                                  }}>{game.lesson}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    {currentUser?.role === 'admin' ? 'Tap "Edit Service Info" to add games and Bible lessons.' : 'No games posted yet.'}
+                  </p>
+                )
+              )}
+
+              {/* EDIT MODE */}
+              {serviceEditMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {editGames.map((game, idx) => (
+                    <div key={idx} style={{
+                      background: 'rgba(255,255,255,0.03)', borderRadius: '12px',
+                      border: '1px solid var(--border-light)', padding: '14px',
+                      display: 'flex', flexDirection: 'column', gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{
+                          fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.07em',
+                          color: '#a78bfa', fontWeight: '700'
+                        }}>Game {idx + 1}</span>
+                        <button
+                          onClick={() => handleRemoveGame(idx)}
+                          style={{
+                            padding: '5px 8px', borderRadius: '6px', border: 'none',
+                            background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={game.name}
+                        onChange={(e) => handleGameChange(idx, 'name', e.target.value)}
+                        placeholder="Game name (e.g. Cone Memory)"
+                        style={{
+                          width: '100%', padding: '9px 12px', borderRadius: '8px',
+                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                          color: '#ffffff', fontSize: '0.875rem', outline: 'none', fontWeight: '700'
+                        }}
+                      />
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#29b6f6', fontWeight: '700', marginBottom: '5px' }}>🎯 How to Play</label>
+                        <textarea
+                          value={game.howToPlay}
+                          onChange={(e) => handleGameChange(idx, 'howToPlay', e.target.value)}
+                          placeholder="Explain how the game works..."
+                          rows={3}
+                          style={{
+                            width: '100%', padding: '9px 12px', borderRadius: '8px',
+                            background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                            color: '#ffffff', fontSize: '0.85rem', outline: 'none',
+                            fontFamily: 'inherit', lineHeight: '1.5', resize: 'vertical'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#a78bfa', fontWeight: '700', marginBottom: '5px' }}>📖 Lesson Learned (Bible Study)</label>
+                        <textarea
+                          value={game.lesson}
+                          onChange={(e) => handleGameChange(idx, 'lesson', e.target.value)}
+                          placeholder="What spiritual/moral lesson does this game teach?"
+                          rows={3}
+                          style={{
+                            width: '100%', padding: '9px 12px', borderRadius: '8px',
+                            background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.3)',
+                            color: '#ffffff', fontSize: '0.85rem', outline: 'none',
+                            fontFamily: 'inherit', lineHeight: '1.5', resize: 'vertical'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={handleAddGame}
+                    style={{
+                      padding: '10px', borderRadius: '10px',
+                      border: '1px dashed rgba(167,139,250,0.4)',
+                      background: 'transparent', color: '#a78bfa',
+                      fontSize: '0.85rem', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                    }}
+                  >
+                    <Plus size={13} /> Add a Game
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
       </main>
 
       {/* Navigation bar */}
@@ -3529,6 +4478,13 @@ function getScoreCell(block, round, gameName) {
             )}
           </div>
           <span>Feed</span>
+        </button>
+        <button
+          className={`mobile-nav-item ${currentTab === 'service' ? 'active' : ''}`}
+          onClick={() => setCurrentTab('service')}
+        >
+          <BookOpen size={20} />
+          <span>Service</span>
         </button>
       </nav>
     </div>

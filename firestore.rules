@@ -16,6 +16,21 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // VBT Sports Platform — Multi-Event Rules (v2.0)
+    // ===============================================================
+    match /vbt_event_registry/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /vbt_events/{eventCode}/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /vbt_push_tokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    // ===============================================================
     // Global Auth Helpers
     // ===============================================================
 
