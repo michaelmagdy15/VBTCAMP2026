@@ -109,6 +109,10 @@ self.addEventListener('push', (event) => {
           'New update from VBT Sports Camp!',
     icon: '/Final%20VBT%20Re-Branding%202026-02%20(3).png',
     badge: '/favicon.svg',
+    vibrate: [200, 100, 200, 100, 300],
+    tag: 'vbt-notification-' + Date.now(),
+    renotify: true,
+    requireInteraction: false,
     data: data.url || 
           (data.data && data.data.url) || 
           (data.notification && data.notification.click_action) || 
@@ -120,7 +124,10 @@ self.addEventListener('push', (event) => {
       .catch((err) => {
         console.error('[Service Worker] showNotification failed, trying basic fallback:', err);
         return self.registration.showNotification(title, {
-          body: options.body
+          body: options.body,
+          vibrate: [200, 100, 200],
+          tag: 'vbt-fallback-' + Date.now(),
+          renotify: true
         });
       })
   );

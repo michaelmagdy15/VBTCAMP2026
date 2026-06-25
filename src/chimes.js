@@ -6,16 +6,30 @@
 let audioCtx = null;
 let hasInteracted = false;
 
+/**
+ * Eagerly unlock the audio context on user gesture.
+ * Also exposed so App.jsx can call it from its own unlock handlers
+ * to unify all AudioContext initialization into one path.
+ */
+export function unlockAudioContext() {
+  hasInteracted = true;
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.warn('[Chimes] AudioContext creation failed:', e);
+      return;
+    }
+  }
+  if (audioCtx.state === 'suspended') {
+    const p = audioCtx.resume();
+    if (p) p.catch(() => {});
+  }
+}
+
 if (typeof window !== 'undefined') {
   const unlockAudio = () => {
-    hasInteracted = true;
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      const p = audioCtx.resume();
-      if (p) p.catch(()=>{});
-    }
+    unlockAudioContext();
     window.removeEventListener('click', unlockAudio);
     window.removeEventListener('touchstart', unlockAudio, { passive: true });
     window.removeEventListener('keydown', unlockAudio);
@@ -28,13 +42,23 @@ if (typeof window !== 'undefined') {
 function getCtx() {
   if (!hasInteracted) return null;
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) { return null; }
   }
   if (audioCtx.state === 'suspended') {
     const p = audioCtx.resume();
-    if (p) p.catch(()=>{});
+    if (p) p.catch(() => {});
   }
   return audioCtx;
+}
+
+/**
+ * Return the shared AudioContext so App.jsx can reuse it
+ * instead of creating duplicate instances.
+ */
+export function getSharedAudioContext() {
+  return getCtx();
 }
 
 // ── Tone primitives ────────────────────────────────────────────────────
@@ -159,7 +183,7 @@ export function chimeCountdown() {
 
 let chimesEnabled = true;
 let lastChimeTime = 0;
-const CHIME_COOLDOWN_MS = 1500; // Prevent chime spam
+const CHIME_COOLDOWN_MS = 800; // Reduced from 1500ms to be more responsive
 
 export function setChimesEnabled(enabled) {
   chimesEnabled = enabled;
@@ -177,9 +201,12 @@ export function isChimesEnabled() {
 export function playChime(eventType) {
   if (!chimesEnabled) return;
   
-  const now = Date.now();
-  if (now - lastChimeTime < CHIME_COOLDOWN_MS) return;
-  lastChimeTime = now;
+  // Urgent chimes bypass cooldown — they should always be heard
+  if (eventType !== 'urgent') {
+    const now = Date.now();
+    if (now - lastChimeTime < CHIME_COOLDOWN_MS) return;
+    lastChimeTime = now;
+  }
 
   switch (eventType) {
     case 'announcement': chimeAnnouncement(); break;

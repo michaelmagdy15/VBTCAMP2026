@@ -13,7 +13,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
 def send_push_notifications(title, body, target_url):
-    db = firestore.Client(project="faa-test-guide-v2")
+    db = firestore.Client(project="faa-test-guide-v2", database="db-vbt")
     tokens_ref = db.collection("vbt_push_tokens")
     docs = tokens_ref.stream()
     tokens = [doc.id for doc in docs]

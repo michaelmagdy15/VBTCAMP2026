@@ -94,9 +94,18 @@ function MessageBubble({ msg, channelColor }) {
     if (playing) {
       a.pause();
     } else {
+      // Force load on iOS before playing
+      if (a.readyState < 2) {
+        a.load();
+      }
       const playPromise = a.play();
       if (playPromise !== undefined) {
-        playPromise.catch(e => console.warn('Audio play error:', e));
+        playPromise.catch(e => {
+          console.warn('Audio play error:', e);
+          // Try reloading the audio source on failure
+          a.load();
+          setTimeout(() => a.play().catch(() => {}), 200);
+        });
       }
     }
   };
@@ -117,7 +126,11 @@ function MessageBubble({ msg, channelColor }) {
     a.addEventListener('error', (e) => {
       console.error('Audio error:', e);
       setPlaying(false);
-      alert('Your browser does not support this audio format. If this was recorded on a PC (WebM), some iPhones cannot play it natively.');
+      // Check if the audio URL ends with .webm (cross-platform incompatibility)
+      const src = a.src || '';
+      if (src.includes('.webm') && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        console.warn('[WalkieTalkie] WebM format not supported on iOS Safari');
+      }
     });
     return () => {
       a.removeEventListener('play', onPlay);
@@ -274,7 +287,7 @@ function MessageBubble({ msg, channelColor }) {
       </button>
 
       {/* Hidden audio element */}
-      <audio ref={audioRef} src={msg.audioUrl} preload="metadata" playsInline />
+      <audio ref={audioRef} src={msg.audioUrl} preload="auto" playsInline crossOrigin="anonymous" />
     </div>
   );
 }

@@ -80,7 +80,7 @@ import ScheduleExporter from './components/ScheduleExporter';
 import WalkieTalkie from './components/WalkieTalkie';
 import GPSMap from './components/GPSMap';
 import ScheduleBuilder from './components/ScheduleBuilder';
-import { playChime } from './chimes';
+import { playChime, unlockAudioContext, getSharedAudioContext } from './chimes';
 import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
 // Firebase Web Push VAPID key (Generate in Firebase Console -> Project Settings -> Cloud Messaging -> Web Push Certificates)
@@ -147,47 +147,29 @@ const faqsList = [
   }
 ];
 
-// Web Audio API Synthesizer for Bell Chime
-let audioCtx = null;
-
-function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-}
-
+// Bell chime functions — now using the shared AudioContext from chimes.js
+// to avoid creating duplicate AudioContext instances
 function playBellChime() {
   try {
-    initAudio();
-    if (!audioCtx) return;
-    const now = audioCtx.currentTime;
-    
-    // Synthesize a crystal-clear "ding-dong" bell sound by layering frequencies
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
     const fundamental = 880; // A5
     const frequencies = [fundamental, fundamental * 1.2, fundamental * 1.5, fundamental * 2.0];
     const gains = [0.4, 0.2, 0.15, 0.1];
-    
-    const masterGain = audioCtx.createGain();
+    const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0.4, now);
     masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
-    masterGain.connect(audioCtx.destination);
-    
+    masterGain.connect(ctx.destination);
     frequencies.forEach((freq, i) => {
-      const osc = audioCtx.createOscillator();
-      const oscGain = audioCtx.createGain();
-      
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
-      
       oscGain.gain.setValueAtTime(gains[i], now);
       oscGain.gain.exponentialRampToValueAtTime(0.001, now + (1.8 - i * 0.2));
-      
       osc.connect(oscGain);
       oscGain.connect(masterGain);
-      
       osc.start(now);
       osc.stop(now + 2.0);
     });
@@ -200,33 +182,26 @@ function playLoudDoubleChime() {
   try {
     playBellChime();
     setTimeout(() => {
-      // Second bell ring with higher frequency and louder volume
       try {
-        initAudio();
-        if (!audioCtx) return;
-        const now = audioCtx.currentTime;
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
         const fundamental = 1046.50; // C6
         const frequencies = [fundamental, fundamental * 1.2, fundamental * 1.5, fundamental * 2.0];
         const gains = [0.5, 0.25, 0.2, 0.1];
-        
-        const masterGain = audioCtx.createGain();
+        const masterGain = ctx.createGain();
         masterGain.gain.setValueAtTime(0.5, now);
         masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
-        masterGain.connect(audioCtx.destination);
-        
+        masterGain.connect(ctx.destination);
         frequencies.forEach((freq, i) => {
-          const osc = audioCtx.createOscillator();
-          const oscGain = audioCtx.createGain();
-          
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, now);
-          
           oscGain.gain.setValueAtTime(gains[i], now);
           oscGain.gain.exponentialRampToValueAtTime(0.001, now + (1.8 - i * 0.2));
-          
           osc.connect(oscGain);
           oscGain.connect(masterGain);
-          
           osc.start(now);
           osc.stop(now + 2.0);
         });
@@ -733,19 +708,19 @@ export default function App() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
     // Mobile audio context & HTML5 audio autoplay unlocker
+    // Uses the shared AudioContext from chimes.js to avoid creating duplicates
     const unlockAudio = () => {
       try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          const context = new AudioContextClass();
-          if (context.state === 'suspended') {
-            context.resume();
-          }
-          // Play a tiny silent buffer to unlock the AudioContext on mobile Safari
-          const buffer = context.createBuffer(1, 1, 22050);
-          const source = context.createBufferSource();
+        // Unlock the shared AudioContext (used by both chimes.js and playBellChime)
+        unlockAudioContext();
+        
+        // Play a tiny silent buffer through the shared context to fully unlock on iOS Safari
+        const ctx = getSharedAudioContext();
+        if (ctx) {
+          const buffer = ctx.createBuffer(1, 1, 22050);
+          const source = ctx.createBufferSource();
           source.buffer = buffer;
-          source.connect(context.destination);
+          source.connect(ctx.destination);
           source.start(0);
         }
         
@@ -1076,20 +1051,10 @@ export default function App() {
     });
 
     // Subscribe to announcements
+    // NOTE: Chime playback is handled by the useEffect on [announcements] (line ~707)
+    // Do NOT add chimes here — it causes double-chiming since both fire for the same event.
     const unsubscribeAnnouncements = subscribeToAnnouncements(currentEventCode, (list) => {
-      // Chimes for live feed / announcement chimes
-      if (prevAnnouncementsRef.current && list.length > prevAnnouncementsRef.current.length) {
-        const newest = list[0]; // descending list
-        if (newest) {
-          if (newest.type === 'ping') {
-            playChime('urgent');
-          } else {
-            playChime('announcement');
-          }
-        }
-      }
       prevAnnouncementsRef.current = list;
-
       setAnnouncements(list);
     });
 
