@@ -30,7 +30,8 @@ import {
   Shield,
   Radio,
   Package,
-  Navigation
+  Navigation,
+  MoreHorizontal
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -335,12 +336,42 @@ export default function App() {
   const [newDaysCount, setNewDaysCount] = useState(1);
   const [newServiceBrief, setNewServiceBrief] = useState('Friend Request — Jesus is knocking... Will you open the door? (Revelation 3:20)\n\nAn outreach service featuring water games, rotational teamwork challenges, and reflection.');
   const [newStations, setNewStations] = useState({
-    station_1: { name: 'Commitment', location: 'Football Field', howToPlay: 'Objective: One team must move from Point A to Point B while staying connected by holding hands.\n\nRules:\n1. The moving team must hold hands at all times.\n2. The opposing team throws water balloons.\n3. If the chain breaks, they restart.', lesson: 'A game of bond, unity, and perseverance. Stay strong and don\'t let anything break your bond.' },
-    station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: 'Objective: Fill the other team\'s bucket with water to earn puzzle pieces and unlock the key!\n\nRules:\n1. Teams carry water to the opposing team\'s bucket.\n2. More water poured = more puzzle pieces.\n3. Complete the puzzle to identify the key.', lesson: 'Revelation 3:20 - Jesus stands at the door and knocks. Key is opening our hearts. Serving others brings us closer to Christ.' },
-    station_3: { name: 'Trust', location: 'Court', howToPlay: 'Objective: One describer describes a drawing using only geometric shapes. The team draws it without asking questions.', lesson: 'Faith and trust. Trust God even when you cannot see the full picture. He sees the complete picture.' },
-    station_4: { name: 'Communication', location: 'Pool', howToPlay: 'Objective: Safely transfer water through a course.\n\nRound 1: Verbal (blindfolded, teammate guides verbally).\nRound 2: Touch (blindfolded, teammate guides by touch).', lesson: 'Listening and understanding. Friendships require clear communication and listening, just like prayer with God.' },
-    big_game: { name: 'Loyalty (Big Game)', location: 'Football Field', howToPlay: 'Objective: Protect your team\'s flag (friendship with God) while marking other flags with water color.\n\nRules:\n1. Attack or defend.\n2. Cleanest flag at the end wins.', lesson: 'Commitment and loyalty. Protecting what is valuable requires sacrifice and teamwork.' },
-    reflection: { name: 'Reflection', location: 'Main Hall', howToPlay: 'Review Bible targets, discuss lessons from the games, and share reflection insights.', lesson: 'Open your heart to Jesus and live in unity, love, and loyalty.' }
+    station_1: {
+      name: 'Commitment',
+      location: 'Football Field',
+      howToPlay: 'Objective: One team must move from Point A to Point B while staying connected by holding hands. The opposing team tries to break their bond using water balloons and obstacles. The first team to reach Point B without breaking wins!\n\nRules:\n1. The moving team must hold hands at all times.\n2. Opposing team can throw water balloons.\n3. Opposing team can stand or move to create obstacles.\n4. If the chain breaks, the team returns to Point A and starts over.\n5. First team to reach Point B with the bond intact wins!\n\nTips for Success:\n- Communicate and move together.\n- Stay strong and don\'t let anything break your bond.\n- Persevere – every try brings you closer to success!',
+      lesson: 'A game of bond, unity, and perseverance. Stay strong and don\'t let anything break your bond.'
+    },
+    station_2: {
+      name: 'Knock & Unlock',
+      location: 'Terrace',
+      howToPlay: 'Objective: To teach the importance of showing love, care, and kindness to others.\n\nSetup:\n- A large square is set up with a bucket at each corner.\n- Two teams stand on opposite corners.\n- Each team is assigned the bucket on the opposite corner.\n\nHow to Play:\n1. Teams use cups or sponges to carry water to the opposing team\'s bucket.\n2. The goal is NOT to fill your own bucket, but to fill the other team\'s bucket.\n3. The more water you pour into the opposing bucket, the more puzzle pieces you earn! (Full bucket = 5 pieces, Half = 3, Less = 1-2, Very little = 0).\n4. After collecting pieces, teams combine their puzzle pieces, work together to assemble the puzzle, and identify what the puzzle represents.\n5. The first team to correctly identify the key wins the game!',
+      lesson: 'Revelation 3:20 - Jesus stands at the door and knocks. A key is needed to open a door. In this game, the key symbolizes opening our hearts to Jesus. The lesson is that the more love, care, and kindness we show to others, the closer we grow to Christ. Just as teams receive more puzzle pieces when they help fill someone else\'s bucket, we receive more joy, purpose, and connection with Jesus when we serve and care for those around us.\n\nMain Message: THE MORE WE GIVE, THE MORE WE RECEIVE.'
+    },
+    station_3: {
+      name: 'Trust',
+      location: 'Court',
+      howToPlay: 'Objective: To teach trust and faith, even when we cannot see the full picture.\n\nHow the Game Works:\n1. One team member (the "Describer") gets a drawing. He can only see it.\n2. He describes the shape to his team using only geometric shapes (e.g., "Draw half a circle, then a small triangle beside it...").\n3. The rest of the team listens carefully and draws what they hear on a board/paper. They cannot ask questions.\n4. When they think they are done, they show their drawing! The goal is to match the original shape.\n\nGame Rules:\n- The describer may only use names of geometric shapes.\n- No telling or showing the answer.\n- No questions allowed from the team.\n- The team has one chance to draw the shape.\n- The closer the drawing matches the original, the more points earned!\n\nTips for Success:\n- Listen carefully.\n- Be clear and specific in describing.\n- Trust the describer.\n- Work together and encourage each other.',
+      lesson: 'Faith and trust. Many times, God asks us to trust Him even when we do not understand what He is doing or where He is leading us. Just like the teams could only see a small part of the logo, we often only see a small part of God\'s plan. However, God sees the complete picture.\n\nMain Message: TRUST GOD, EVEN WHEN YOU CANNOT SEE THE WHOLE PICTURE.'
+    },
+    station_4: {
+      name: 'Communication',
+      location: 'Pool',
+      howToPlay: 'Objective: To teach the importance of communication and listening to one another.\n\nSetup: Set up a course with several obstacles between Point A and Point B.\nGoal: Safely transfer the item (water) through the course and reach Point B as a team!\n\nHow it Works - Rounds:\n- Round 1: Hearing (Verbal) - Player is blindfolded. Can only follow verbal instructions from teammates. Focus: Listening and giving clear verbal directions.\n- Round 2: Touch (Non-verbal) - Player is blindfolded. Cannot hear. Can only be guided through touch by a teammate. Focus: Non-verbal communication and trusting touch.\n\nTips for Success:\n- Speak clearly and simply.\n- Listen carefully and patiently.\n- Encourage and support one another.\n- Trust your teammates and work together.',
+      lesson: 'Listening and understanding. Communication is essential in every relationship, especially in our friendship with God. Just as the players needed to listen carefully and trust the guidance they received, we need to take time to listen to God\'s voice and communicate with Him through prayer. Good communication helps us stay connected, understand one another, and move in the right direction.\n\nMain Message: A STRONG FRIENDSHIP REQUIRES CLEAR COMMUNICATION AND LISTENING.'
+    },
+    big_game: {
+      name: 'Loyalty (Big Game)',
+      location: 'Football Field',
+      howToPlay: 'Objective: Each team has a flag that represents their friendship with God. During a large water color battle, teams must protect their own flag while trying to mark the flags of other teams with their team color.\n\nHow to Play:\n1. Each team is given a flag and a team color (water color).\n2. Protect your own flag while trying to mark (splash) other teams\' flags with your color.\n3. Throughout the game, teams must choose to attack others or defend their own flag.\n4. The team whose flag remains the cleanest at the end wins!\n\nHow to Defend Your Flag - Options:\n- Option 1: Stay Loyal. Stay Close. Keep a loyal teammate with the flag and protect him at all costs! (Stick together, Protect your flag bearer, Don\'t let them get marked!)\n- Option 2: Secure the Zone. Place the flag inside the safe zone. Players can attack the flag only if they enter the zone! (Safe zone around the flag, Attack only if you enter the zone, Control the zone to your advantage)\n\nVictory Condition: The first team to successfully mark all other teams\' flags wins!\n\nTips for Success:\n- Communicate with your team.\n- Work together and trust one another.\n- Balance offense and defense.\n- Be willing to sacrifice for your team.',
+      lesson: 'Commitment and loyalty. In the game, protecting the flag required sacrifice, teamwork, and commitment. Some players had to give up the chance to attack in order to defend something important. Our relationship with God is the same. Loyalty means choosing to protect and strengthen our friendship with Him, even when it takes effort, time, and sacrifice.\n\nMain Message: WHAT IS VALUABLE IS WORTH PROTECTING. Loyalty means staying committed, even when it requires sacrifice.'
+    },
+    reflection: {
+      name: 'Reflection',
+      location: 'Main Hall',
+      howToPlay: 'Review Bible targets, discuss lessons from the games, and share reflection insights.',
+      lesson: 'Open your heart to Jesus and live in unity, love, and loyalty. Reflection leader: Daniel El Masry.'
+    }
   });
   const [wizardAttending, setWizardAttending] = useState([]);
   const [wizardRoles, setWizardRoles] = useState({});
@@ -464,6 +495,7 @@ export default function App() {
 
   // UI state
   const [currentTab, setCurrentTab] = useState('scoreboard');
+  const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const [infoSubTab, setInfoSubTab] = useState('map');
   const [settingsSubTab, setSettingsSubTab] = useState('config');
 
@@ -2981,6 +3013,7 @@ export default function App() {
                                 <option value="team_black_2">{(newTeamBlack || 'Black') + ' 2 Leader'}</option>
                                 <option value="team_blue_1">{(newTeamBlue || 'Blue') + ' 1 Leader'}</option>
                                 <option value="team_blue_2">{(newTeamBlue || 'Blue') + ' 2 Leader'}</option>
+                                <option value="media">Media Coverage</option>
                               </select>
                             )}
                           </div>
@@ -3290,68 +3323,14 @@ export default function App() {
     const getActiveTabs = () => {
     if (!currentUser) return [];
     
-    // For Service Mode:
-    if (eventConfig.eventType === 'service') {
-      if (currentUser.role === 'admin') {
-        return [
-          { id: 'schedule', label: 'Schedule', icon: Calendar },
-          { id: 'scoreboard', label: 'Scores', icon: Trophy },
-          { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'info', label: 'Map', icon: MapIcon },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
-          { id: 'walkie', label: 'Talkie', icon: Radio },
-          { id: 'logistics', label: 'Logistics', icon: Package },
-          { id: 'settings', label: 'Controls', icon: Settings }
-        ];
-      } else if (currentUser.role === 'leader') {
-        return [
-          { id: 'schedule', label: 'Schedule', icon: Calendar },
-          { id: 'myteam', label: 'My Team', icon: Users },
-          { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'info', label: 'Map', icon: MapIcon },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
-          { id: 'walkie', label: 'Talkie', icon: Radio },
-          { id: 'logistics', label: 'Logistics', icon: Package }
-        ];
-      } else if (currentUser.role === 'referee') {
-        return [
-          { id: 'schedule', label: 'Schedule', icon: Calendar },
-          { id: 'scoreboard', label: 'Scores', icon: Trophy },
-          { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'info', label: 'Map', icon: MapIcon },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
-          { id: 'walkie', label: 'Talkie', icon: Radio },
-          { id: 'logistics', label: 'Logistics', icon: Package }
-        ];
-      } else {
-        // viewer or visitor
-        return [
-          { id: 'schedule', label: 'Schedule', icon: Calendar },
-          { id: 'scoreboard', label: 'Scores', icon: Trophy },
-          { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'info', label: 'Map', icon: MapIcon },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
-          { id: 'walkie', label: 'Talkie', icon: Radio },
-          { id: 'logistics', label: 'Logistics', icon: Package }
-        ];
-      }
-    }
-    
-    // For Camp Mode (legacy):
-    const tabs = [
+    // For both Service Mode and Camp Mode, we show exactly 5 bottom navigation tabs
+    return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
-      { id: 'myteam', label: 'My Team', icon: Users },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
       { id: 'info', label: 'Map', icon: MapIcon },
-      { id: 'stats', label: 'Stats', icon: BarChart3 },
-      { id: 'walkie', label: 'Talkie', icon: Radio },
-      { id: 'logistics', label: 'Logistics', icon: Package }
+      { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+      { id: 'more', label: 'More', icon: MoreHorizontal }
     ];
-    if (currentUser.role === 'admin') {
-      tabs.push({ id: 'settings', label: 'Controls', icon: Settings });
-    }
-    tabs.push({ id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 });
-    return tabs;
   };
 
   const totalBothSides = scoreCalculations.shakesFinal + scoreCalculations.friesFinal;
@@ -3449,17 +3428,18 @@ export default function App() {
                   background: 'rgba(251, 191, 36, 0.15)',
                   border: '1px solid rgba(251, 191, 36, 0.3)',
                   color: '#fbbf24',
-                  padding: '6px 10px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  fontSize: '0.7rem',
-                  fontWeight: '700',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  justifyContent: 'center',
+                  flexShrink: 0
                 }}
+                title="Enable Alerts"
               >
-                <Bell size={12} style={{ animation: 'pulse-glow 1.5s infinite' }} /> Enable Alerts
+                <Bell size={16} style={{ animation: 'pulse-glow 1.5s infinite' }} />
               </button>
             )}
             <div className="header-user-info" style={{ textAlign: 'right' }}>
@@ -5674,6 +5654,7 @@ export default function App() {
                                   <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
                                   <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
                                   <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
+                                  <option value="media">Media Coverage</option>
                                 </select>
                               )}
                             </div>
@@ -6902,11 +6883,19 @@ export default function App() {
       >
         {getActiveTabs().map((t) => {
           const Icon = t.icon;
+          const isMoreActive = t.id === 'more' && !['schedule', 'scoreboard', 'info', 'timeline'].includes(currentTab);
+          const isActive = currentTab === t.id || isMoreActive;
           return (
             <button 
               key={t.id}
-              className={`mobile-nav-item ${currentTab === t.id ? 'active' : ''}`}
-              onClick={() => setCurrentTab(t.id)}
+              className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => {
+                if (t.id === 'more') {
+                  setShowMoreDrawer(true);
+                } else {
+                  setCurrentTab(t.id);
+                }
+              }}
               style={{
                 flex: getActiveTabs().length > 5 ? '0 0 auto' : '1',
                 minWidth: getActiveTabs().length > 5 ? '68px' : '60px',
@@ -6936,6 +6925,269 @@ export default function App() {
           );
         })}
       </nav>
+
+      {/* More Drawer Slide-up Sheet */}
+      {showMoreDrawer && (
+        <div
+          className="more-drawer-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowMoreDrawer(false)}
+        >
+          <div
+            className="more-drawer-content"
+            style={{
+              width: '100%',
+              maxWidth: '500px',
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              borderLeft: '1px solid rgba(255, 255, 255, 0.05)',
+              borderRight: '1px solid rgba(255, 255, 255, 0.05)',
+              borderRadius: '24px 24px 0 0',
+              padding: '20px 20px calc(24px + env(safe-area-inset-bottom, 0px)) 20px',
+              boxShadow: '0 -10px 40px rgba(0,0,0,0.5)',
+              animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Grab handle bar */}
+            <div style={{ width: '36px', height: '4px', background: 'rgba(255, 255, 255, 0.15)', borderRadius: '2px', margin: '0 auto 8px auto' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '1rem', fontWeight: '700', fontFamily: 'var(--font-title)', color: '#ffffff' }}>More Options</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>Logged in as {currentUser.name}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Leader specific: My Team */}
+              {currentUser.role === 'leader' && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('myteam');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Users size={18} color="var(--vbt-sky)" /> My Team Standings
+                </button>
+              )}
+
+              {/* Admin specific: Controls */}
+              {currentUser.role === 'admin' && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('settings');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Settings size={18} color="var(--vbt-sky)" /> Coordinator Controls
+                </button>
+              )}
+
+              {/* Admin specific: Stats & Deductions */}
+              {currentUser.role === 'admin' && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('stats');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <BarChart3 size={18} color="var(--vbt-sky)" /> Stats & Point Deductions
+                </button>
+              )}
+
+              {/* Admin, Leader, Referee: Logistics */}
+              {['admin', 'leader', 'referee'].includes(currentUser.role) && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('logistics');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Package size={18} color="var(--vbt-sky)" /> Materials & Logistics
+                </button>
+              )}
+
+              {/* Admin, Leader, Referee: Walkie Talkie */}
+              {['admin', 'leader', 'referee'].includes(currentUser.role) && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('walkie');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Radio size={18} color="var(--vbt-sky)" /> Walkie-Talkie Channels
+                </button>
+              )}
+
+              {/* FAQs & Rules (Everyone) */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('info');
+                  setInfoSubTab('faq');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+              >
+                <HelpCircle size={18} color="var(--vbt-sky)" /> FAQs & Camp Rules
+              </button>
+
+              <hr style={{ border: 'none', height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '8px 0' }} />
+
+              {/* Log Out (Everyone) */}
+              <button
+                className="more-drawer-item logout-btn"
+                onClick={() => {
+                  handleLogout();
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '12px',
+                  color: '#f87171',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+              >
+                <LogOut size={18} color="#f87171" /> Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

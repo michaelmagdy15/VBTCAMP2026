@@ -511,7 +511,7 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
   const getLeaderNamesForBigGame = () => {
     const leaders = [];
     Object.entries(configData.servantAssignments || {}).forEach(([sId, rCode]) => {
-      if (activeServantsList.includes(sId) && (rCode === 'big_game_1' || rCode === 'big_game_2' || rCode === 'referee')) {
+      if (activeServantsList.includes(sId) && (rCode === 'big_game_1' || rCode === 'big_game_2' || rCode === 'referee' || sId === 'daniel_el_masry')) {
         const s = globalServants.find(serv => serv.id === sId);
         if (s) leaders.push(s.name);
       }

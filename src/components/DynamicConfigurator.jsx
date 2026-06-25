@@ -152,9 +152,9 @@ const styles = {
     gap: 16,
     alignItems: 'start',
   },
-  colorSwatch: (hex, isSelected) => ({
-    width: 28,
-    height: 28,
+  colorSwatch: (hex, isSelected, isMobile) => ({
+    width: isMobile ? 32 : 28,
+    height: isMobile ? 32 : 28,
     borderRadius: 8,
     backgroundColor: hex,
     border: isSelected ? '2px solid #fff' : '2px solid transparent',
@@ -486,7 +486,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
   return (
     <div style={{ ...styles.container, padding: isMobile ? '0 12px' : 0 }}>
       {/* Header */}
-      <div style={styles.header}>
+      <div style={{ ...styles.header, fontSize: isMobile ? 18 : 22, marginBottom: isMobile ? 16 : 28 }}>
         <div style={styles.headerIcon}>
           <Settings size={20} color="#fff" />
         </div>
@@ -495,7 +495,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
       {/* ═══════ Section 1: Team Count ═══════ */}
       <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
-        <div style={styles.sectionTitle}>
+        <div style={{ ...styles.sectionTitle, fontSize: isMobile ? 14 : 16 }}>
           <Palette size={16} color={COLORS.sky} />
           Teams
         </div>
@@ -518,7 +518,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           >
             <Plus size={16} />
           </button>
-          <span style={{ fontSize: 13, color: COLORS.textSecondary }}>teams (2–8)</span>
+          <span style={{ fontSize: isMobile ? 12 : 13, color: COLORS.textSecondary }}>teams (2–8)</span>
         </div>
 
         <hr style={styles.divider} />
@@ -535,14 +535,14 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           >
             <div style={{ ...styles.teamGrid, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'start' }}>
               <div style={{ flex: isMobile ? 'none' : '1 1 240px', minWidth: 0, width: isMobile ? '100%' : 'auto' }}>
-                <label style={styles.label}>Team Name</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Team Name</label>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, fontSize: isMobile ? 13 : 14 }}
                   value={team.name}
                   onChange={(e) => updateTeam(idx, 'name', e.target.value)}
                   placeholder={`Team ${idx + 1}`}
                 />
-                <label style={{ ...styles.label, marginTop: 10 }}>Color</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13, marginTop: 10 }}>Color</label>
                 <div style={{ 
                   display: 'flex', 
                   flexDirection: isMobile ? 'column' : 'row', 
@@ -553,7 +553,8 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                     style={{ 
                       ...(isMobile ? styles.input : styles.inputSmall), 
                       width: isMobile ? '100%' : 80, 
-                      textAlign: isMobile ? 'left' : 'center' 
+                      textAlign: isMobile ? 'left' : 'center',
+                      fontSize: isMobile ? 13 : 14
                     }}
                     value={team.color}
                     onChange={(e) => updateTeam(idx, 'color', e.target.value)}
@@ -568,7 +569,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                     {PRESET_TEAM_COLORS.map((preset) => (
                       <div
                         key={preset.hex}
-                        style={styles.colorSwatch(preset.hex, team.color === preset.hex)}
+                        style={styles.colorSwatch(preset.hex, team.color === preset.hex, isMobile)}
                         onClick={() => updateTeam(idx, 'color', preset.hex)}
                         title={preset.name}
                       />
@@ -577,7 +578,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                 </div>
               </div>
               <div style={{ flex: isMobile ? 'none' : '0 0 auto', width: isMobile ? '100%' : 'auto', marginTop: isMobile ? 12 : 0 }}>
-                <label style={styles.label}>Logo</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Logo</label>
                 <button style={{ ...styles.uploadBtn, width: isMobile ? '100%' : 56, height: isMobile ? 44 : 56 }}>
                   <span>{isMobile ? 'Upload Logo' : 'Upload'}</span>
                 </button>
@@ -589,7 +590,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
       {/* ═══════ Section 2: Score Categories ═══════ */}
       <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
-        <div style={styles.sectionTitle}>Score Categories</div>
+        <div style={{ ...styles.sectionTitle, fontSize: isMobile ? 14 : 16 }}>Score Categories</div>
 
         {categories.map((cat, idx) => (
           <div 
@@ -642,9 +643,9 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 8, alignItems: isMobile ? 'stretch' : 'flex-end' }}>
           <div style={{ flex: isMobile ? 'none' : 1, minWidth: isMobile ? 0 : 140, width: isMobile ? '100%' : 'auto' }}>
-            <label style={styles.label}>Category Name</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Category Name</label>
             <input
-              style={styles.input}
+              style={{ ...styles.input, fontSize: isMobile ? 13 : 14 }}
               value={newCatName}
               onChange={(e) => setNewCatName(e.target.value)}
               placeholder="e.g. Bible Verse Memorization"
@@ -652,11 +653,12 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             />
           </div>
           <div style={{ width: isMobile ? '100%' : 80 }}>
-            <label style={styles.label}>Points</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Points</label>
             <input
               style={{ 
                 ...(isMobile ? styles.input : styles.inputSmall), 
-                width: '100%' 
+                width: '100%',
+                fontSize: isMobile ? 13 : 14
               }}
               type="number"
               value={newCatPoints}
@@ -680,16 +682,17 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
       {/* ═══════ Section 3: Service Time Profile ═══════ */}
       <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
-        <div style={styles.sectionTitle}>Service Time Profile</div>
+        <div style={{ ...styles.sectionTitle, fontSize: isMobile ? 14 : 16 }}>Service Time Profile</div>
 
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, marginBottom: 16 }}>
           <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
-            <label style={styles.label}>Start Time</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Start Time</label>
             <input
               style={{ 
                 ...(isMobile ? styles.input : styles.inputSmall), 
                 width: '100%', 
-                textAlign: isMobile ? 'left' : 'center' 
+                textAlign: isMobile ? 'left' : 'center',
+                fontSize: isMobile ? 13 : 14
               }}
               type="time"
               value={startTime}
@@ -697,11 +700,12 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             />
           </div>
           <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
-            <label style={styles.label}>Round Duration (min)</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Round Duration (min)</label>
             <input
               style={{ 
                 ...(isMobile ? styles.input : styles.inputSmall), 
-                width: '100%' 
+                width: '100%',
+                fontSize: isMobile ? 13 : 14
               }}
               type="number"
               value={roundDuration}
@@ -711,11 +715,12 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             />
           </div>
           <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
-            <label style={styles.label}>Break Between (min)</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Break Between (min)</label>
             <input
               style={{ 
                 ...(isMobile ? styles.input : styles.inputSmall), 
-                width: '100%' 
+                width: '100%',
+                fontSize: isMobile ? 13 : 14
               }}
               type="number"
               value={breakTime}
@@ -728,7 +733,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
         {timePreview.length > 0 && (
           <div>
-            <label style={styles.label}>Schedule Preview</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Schedule Preview</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {timePreview.map((time, idx) => (
                 <span key={idx} style={styles.previewChip}>
@@ -742,7 +747,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
       {/* ═══════ Section 4: Template Management ═══════ */}
       <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
-        <div style={styles.sectionTitle}>
+        <div style={{ ...styles.sectionTitle, fontSize: isMobile ? 14 : 16 }}>
           <Save size={16} color={COLORS.sky} />
           Templates
         </div>
@@ -779,7 +784,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           </div>
         ) : savedTemplates.length > 0 ? (
           <>
-            <label style={{ ...styles.label, marginBottom: 8 }}>Saved Templates</label>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13, marginBottom: 8 }}>Saved Templates</label>
             {savedTemplates.map((t) => (
               <div 
                 key={t.id} 
@@ -792,7 +797,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                 }}
               >
                 <div style={{ ...styles.templateInfo, marginRight: isMobile ? 0 : 12 }}>
-                  <div style={styles.templateName}>{t.name}</div>
+                  <div style={{ ...styles.templateName, fontSize: isMobile ? 13 : 14 }}>{t.name}</div>
                   {t.description && <div style={styles.templateDesc}>{t.description}</div>}
                 </div>
                 <div style={{ ...styles.templateActions, justifyContent: isMobile ? 'stretch' : 'flex-start', gap: 6 }}>
@@ -836,7 +841,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
         <hr style={styles.divider} />
 
         {/* Preset templates */}
-        <label style={{ ...styles.label, marginBottom: 8 }}>
+        <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13, marginBottom: 8 }}>
           Preset Templates
           <span style={styles.presetBadge}>Built-in</span>
         </label>
@@ -852,7 +857,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             }}
           >
             <div style={{ ...styles.templateInfo, marginRight: isMobile ? 0 : 12 }}>
-              <div style={styles.templateName}>{preset.name}</div>
+              <div style={{ ...styles.templateName, fontSize: isMobile ? 13 : 14 }}>{preset.name}</div>
               <div style={preset.description ? styles.templateDesc : { display: 'none' }}>{preset.description}</div>
             </div>
             <div style={{ ...styles.templateActions, justifyContent: isMobile ? 'stretch' : 'flex-start' }}>
@@ -878,7 +883,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
       {/* ── Section: Location Map Key ── */}
       <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
-        <div style={styles.sectionTitle}>
+        <div style={{ ...styles.sectionTitle, fontSize: isMobile ? 14 : 16 }}>
           <Palette size={18} /> Location Map Key Configurator
         </div>
         <p style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 16 }}>
@@ -898,9 +903,9 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           >
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 10 }}>
               <div>
-                <label style={styles.label}>Location ID (unique, e.g. 1, MH)</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Location ID (unique, e.g. 1, MH)</label>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, fontSize: isMobile ? 13 : 14 }}
                   value={loc.id}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -913,9 +918,9 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                 />
               </div>
               <div>
-                <label style={styles.label}>Display Label (e.g. 1. Football Field)</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Display Label (e.g. 1. Football Field)</label>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, fontSize: isMobile ? 13 : 14 }}
                   value={loc.label}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -931,9 +936,9 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.5fr', gap: 12, marginBottom: 10 }}>
               <div>
-                <label style={styles.label}>Internal Name (e.g. Football Field)</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Internal Name (e.g. Football Field)</label>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, fontSize: isMobile ? 13 : 14 }}
                   value={loc.name}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -946,7 +951,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                 />
               </div>
               <div>
-                <label style={styles.label}>Hosted Games (comma-separated)</label>
+                <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Hosted Games (comma-separated)</label>
                 <input
                   style={styles.input}
                   value={(loc.games || []).join(', ')}
