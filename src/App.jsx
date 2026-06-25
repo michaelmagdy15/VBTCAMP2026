@@ -68,6 +68,7 @@ import { canEditScore, canEditDeductions, canEditTokens, canPostAnnouncement, ca
 import RoleLogin from './components/RoleLogin';
 import PhotoFeed from './components/PhotoFeed';
 import DynamicConfigurator from './components/DynamicConfigurator';
+import DumbDashboard from './components/DumbDashboard';
 import { generateRoundRobin, calculateTimeSlots, validateSchedule } from './matchupEngine';
 import { saveAsTemplate, loadTemplates, deleteTemplate, PRESET_TEMPLATES } from './templates';
 import { offlineQueue, setupOnlineListener } from './offlineSync';
@@ -473,6 +474,7 @@ export default function App() {
   const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginUseSimpleLayout, setLoginUseSimpleLayout] = useState(false);
 
   // Refs for tracking initial load to prevent playing sounds for historical data
   const loadTime = useRef(Date.now());
@@ -1177,8 +1179,12 @@ export default function App() {
       let grade = 'All';
       let name = servant.name;
       
-      if (servant.defaultRole === 'admin' || roleCode === 'coordinator') {
+      if (servant.defaultRole === 'admin') {
         resolvedRole = 'admin';
+        teamCode = 'ADMIN';
+        name = servant.name || 'Coordinator';
+      } else if (servant.defaultRole === 'coordinator' || roleCode === 'coordinator') {
+        resolvedRole = 'service_leader';
         teamCode = 'ADMIN';
         name = servant.name || 'Coordinator';
       } else if (roleCode.startsWith('team_')) {
@@ -1206,7 +1212,8 @@ export default function App() {
         teamCode: teamCode,
         side: side,
         grade: grade,
-        roleCode: roleCode
+        roleCode: roleCode,
+        uiMode: servant.uiMode || (loginUseSimpleLayout ? 'dumb' : 'detailed')
       };
       
       setCurrentUser(user);
@@ -1214,7 +1221,7 @@ export default function App() {
       setLoginError('');
       setLoginPassword('');
       
-      if (resolvedRole === 'admin' || resolvedRole === 'referee') {
+      if (resolvedRole === 'admin' || resolvedRole === 'service_leader' || resolvedRole === 'referee') {
         setCurrentTab('scoreboard');
       } else if (resolvedRole === 'leader') {
         setCurrentTab('myteam');
@@ -1249,7 +1256,8 @@ export default function App() {
         name: leaderObj.fullName.split('/')[0].trim(),
         teamCode: leaderObj.code,
         side: leaderObj.side,
-        grade: leaderObj.grade
+        grade: leaderObj.grade,
+        uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
       };
       setCurrentUser(user);
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
@@ -1269,7 +1277,8 @@ export default function App() {
         name: 'Coordinator',
         teamCode: 'ADMIN',
         side: 'System',
-        grade: 'All'
+        grade: 'All',
+        uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
       };
       setCurrentUser(user);
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
@@ -1289,7 +1298,8 @@ export default function App() {
         name: 'Game Leader',
         teamCode: 'REF',
         side: 'System',
-        grade: 'All'
+        grade: 'All',
+        uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
       };
       setCurrentUser(user);
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
@@ -1916,6 +1926,43 @@ export default function App() {
       const msg = `${action} ${Math.abs(amount)} deduction ${pointsStr} to ${teamCode} (Total: ${newVal})`;
       await addAnnouncement(currentEventCode, msg, currentUser.name, 'deduction');
     }
+  };
+
+  // Dumb Dashboard point deductions submit handler
+  const handleDumbSubmitDeduction = async (teamCode, points, reason) => {
+    if (!currentUser || (
+      currentUser.role !== 'admin' &&
+      currentUser.role !== 'service_leader' &&
+      (currentUser.role !== 'leader' || currentUser.teamCode !== teamCode)
+    )) {
+      alert("Permission denied. You do not have permission to adjust deductions for this team.");
+      return;
+    }
+
+    const ptsNum = Number(points) || 0;
+    const currentVal = (campState.teamDeductions || {})[teamCode] || 0;
+    const newVal = Math.min(25, Math.max(0, currentVal + ptsNum));
+
+    const newDeductions = { ...(campState.teamDeductions || {}), [teamCode]: newVal };
+    await handleUpdateCampState({ teamDeductions: newDeductions });
+    await syncToGoogleSheet({ teamDeductions: newDeductions });
+
+    if (currentUser) {
+      const msg = `deducted ${ptsNum} points from ${teamCode} for ${reason} (Total: ${newVal})`;
+      await addAnnouncement(currentEventCode, msg, currentUser.name, 'deduction');
+    }
+  };
+
+  // Dumb Dashboard score submit handler
+  const handleDumbSubmitScore = async (matchupId, scores) => {
+    const parts = matchupId.split('_');
+    if (parts.length < 3) return;
+    const block = parts[0];
+    const round = parts[1];
+    const game = parts.slice(2).join('_');
+
+    const winner = scores.scoreA > scores.scoreB ? 'Shakes' : scores.scoreB > scores.scoreA ? 'Fries' : 'Tie';
+    await handleToggleWinner(block, round, game, winner);
   };
 
   // Adjust Tokens
@@ -3260,6 +3307,20 @@ export default function App() {
               </div>
             </div>
 
+            {/* Simple Layout Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', marginBottom: '4px' }}>
+              <input 
+                type="checkbox"
+                id="loginUseSimpleLayout"
+                checked={loginUseSimpleLayout}
+                onChange={(e) => setLoginUseSimpleLayout(e.target.checked)}
+                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+              />
+              <label htmlFor="loginUseSimpleLayout" style={{ fontSize: '0.85rem', color: '#cbd5e1', cursor: 'pointer', userSelect: 'none' }}>
+                Use Simple Layout (Dumb Phone Version)
+              </label>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
               <button 
                 type="submit"
@@ -3320,7 +3381,33 @@ export default function App() {
     );
   }
 
-    const getActiveTabs = () => {
+  const activeUiMode = (currentUser?.id && globalServants.find(s => s.id === currentUser.id)?.uiMode) || currentUser?.uiMode || 'detailed';
+
+  if (currentUser && (currentUser.uiMode === 'dumb' || activeUiMode === 'dumb')) {
+    return (
+      <DumbDashboard
+        currentUser={currentUser}
+        activeEventCode={currentEventCode}
+        eventConfig={eventConfig}
+        campData={campState}
+        activeScheduleItem={activeScheduleItem}
+        standings={scoreCalculations}
+        onLogout={handleLogout}
+        onSubmitDeduction={handleDumbSubmitDeduction}
+        onSubmitScore={handleDumbSubmitScore}
+        onPostAnnouncement={async (text) => {
+          if (text.trim()) {
+            await addAnnouncement(currentEventCode, text, currentUser.name, 'announcement');
+          }
+        }}
+        announcements={announcements}
+        urgentAlert={urgentAlert}
+        activePingAlert={activePingAlert}
+      />
+    );
+  }
+
+  const getActiveTabs = () => {
     if (!currentUser) return [];
     
     // For both Service Mode and Camp Mode, we show exactly 5 bottom navigation tabs
@@ -5632,30 +5719,42 @@ export default function App() {
                               </div>
                               
                               {isAttending && (
-                                <select
-                                  value={editRoles[s.id] || 'volunteer'}
-                                  onChange={(e) => setEditRoles(prev => ({ ...prev, [s.id]: e.target.value }))}
-                                  style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', width: '100%', maxWidth: '160px', minHeight: '32px' }}
-                                >
-                                  <option value="volunteer">Volunteer/Ref</option>
-                                  <option value="coordinator">Coordinator</option>
-                                  <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
-                                  <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
-                                  <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
-                                  <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
-                                  <option value="big_game_1">Big Game Lead 1</option>
-                                  <option value="big_game_2">Big Game Lead 2</option>
-                                  <option value="reflection">Reflection Lead</option>
-                                  <option value="team_red_1">{(editTeamRed || 'Red') + ' 1 Leader'}</option>
-                                  <option value="team_red_2">{(editTeamRed || 'Red') + ' 2 Leader'}</option>
-                                  <option value="team_white_1">{(editTeamWhite || 'White') + ' 1 Leader'}</option>
-                                  <option value="team_white_2">{(editTeamWhite || 'White') + ' 2 Leader'}</option>
-                                  <option value="team_black_1">{(editTeamBlack || 'Black') + ' 1 Leader'}</option>
-                                  <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
-                                  <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
-                                  <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
-                                  <option value="media">Media Coverage</option>
-                                </select>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <select
+                                    value={editRoles[s.id] || 'volunteer'}
+                                    onChange={(e) => setEditRoles(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                    style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', width: '100%', maxWidth: '160px', minHeight: '32px' }}
+                                  >
+                                    <option value="volunteer">Volunteer/Ref</option>
+                                    <option value="coordinator">Coordinator</option>
+                                    <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
+                                    <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
+                                    <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
+                                    <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
+                                    <option value="big_game_1">Big Game Lead 1</option>
+                                    <option value="big_game_2">Big Game Lead 2</option>
+                                    <option value="reflection">Reflection Lead</option>
+                                    <option value="team_red_1">{(editTeamRed || 'Red') + ' 1 Leader'}</option>
+                                    <option value="team_red_2">{(editTeamRed || 'Red') + ' 2 Leader'}</option>
+                                    <option value="team_white_1">{(editTeamWhite || 'White') + ' 1 Leader'}</option>
+                                    <option value="team_white_2">{(editTeamWhite || 'White') + ' 2 Leader'}</option>
+                                    <option value="team_black_1">{(editTeamBlack || 'Black') + ' 1 Leader'}</option>
+                                    <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
+                                    <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
+                                    <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
+                                    <option value="media">Media Coverage</option>
+                                  </select>
+                                  <select
+                                    value={s.uiMode || 'detailed'}
+                                    onChange={async (e) => {
+                                      await updateServant(s.id, { uiMode: e.target.value });
+                                    }}
+                                    style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', minHeight: '32px' }}
+                                  >
+                                    <option value="detailed">Detailed UI</option>
+                                    <option value="dumb">Simple UI (Dumb)</option>
+                                  </select>
+                                </div>
                               )}
                             </div>
                           );

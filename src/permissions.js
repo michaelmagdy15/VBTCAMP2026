@@ -9,6 +9,7 @@ export const ROLES = {
   VIEWER: 'viewer',
   REFEREE: 'referee',
   LEADER: 'leader',
+  SERVICE_LEADER: 'service_leader',
   ADMIN: 'admin',
 };
 
@@ -36,14 +37,14 @@ export function canViewScoreboard(/* user */) {
 /**
  * Determines whether a user may edit scores for a given matchup.
  *
- * - Admin:   always allowed
+ * - Admin / Service Leader: always allowed
  * - Referee: only if matchup.game is in user.assignedGames
  * - Leader / Viewer: never
  */
 export function canEditScore(user, matchup /*, eventConfig */) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN) return true;
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) return true;
 
   if (role === ROLES.REFEREE) {
     const assignedGames = user?.assignedGames || [];
@@ -58,14 +59,14 @@ export function canEditScore(user, matchup /*, eventConfig */) {
 /**
  * Determines whether a user may edit deductions for a team.
  *
- * - Admin:  always allowed
+ * - Admin / Service Leader: always allowed
  * - Leader: only if teamCode is in user.assignedTeams
  * - Referee / Viewer: never
  */
 export function canEditDeductions(user, teamCode /*, eventConfig */) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN) return true;
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) return true;
 
   if (role === ROLES.LEADER) {
     const assignedTeams = user?.assignedTeams || [];
@@ -87,11 +88,11 @@ export function canEditTokens(user) {
 // ─── Announcements ───────────────────────────────────────────
 
 /**
- * Admins and Leaders may post announcements.
+ * Admins, Leaders, and Service Leaders may post announcements.
  */
 export function canPostAnnouncement(user) {
   const role = getPermissionLevel(user);
-  return role === ROLES.ADMIN || role === ROLES.LEADER;
+  return role === ROLES.ADMIN || role === ROLES.LEADER || role === ROLES.SERVICE_LEADER;
 }
 
 // ─── Config ──────────────────────────────────────────────────
@@ -106,19 +107,21 @@ export function canEditConfig(user) {
 // ─── Ping ────────────────────────────────────────────────────
 
 /**
- * Only admins may send pings.
+ * Admins and Service Leaders may send pings.
  */
 export function canSendPing(user) {
-  return getPermissionLevel(user) === ROLES.ADMIN;
+  const role = getPermissionLevel(user);
+  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER;
 }
 
 // ─── Alerts ──────────────────────────────────────────────────
 
 /**
- * Only admins may create alerts.
+ * Admins and Service Leaders may create alerts.
  */
 export function canCreateAlert(user) {
-  return getPermissionLevel(user) === ROLES.ADMIN;
+  const role = getPermissionLevel(user);
+  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER;
 }
 
 // ─── Editable Scopes ─────────────────────────────────────────
@@ -126,14 +129,14 @@ export function canCreateAlert(user) {
 /**
  * Returns the list of team codes the user is allowed to edit.
  *
- * - Admin:  all team codes from campData
+ * - Admin / Service Leader: all team codes from campData
  * - Leader: only user.assignedTeams
  * - Others: empty array
  */
 export function getEditableTeams(user, campData) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN) {
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) {
     // Return all team codes found in campData
     if (Array.isArray(campData?.teams)) {
       return campData.teams.map((t) => t.code || t.teamCode).filter(Boolean);
@@ -154,14 +157,14 @@ export function getEditableTeams(user, campData) {
 /**
  * Returns the list of games the user is allowed to edit.
  *
- * - Admin:   all games from campData
+ * - Admin / Service Leader: all games from campData
  * - Referee: only user.assignedGames
  * - Others:  empty array
  */
 export function getEditableGames(user, campData) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN) {
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) {
     if (Array.isArray(campData?.games)) {
       return campData.games.map((g) => g.name || g.game).filter(Boolean);
     }

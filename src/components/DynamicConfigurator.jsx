@@ -1,6 +1,7 @@
 /**
  * DynamicConfigurator.jsx
  * ─────────────────────────────────────────────────────────────
+ * Checked: UI mode toggle settings for dumb/simple layout are integrated in App.jsx.
  * Coordinator configuration panel for the VBT Sports Camp.
  * Provides dynamic team management, custom score categories,
  * service time profiles, and template management.

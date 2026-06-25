@@ -326,10 +326,11 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   const feedRef = useRef(null);
 
   const [token, setToken] = useState(null);
+  const [connected, setConnected] = useState(false);
 
   // Generate Token when channel changes
   useEffect(() => {
-    if (eventCode && activeChannel) {
+    if (eventCode && activeChannel && connected) {
       try {
         const t = generateAgoraToken(`${eventCode}_${activeChannel}`);
         setToken(t);
@@ -337,7 +338,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
         console.error("Token generation failed:", err);
       }
     }
-  }, [eventCode, activeChannel]);
+  }, [eventCode, activeChannel, connected]);
 
   // Agora Integration
   useJoin({
@@ -345,9 +346,9 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
     channel: `${eventCode}_${activeChannel}`,
     token: token,
     uid: null // Let Agora assign UID, token built with uid 0 allows this
-  }, !!eventCode && !!activeChannel && !!token);
+  }, !!eventCode && !!activeChannel && !!token && connected);
 
-  const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
+  const { localMicrophoneTrack } = useLocalMicrophoneTrack(connected);
   usePublish([localMicrophoneTrack]);
 
   const remoteUsers = useRemoteUsers();
@@ -577,19 +578,56 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
       </div>
 
       {/* ── Feed Area ─────────────────────────────────── */}
-      <div
-        ref={feedRef}
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px 20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-        }}
-      >
-        
-        {/* Remote Active Speaker */}
+      {!connected ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: '50%', background: `${channelColor}22`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20
+          }}>
+            <Radio size={40} color={channelColor} />
+          </div>
+          <h2 style={{ fontFamily: T.fontTitle, fontSize: 20, fontWeight: 700, margin: '0 0 10px 0', textAlign: 'center' }}>
+            Join {getChannelLabel(activeChannel)}
+          </h2>
+          <p style={{ fontFamily: T.fontBody, fontSize: 14, color: T.textSecondary, textAlign: 'center', marginBottom: 30, maxWidth: 280 }}>
+            You need to connect to the channel to send and receive live audio broadcasts.
+          </p>
+          <button
+            onClick={() => {
+              setConnected(true);
+              // Pre-initialize audio context on user gesture for iOS
+              import('../chimes').then(m => m.playChime('notification'));
+            }}
+            style={{
+              background: channelColor,
+              color: '#fff',
+              border: 'none',
+              padding: '14px 32px',
+              borderRadius: 30,
+              fontFamily: T.fontTitle,
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: 'pointer',
+              boxShadow: `0 8px 20px ${channelColor}44`,
+            }}
+          >
+            Connect to Channel
+          </button>
+        </div>
+      ) : (
+        <div
+          ref={feedRef}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          
+          {/* Remote Active Speaker */}
         {channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId && (
           <div
             style={{
@@ -686,6 +724,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
           <MessageBubble key={msg.id} msg={msg} channelColor={channelColor} />
         ))}
       </div>
+      )}
 
       {/* ── Push-to-Talk Button ────────────────────────────────────── */}
       <div
@@ -733,14 +772,16 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
             fontSize: 14,
             fontFamily: T.fontBody,
             fontWeight: 600,
-            color: isSomeoneElseSpeaking ? '#ef4444' : T.textSecondary,
+            color: !connected ? T.textSecondary : isSomeoneElseSpeaking ? '#ef4444' : T.textSecondary,
           }}
         >
-          {uploading 
-            ? 'Saving replay...' 
-            : isSomeoneElseSpeaking 
-              ? `${channelLock.currentSpeakerName || 'Someone'} is talking...`
-              : 'Hold to Talk'}
+          {!connected
+            ? 'Connect to talk'
+            : uploading 
+              ? 'Saving replay...' 
+              : isSomeoneElseSpeaking 
+                ? `${channelLock.currentSpeakerName || 'Someone'} is talking...`
+                : 'Hold to Talk'}
         </span>
       </div>
     </div>
