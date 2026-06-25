@@ -26,7 +26,11 @@ import {
   Flame,
   Award,
   BarChart3,
-  BookOpen
+  BookOpen,
+  Shield,
+  Radio,
+  Package,
+  Navigation
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -51,6 +55,31 @@ import {
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
+
+// ─── NEW COMPONENT IMPORTS (Future Improvements) ────────────────────────────
+import InteractiveMap from './components/InteractiveMap';
+import './components/InteractiveMap.css';
+import StandingsAnalytics from './components/StandingsAnalytics';
+import './components/StandingsAnalytics.css';
+import AlertBanner from './components/AlertBanner';
+import { soundBoard, ttsAnnouncer, transitionAlerter } from './notifications';
+import { canEditScore, canEditDeductions, canEditTokens, canPostAnnouncement, canEditConfig, canSendPing, canCreateAlert } from './permissions';
+import RoleLogin from './components/RoleLogin';
+import PhotoFeed from './components/PhotoFeed';
+import DynamicConfigurator from './components/DynamicConfigurator';
+import { generateRoundRobin, calculateTimeSlots, validateSchedule } from './matchupEngine';
+import { saveAsTemplate, loadTemplates, deleteTemplate, PRESET_TEMPLATES } from './templates';
+import { offlineQueue, setupOnlineListener } from './offlineSync';
+
+// VBT Phase 3 Operations & Logistics Components
+import LogisticsPanel from './components/LogisticsPanel';
+import FeedMessage from './components/FeedMessage';
+import ScheduleExporter from './components/ScheduleExporter';
+import WalkieTalkie from './components/WalkieTalkie';
+import GPSMap from './components/GPSMap';
+import ScheduleBuilder from './components/ScheduleBuilder';
+import { playChime } from './chimes';
+import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
 // Firebase Web Push VAPID key (Generate in Firebase Console -> Project Settings -> Cloud Messaging -> Web Push Certificates)
 // Replace this placeholder with your actual key to connect browser push notifications.
@@ -303,6 +332,7 @@ export default function App() {
   const [creationStep, setCreationStep] = useState(1);
   const [newEventType, setNewEventType] = useState('service');
   const [newKidCount, setNewKidCount] = useState(100);
+  const [newDaysCount, setNewDaysCount] = useState(1);
   const [newServiceBrief, setNewServiceBrief] = useState('Friend Request — Jesus is knocking... Will you open the door? (Revelation 3:20)\n\nAn outreach service featuring water games, rotational teamwork challenges, and reflection.');
   const [newStations, setNewStations] = useState({
     station_1: { name: 'Commitment', location: 'Football Field', howToPlay: 'Objective: One team must move from Point A to Point B while staying connected by holding hands.\n\nRules:\n1. The moving team must hold hands at all times.\n2. The opposing team throws water balloons.\n3. If the chain breaks, they restart.', lesson: 'A game of bond, unity, and perseverance. Stay strong and don\'t let anything break your bond.' },
@@ -320,6 +350,7 @@ export default function App() {
 
   // Live edit config states for existing active Service Mode event
   const [editKidCount, setEditKidCount] = useState(100);
+  const [editDaysCount, setEditDaysCount] = useState(1);
   const [editAttending, setEditAttending] = useState([]);
   const [editRoles, setEditRoles] = useState({});
   
@@ -347,6 +378,7 @@ export default function App() {
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
   const side1Name = eventConfig.side1Name || 'Shakes';
   const side2Name = eventConfig.side2Name || 'Fries';
+  const daysCount = eventConfig.daysCount || (eventConfig.eventType === 'camp' ? 2 : 1);
 
   const getTeamColorHex = (teamCode) => {
     if (!teamCode) return '#ffffff';
@@ -425,6 +457,12 @@ export default function App() {
   // UI state
   const [currentTab, setCurrentTab] = useState('scoreboard');
   const [infoSubTab, setInfoSubTab] = useState('map');
+  const [settingsSubTab, setSettingsSubTab] = useState('config');
+
+  // Refs for tracking state/data changes to trigger chimes
+  const prevCampStateRef = useRef(null);
+  const prevScheduleRef = useRef(null);
+  const prevAnnouncementsRef = useRef(null);
   const [expandedBlocks, setExpandedBlocks] = useState({ 1: true, 2: false, 3: false, 4: false });
   const [selectedMapLocation, setSelectedMapLocation] = useState(null);
   const [expandedFaqs, setExpandedFaqs] = useState({});
@@ -435,6 +473,7 @@ export default function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uploadImage, setUploadImage] = useState(null);
+  const [mapConfig, setMapConfig] = useState(null);
 
   // ─── SERVICE MODE STATE ───────────────────────────────────────────────
   // Live service data from Firestore (brief + groups + games)
@@ -497,6 +536,7 @@ export default function App() {
     }
   };
   const [activePingAlert, setActivePingAlert] = useState({ show: false, text: '' });
+  const [urgentAlert, setUrgentAlert] = useState({ show: false, text: '', type: 'urgent', timestamp: '' });
   const [statsSubTab, setStatsSubTab] = useState('charts');
   const [scoreViewMode, setScoreViewMode] = useState('block'); // 'block' | 'game'
   const [expandedGames, setExpandedGames] = useState({});
@@ -545,11 +585,38 @@ export default function App() {
     }
   };
 
-  const isTimeSlotActive = (timeStr, blockName) => {
+  const getEventCurrentDay = () => {
+    if (eventConfig && eventConfig.activeDayOverride) {
+      return parseInt(eventConfig.activeDayOverride, 10) || 1;
+    }
+    if (!eventConfig || !eventConfig.eventDate) return 1;
+    try {
+      const start = new Date(eventConfig.eventDate);
+      if (isNaN(start.getTime())) return 1;
+      const today = new Date(currentTime);
+      start.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      const diffTime = today.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      if (diffDays < 1) return 1;
+      const daysCount = eventConfig.daysCount || (eventConfig.eventType === 'camp' ? 2 : 1);
+      if (diffDays > daysCount) return daysCount;
+      return diffDays;
+    } catch (e) {
+      return 1;
+    }
+  };
+
+  const isTimeSlotActive = (timeStr, blockName, matchupDay) => {
     try {
       let timePart = timeStr.trim();
       const match = timePart.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (!match) return false;
+      
+      if (matchupDay) {
+        const currentDay = getEventCurrentDay();
+        if (matchupDay !== currentDay) return false;
+      }
       
       const hours = parseInt(match[1]);
       const minutes = parseInt(match[2]);
@@ -573,9 +640,14 @@ export default function App() {
   };
 
   const liveLocationStatus = useMemo(() => {
-    const activeMatchups = campData.matchups.filter(m => isTimeSlotActive(m.time, `Block ${m.block}`));
+    const activeMatchups = campData.matchups.filter(m => {
+      const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
+    });
     
-    return locationKey.map(loc => {
+    const effectiveLocationKey = eventConfig.locationKey || locationKey;
+    
+    return effectiveLocationKey.map(loc => {
       const active = activeMatchups.find(m => 
         m.location && (
           m.location.toLowerCase().includes(loc.name.toLowerCase()) || 
@@ -588,7 +660,7 @@ export default function App() {
         activeMatchup: active || null
       };
     });
-  }, [campData, campState, currentTime]);
+  }, [campData, campState, currentTime, eventConfig]);
 
   // Watch for new announcements to play chimes and trigger notifications
   useEffect(() => {
@@ -623,12 +695,15 @@ export default function App() {
   // Smart auto-detection of current day on load
   useEffect(() => {
     if (campData && campData.matchups) {
-      const hasActiveBlock4 = campData.matchups.some(m => m.block === 4 && isTimeSlotActive(m.time, `Block ${m.block}`));
+      const hasActiveBlock4 = campData.matchups.some(m => {
+        const mDay = m.day || (eventConfig.eventType === 'camp' ? (m.block === 4 ? 2 : 1) : 1);
+        return m.block === 4 && isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
+      });
       if (hasActiveBlock4) {
         setScheduleDayFilter('2');
       }
     }
-  }, [campData]);
+  }, [campData, eventConfig]);
 
   // Set up push notifications (Web PWA or Native Capacitor iOS) on user login
   useEffect(() => {
@@ -655,6 +730,19 @@ export default function App() {
     window.addEventListener('vbt-push-notification', handleNativePush);
     return () => window.removeEventListener('vbt-push-notification', handleNativePush);
   }, []);
+
+  // Set up offline sync queue flush on reconnect
+  useEffect(() => {
+    const cleanup = setupOnlineListener(async () => {
+      console.log('[Offline Sync] Device back online, flushing queue...');
+      await offlineQueue.flushQueue(async (collection, docPath, data) => {
+        if (currentEventCode) {
+          await updateCampState(currentEventCode, data);
+        }
+      });
+    });
+    return cleanup;
+  }, [currentEventCode]);
 
   // Synchronize Block filter when Day changes
   useEffect(() => {
@@ -702,6 +790,15 @@ export default function App() {
         setEventConfig({ ...defaultEventConfig, ...cfg });
         setEditEventConfig({ ...defaultEventConfig, ...cfg });
       }
+    });
+    return () => unsub();
+  }, [currentEventCode]);
+
+  // Subscribe to Map Config
+  useEffect(() => {
+    if (!currentEventCode) return;
+    const unsub = subscribeToMapConfig(currentEventCode, (cfg) => {
+      setMapConfig(cfg);
     });
     return () => unsub();
   }, [currentEventCode]);
@@ -756,25 +853,30 @@ export default function App() {
 
   // Live configurator state sync when active event config changes
   useEffect(() => {
-    if (eventConfig && eventConfig.eventType === 'service') {
-      setEditKidCount(eventConfig.kidCount || 100);
-      setEditAttending(eventConfig.activeServants || []);
-      setEditRoles(eventConfig.servantAssignments || {});
-      const teamNames = eventConfig.teamNames || { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' };
-      setEditTeamRed(teamNames.red || 'Red');
-      setEditTeamWhite(teamNames.white || 'White');
-      setEditTeamBlack(teamNames.black || 'Black');
-      setEditTeamBlue(teamNames.blue || 'Blue');
-      setEditStations(eventConfig.stations || {
-        station_1: { name: 'Commitment', location: 'Football Field', howToPlay: '', lesson: '' },
-        station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: '', lesson: '' },
-        station_3: { name: 'Trust', location: 'Court', howToPlay: '', lesson: '' },
-        station_4: { name: 'Communication', location: 'Pool', howToPlay: '', lesson: '' }
-      });
-      setEditBigGameName(eventConfig.bigGameName || 'Loyalty (Big Game)');
-      setEditBigGameLocation(eventConfig.bigGameLocation || 'Football Field');
-      setEditBigGameHowToPlay(eventConfig.bigGameHowToPlay || '');
-      setEditBigGameLesson(eventConfig.bigGameLesson || '');
+    if (eventConfig) {
+      if (eventConfig.eventType === 'service') {
+        setEditKidCount(eventConfig.kidCount || 100);
+        setEditDaysCount(eventConfig.daysCount || 1);
+        setEditAttending(eventConfig.activeServants || []);
+        setEditRoles(eventConfig.servantAssignments || {});
+        const teamNames = eventConfig.teamNames || { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' };
+        setEditTeamRed(teamNames.red || 'Red');
+        setEditTeamWhite(teamNames.white || 'White');
+        setEditTeamBlack(teamNames.black || 'Black');
+        setEditTeamBlue(teamNames.blue || 'Blue');
+        setEditStations(eventConfig.stations || {
+          station_1: { name: 'Commitment', location: 'Football Field', howToPlay: '', lesson: '' },
+          station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: '', lesson: '' },
+          station_3: { name: 'Trust', location: 'Court', howToPlay: '', lesson: '' },
+          station_4: { name: 'Communication', location: 'Pool', howToPlay: '', lesson: '' }
+        });
+        setEditBigGameName(eventConfig.bigGameName || 'Loyalty (Big Game)');
+        setEditBigGameLocation(eventConfig.bigGameLocation || 'Football Field');
+        setEditBigGameHowToPlay(eventConfig.bigGameHowToPlay || '');
+        setEditBigGameLesson(eventConfig.bigGameLesson || '');
+      } else {
+        setEditDaysCount(eventConfig.daysCount || 2);
+      }
     }
   }, [eventConfig]);
 
@@ -856,6 +958,20 @@ export default function App() {
           lastUpdatedAt: data.lastUpdatedAt || null,
           appsScriptWebappUrl: data.appsScriptWebappUrl || ''
         };
+
+        // Chimes for live score/deduction/token updates
+        if (prevCampStateRef.current) {
+          const prev = prevCampStateRef.current;
+          const tokensChanged = prev.tokens?.shakes !== normalized.tokens?.shakes || prev.tokens?.fries !== normalized.tokens?.fries;
+          const blockScoresChanged = JSON.stringify(prev.blockScores) !== JSON.stringify(normalized.blockScores);
+          const deductionsChanged = JSON.stringify(prev.teamDeductions) !== JSON.stringify(normalized.teamDeductions);
+          
+          if (tokensChanged || blockScoresChanged || deductionsChanged) {
+            playChime('score');
+          }
+        }
+        prevCampStateRef.current = normalized;
+
         setCampState(normalized);
         localStorage.setItem(`vbt_state_${currentEventCode}`, JSON.stringify(normalized));
         if (data.appsScriptWebappUrl) setAppsScriptWebappUrl(data.appsScriptWebappUrl);
@@ -868,6 +984,15 @@ export default function App() {
     // Subscribe to Firestore for schedule/matchup data
     const unsubscribeSchedule = subscribeToScheduleData(currentEventCode, (data) => {
       if (data) {
+        // Chimes for live schedule matchups modifications
+        if (prevScheduleRef.current) {
+          const matchupsChanged = JSON.stringify(prevScheduleRef.current.matchups) !== JSON.stringify(data.matchups);
+          if (matchupsChanged) {
+            playChime('schedule');
+          }
+        }
+        prevScheduleRef.current = data;
+
         setCampData(data);
         localStorage.setItem(`vbt_schedule_${currentEventCode}`, JSON.stringify(data));
       }
@@ -875,6 +1000,19 @@ export default function App() {
 
     // Subscribe to announcements
     const unsubscribeAnnouncements = subscribeToAnnouncements(currentEventCode, (list) => {
+      // Chimes for live feed / announcement chimes
+      if (prevAnnouncementsRef.current && list.length > prevAnnouncementsRef.current.length) {
+        const newest = list[0]; // descending list
+        if (newest) {
+          if (newest.type === 'ping') {
+            playChime('urgent');
+          } else {
+            playChime('announcement');
+          }
+        }
+      }
+      prevAnnouncementsRef.current = list;
+
       setAnnouncements(list);
     });
 
@@ -967,7 +1105,7 @@ export default function App() {
       if (servant.defaultRole === 'admin' || roleCode === 'coordinator') {
         resolvedRole = 'admin';
         teamCode = 'ADMIN';
-        name = 'Coordinator';
+        name = servant.name || 'Coordinator';
       } else if (roleCode.startsWith('team_')) {
         resolvedRole = 'leader';
         const parts = roleCode.split('_'); // ["team", "white", "1"]
@@ -1268,6 +1406,7 @@ export default function App() {
           description: newServiceBrief,
           eventDate: newEventDate || new Date().toISOString().split('T')[0],
           eventType: 'service',
+          daysCount: parseInt(newDaysCount, 10) || 1,
           kidCount: parseInt(newKidCount, 10) || 100,
           primaryColor: '#a78bfa',
           logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
@@ -1310,6 +1449,7 @@ export default function App() {
           description: 'Camp Outreach',
           eventDate: newEventDate || new Date().toISOString().split('T')[0],
           eventType: 'camp',
+          daysCount: parseInt(newDaysCount, 10) || 2,
           side1Name: newEventSide1 || 'Shakes',
           side2Name: newEventSide2 || 'Fries',
           primaryColor: '#1441a1',
@@ -1357,6 +1497,7 @@ export default function App() {
       const updatedConfig = {
         ...editEventConfig,
         kidCount: parseInt(editKidCount, 10) || 100,
+        daysCount: parseInt(editDaysCount, 10) || 1,
         activeServants: editAttending,
         servantAssignments: editRoles,
         teamNames: {
@@ -1786,7 +1927,8 @@ export default function App() {
       announcementText.trim(),
       currentUser.name,
       'announcement',
-      uploadImage
+      uploadImage,
+      currentUser.role
     );
     
     // Trigger remote push notification to all leaders/coordinators
@@ -1847,8 +1989,10 @@ export default function App() {
   const filteredMatchups = useMemo(() => {
     return campData.matchups.filter(m => {
       // Day filter
-      if (scheduleDayFilter === '1' && ![1, 2, 3].includes(m.block)) return false;
-      if (scheduleDayFilter === '2' && m.block !== 4) return false;
+      if (daysCount > 1) {
+        const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+        if (scheduleDayFilter !== String(mDay)) return false;
+      }
 
       // Block filter
       if (scheduleBlockFilter !== 'All' && m.block !== parseInt(scheduleBlockFilter)) {
@@ -1861,7 +2005,7 @@ export default function App() {
       }
       return true;
     });
-  }, [scheduleTeamFilter, scheduleBlockFilter, scheduleDayFilter]);
+  }, [scheduleTeamFilter, scheduleBlockFilter, scheduleDayFilter, campData.matchups, eventConfig.eventType, daysCount]);
 
   const myTeamInfo = useMemo(() => {
     if (!currentUser) return null;
@@ -1871,6 +2015,7 @@ export default function App() {
       rawSchedule = (campData.matchups || [])
         .filter(m => m.shakes === currentUser.teamCode || m.fries === currentUser.teamCode)
         .map(m => ({
+          day: m.day || 1,
           block: `Block ${m.block}`,
           round: m.round,
           game: m.game,
@@ -1887,16 +2032,20 @@ export default function App() {
     return {
       ...teamDetails,
       schedule: rawSchedule,
-      day1Schedule: isService ? rawSchedule : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 1')),
-      day2Schedule: isService ? [] : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 2')),
+      day1Schedule: isService ? rawSchedule.filter(s => (s.day || 1) === 1) : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 1')),
+      day2Schedule: isService ? rawSchedule.filter(s => (s.day || 1) === 2) : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 2')),
       deductions: (campState.teamDeductions || {})[currentUser.teamCode] || 0
     };
   }, [currentUser, campState, campData, eventConfig]);
 
   const currentActiveSlot = useMemo(() => {
     if (!myTeamInfo || !myTeamInfo.schedule) return null;
-    return myTeamInfo.schedule.find(slot => slot.block && isTimeSlotActive(slot.time, slot.block));
-  }, [myTeamInfo, campState, currentTime]);
+    return myTeamInfo.schedule.find(slot => {
+      const sBlockNum = parseInt(slot.block?.replace('Block ', ''), 10) || 1;
+      const sDay = slot.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(sBlockNum) ? 1 : 2) : 1);
+      return slot.block && isTimeSlotActive(slot.time, slot.block, sDay);
+    });
+  }, [myTeamInfo, campState, currentTime, eventConfig.eventType]);
 
   // Find matches scheduled at the selected map location
   const mapLocationMatches = useMemo(() => {
@@ -2403,12 +2552,26 @@ export default function App() {
                         <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Event Type</label>
                         <select
                           value={newEventType}
-                          onChange={(e) => setNewEventType(e.target.value)}
+                          onChange={(e) => {
+                            setNewEventType(e.target.value);
+                            setNewDaysCount(e.target.value === 'camp' ? 2 : 1);
+                          }}
                           style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
                         >
                           <option value="service">Service Mode (Dynamic 4 Teams)</option>
                           <option value="camp">Camp Mode (Legacy 2 Teams)</option>
                         </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Days of Event</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={newDaysCount}
+                          onChange={(e) => setNewDaysCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
                       </div>
                     </div>
 
@@ -3091,7 +3254,10 @@ export default function App() {
           { id: 'schedule', label: 'Schedule', icon: Calendar },
           { id: 'scoreboard', label: 'Scores', icon: Trophy },
           { id: 'service', label: 'Games', icon: BookOpen },
+          { id: 'info', label: 'Map', icon: MapIcon },
           { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+          { id: 'walkie', label: 'Talkie', icon: Radio },
+          { id: 'logistics', label: 'Logistics', icon: Package },
           { id: 'settings', label: 'Controls', icon: Settings }
         ];
       } else if (currentUser.role === 'leader') {
@@ -3099,14 +3265,20 @@ export default function App() {
           { id: 'schedule', label: 'Schedule', icon: Calendar },
           { id: 'myteam', label: 'My Team', icon: Users },
           { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 }
+          { id: 'info', label: 'Map', icon: MapIcon },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+          { id: 'walkie', label: 'Talkie', icon: Radio },
+          { id: 'logistics', label: 'Logistics', icon: Package }
         ];
       } else if (currentUser.role === 'referee') {
         return [
           { id: 'schedule', label: 'Schedule', icon: Calendar },
           { id: 'scoreboard', label: 'Scores', icon: Trophy },
           { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 }
+          { id: 'info', label: 'Map', icon: MapIcon },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+          { id: 'walkie', label: 'Talkie', icon: Radio },
+          { id: 'logistics', label: 'Logistics', icon: Package }
         ];
       } else {
         // viewer or visitor
@@ -3114,7 +3286,10 @@ export default function App() {
           { id: 'schedule', label: 'Schedule', icon: Calendar },
           { id: 'scoreboard', label: 'Scores', icon: Trophy },
           { id: 'service', label: 'Games', icon: BookOpen },
-          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 }
+          { id: 'info', label: 'Map', icon: MapIcon },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+          { id: 'walkie', label: 'Talkie', icon: Radio },
+          { id: 'logistics', label: 'Logistics', icon: Package }
         ];
       }
     }
@@ -3125,7 +3300,9 @@ export default function App() {
       { id: 'myteam', label: 'My Team', icon: Users },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
       { id: 'info', label: 'Map', icon: MapIcon },
-      { id: 'stats', label: 'Stats', icon: BarChart3 }
+      { id: 'stats', label: 'Stats', icon: BarChart3 },
+      { id: 'walkie', label: 'Talkie', icon: Radio },
+      { id: 'logistics', label: 'Logistics', icon: Package }
     ];
     if (currentUser.role === 'admin') {
       tabs.push({ id: 'settings', label: 'Controls', icon: Settings });
@@ -3140,7 +3317,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Visual Ping Overlay */}
+      {/* Visual Ping Overlay (legacy) */}
       {activePingAlert.show && (
         <div style={{
           position: 'fixed',
@@ -3172,6 +3349,16 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* New Alert Banner System */}
+      <AlertBanner
+        alert={urgentAlert}
+        onDismiss={() => setUrgentAlert({ show: false, text: '', type: 'urgent', timestamp: '' })}
+        isAdmin={currentUser?.role === 'admin'}
+        onCreateAlert={(text) => {
+          setUrgentAlert({ show: true, text, type: 'urgent', timestamp: new Date().toISOString() });
+          addAnnouncement(currentEventCode, `🚨 URGENT: ${text}`, currentUser?.name || 'Admin', 'ping');
+        }}
+      />
       {/* Header */}
       <header className="glass-panel" style={{
         position: 'sticky',
@@ -3498,7 +3685,8 @@ export default function App() {
                                 const key = `${m.block}_${m.round}_${m.game}`;
                                 const winner = (campState.blockScores || {})[key] || 'NA';
                                 const pts = campData.gamePoints[m.game];
-                                const isActive = isTimeSlotActive(m.time, `Block ${m.block}`);
+                                const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                                const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                                 
                                 return (
                                   <div key={idx} className="glass-panel" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)' }}>
@@ -3633,7 +3821,8 @@ export default function App() {
                       {gameMatches.map((m, idx) => {
                         const key = `${m.block}_${m.round}_${m.game}`;
                         const winner = (campState.blockScores || {})[key] || 'NA';
-                        const isActive = isTimeSlotActive(m.time, `Block ${m.block}`);
+                        const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                        const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                         
                         return (
                           <div key={idx} className="glass-panel" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -3855,136 +4044,91 @@ export default function App() {
                 <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>Team Timeline & Schedule</h3>
               </div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Day 1 Section */}
-                <div>
-                  <h4 style={{ 
-                    fontSize: '0.75rem', 
-                    color: 'var(--vbt-sky)', 
-                    fontWeight: '700', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em',
-                    marginBottom: '8px',
-                    borderBottom: '1px solid rgba(41, 182, 246, 0.2)',
-                    paddingBottom: '4px'
-                  }}>
-                    Day 1 (Blocks 1-3)
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {myTeamInfo.day1Schedule.length === 0 ? (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>No Day 1 activities scheduled.</p>
-                    ) : (
-                      myTeamInfo.day1Schedule.map((slot, idx) => {
-                        const isActive = isTimeSlotActive(slot.time, slot.block);
-                        return (
-                          <div 
-                            key={`day1-${idx}`} 
-                            className="glass-panel"
-                            style={{ 
-                              padding: '12px', 
-                              background: isActive ? 'rgba(41, 182, 246, 0.08)' : 'rgba(0,0,0,0.15)',
-                              borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)',
-                              boxShadow: isActive ? 'var(--shadow-glow-shakes)' : 'none'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)' }}>
-                                  {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
-                                </span>
-                                {isActive && (
-                                  <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
-                                    LIVE NOW
-                                  </span>
-                                )}
-                              </div>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{slot.block.split(' - ')[0]}</span>
-                            </div>
-                            
-                            <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{slot.game}</p>
-                                {slot.gameExtra && (
-                                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Split: {slot.gameExtra}</p>
-                                )}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px' }}>
-                                <MapPin size={12} style={{ color: 'var(--vbt-sky)' }} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ffffff' }}>{slot.location}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {Array.from({ length: daysCount }, (_, i) => i + 1).map(d => {
+                  const daySchedule = myTeamInfo.schedule.filter(s => {
+                    const sBlockNum = parseInt(s.block?.replace('Block ', ''), 10) || 1;
+                    const sDay = s.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(sBlockNum) ? 1 : 2) : 1);
+                    return sDay === d;
+                  });
 
-                {/* Day 2 Section */}
-                {eventConfig.eventType !== 'service' && (
-                  <div>
-                    <h4 style={{ 
-                      fontSize: '0.75rem', 
-                      color: '#f43f5e', 
-                      fontWeight: '700', 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.05em',
-                      marginBottom: '8px',
-                      borderBottom: '1px solid rgba(244, 63, 94, 0.2)',
-                      paddingBottom: '4px'
-                    }}>
-                      Day 2 (Block 4)
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {myTeamInfo.day2Schedule.length === 0 ? (
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>No Day 2 activities scheduled.</p>
-                      ) : (
-                        myTeamInfo.day2Schedule.map((slot, idx) => {
-                          const isActive = isTimeSlotActive(slot.time, slot.block);
-                          return (
-                            <div 
-                              key={`day2-${idx}`} 
-                              className="glass-panel"
-                              style={{ 
-                                padding: '12px', 
-                                background: isActive ? 'rgba(41, 182, 246, 0.08)' : 'rgba(0,0,0,0.15)',
-                                borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)',
-                                boxShadow: isActive ? 'var(--shadow-glow-shakes)' : 'none'
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)' }}>
-                                    {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
-                                  </span>
-                                  {isActive && (
-                                    <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
-                                      LIVE NOW
+                  const colors = ['var(--vbt-sky)', '#f43f5e', '#a855f7', '#eab308', '#10b981'];
+                  const headerColor = colors[(d - 1) % colors.length];
+
+                  return (
+                    <div key={`myteam-day-${d}`}>
+                      <h4 style={{ 
+                        fontSize: '0.75rem', 
+                        color: headerColor, 
+                        fontWeight: '700', 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.05em',
+                        marginBottom: '8px',
+                        borderBottom: `1px solid ${headerColor}33`,
+                        paddingBottom: '4px'
+                      }}>
+                        Day {d} {eventConfig.eventType === 'camp' ? (d === 1 ? '(Blocks 1-3)' : '(Block 4)') : ''}
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {daySchedule.length === 0 ? (
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>
+                            No Day {d} activities scheduled.
+                          </p>
+                        ) : (
+                          daySchedule.map((slot, idx) => {
+                            const sBlockNum = parseInt(slot.block?.replace('Block ', ''), 10) || 1;
+                            const sDay = slot.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(sBlockNum) ? 1 : 2) : 1);
+                            const isActive = isTimeSlotActive(slot.time, slot.block, sDay);
+                            return (
+                              <div 
+                                key={`day-${d}-${idx}`} 
+                                className="glass-panel"
+                                style={{ 
+                                  padding: '12px', 
+                                  background: isActive ? 'rgba(41, 182, 246, 0.08)' : 'rgba(0,0,0,0.15)',
+                                  borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)',
+                                  boxShadow: isActive ? 'var(--shadow-glow-shakes)' : 'none'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)' }}>
+                                      {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
                                     </span>
-                                  )}
+                                    {isActive && (
+                                      <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
+                                        LIVE NOW
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{slot.block}</span>
                                 </div>
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{slot.block.split(' - ')[0]}</span>
+                                
+                                <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div>
+                                    <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{slot.game}</p>
+                                    {slot.gameExtra && (
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Split: {slot.gameExtra}</p>
+                                    )}
+                                    {slot.opponent && (
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                                        Opponent: <span style={{ color: '#ffffff', fontWeight: '600' }}>{slot.opponent}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px' }}>
+                                    <MapPin size={12} style={{ color: 'var(--vbt-sky)' }} />
+                                    <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ffffff' }}>{slot.location}</span>
+                                  </div>
+                                </div>
                               </div>
-                              
-                              <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                  <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{slot.game}</p>
-                                  {slot.gameExtra && (
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Split: {slot.gameExtra}</p>
-                                  )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px' }}>
-                                  <MapPin size={12} style={{ color: 'var(--vbt-sky)' }} />
-                                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ffffff' }}>{slot.location}</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             </div>
 
@@ -4035,6 +4179,12 @@ export default function App() {
         {/* Tab 3: Full Schedule filterable */}
         {currentTab === 'schedule' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <ScheduleExporter
+              scheduleData={campData}
+              campData={campData}
+              eventConfig={eventConfig}
+              getTeamColorHex={getTeamColorHex}
+            />
             {eventConfig.eventType === 'service' ? (
               <div style={{
                 background: 'rgba(41, 182, 246, 0.1)',
@@ -4062,58 +4212,66 @@ export default function App() {
             )}
 
             {/* Day Selector Segmented Control */}
-            <div className="toggle-group" style={{ 
-              display: 'flex',
-              width: '100%',
-              background: 'rgba(0,0,0,0.25)',
-              borderRadius: '10px',
-              padding: '2px',
-              border: '1px solid var(--border-light)'
-            }}>
-              <button 
-                type="button"
-                className={`toggle-btn ${scheduleDayFilter === '1' ? 'active' : ''}`}
-                onClick={() => setScheduleDayFilter('1')}
-                style={{ 
-                  flex: 1, 
-                  padding: '8px 12px', 
-                  fontSize: '0.8rem', 
-                  fontWeight: '700',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease-in-out',
-                  background: scheduleDayFilter === '1' ? 'var(--gradient-vbt)' : 'transparent',
-                  color: '#ffffff'
-                }}
-              >
-                Day 1 (Blocks 1-3)
-              </button>
-              <button 
-                type="button"
-                className={`toggle-btn ${scheduleDayFilter === '2' ? 'active' : ''}`}
-                onClick={() => setScheduleDayFilter('2')}
-                style={{ 
-                  flex: 1, 
-                  padding: '8px 12px', 
-                  fontSize: '0.8rem', 
-                  fontWeight: '700',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease-in-out',
-                  background: scheduleDayFilter === '2' ? 'var(--gradient-vbt)' : 'transparent',
-                  color: '#ffffff'
-                }}
-              >
-                Day 2 (Block 4)
-              </button>
-            </div>
+            {daysCount > 1 && (
+              <div className="toggle-group" style={{ 
+                display: 'flex',
+                width: '100%',
+                background: 'rgba(0,0,0,0.25)',
+                borderRadius: '10px',
+                padding: '2px',
+                border: '1px solid var(--border-light)',
+                overflowX: 'auto'
+              }}>
+                {Array.from({ length: daysCount }, (_, i) => i + 1).map(d => (
+                  <button 
+                    key={d}
+                    type="button"
+                    className={`toggle-btn ${scheduleDayFilter === String(d) ? 'active' : ''}`}
+                    onClick={() => setScheduleDayFilter(String(d))}
+                    style={{ 
+                      flex: 1, 
+                      padding: '8px 12px', 
+                      fontSize: '0.8rem', 
+                      fontWeight: '700',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease-in-out',
+                      background: scheduleDayFilter === String(d) ? 'var(--gradient-vbt)' : 'transparent',
+                      color: '#ffffff',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Day {d} {eventConfig.eventType === 'camp' ? (d === 1 ? '(Blocks 1-3)' : '(Block 4)') : ''}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <h2 style={{ fontSize: '1.2rem', color: '#ffffff' }}>Matchups & Locations</h2>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {scheduleDayFilter === '1' ? (
+                {eventConfig.eventType === 'service' ? (
+                  <select 
+                    value={scheduleBlockFilter}
+                    onChange={(e) => setScheduleBlockFilter(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border-light)',
+                      color: '#ffffff',
+                      fontSize: '0.75rem',
+                      outline: 'none',
+                      fontWeight: '600'
+                    }}
+                  >
+                    <option value="All">All Blocks</option>
+                    <option value="1">Rotational Stations (Block 1)</option>
+                    <option value="2">Big Game (Block 2)</option>
+                    <option value="3">Reflection (Block 3)</option>
+                  </select>
+                ) : scheduleDayFilter === '1' ? (
                   <select 
                     value={scheduleBlockFilter}
                     onChange={(e) => setScheduleBlockFilter(e.target.value)}
@@ -4449,7 +4607,8 @@ export default function App() {
                 </div>
               ) : (
                 filteredMatchups.map((m, idx) => {
-                  const isActive = isTimeSlotActive(m.time, `Block ${m.block}`);
+                  const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                  const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                   const key = `${m.block}_${m.round}_${m.game}`;
                   const winner = (campState.blockScores || {})[key] || 'NA';
                   
@@ -4621,89 +4780,48 @@ export default function App() {
                   No feed items yet. Edits and announcements will show up here.
                 </div>
               ) : (
-                announcements.map((feed) => {
-                  const time = new Date(feed.timestamp);
-                  const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  
-                  let iconColor = 'var(--text-muted)';
-                  let bgColor = 'var(--bg-surface)';
-                  if (feed.type === 'score') {
-                    iconColor = '#fbbf24';
-                    bgColor = 'rgba(251, 191, 36, 0.04)';
-                  } else if (feed.type === 'deduction') {
-                    iconColor = '#ef4444';
-                    bgColor = 'rgba(239, 68, 68, 0.04)';
-                  } else if (feed.type === 'system') {
-                    iconColor = 'var(--vbt-sky)';
-                    bgColor = 'rgba(41, 182, 246, 0.04)';
-                  }
-                  
-                  return (
-                    <div 
-                      key={feed.id} 
-                      className="glass-panel" 
-                      style={{ 
-                        padding: '12px', 
-                        background: bgColor,
-                        borderLeft: feed.type === 'score' ? '3px solid #fbbf24' : feed.type === 'deduction' ? '3px solid #ef4444' : feed.type === 'system' ? '3px solid var(--vbt-sky)' : '1px solid var(--border-light)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                          {feed.sender}
-                        </span>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                          {timeStr}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{feed.text}</p>
-                      
-                      {feed.image && (
-                        <div style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', maxWidth: '300px', border: '1px solid var(--border-light)' }}>
-                          <img src={feed.image} alt="Feed Attachment" style={{ width: '100%', height: 'auto', display: 'block' }} />
-                        </div>
-                      )}
-
-                      {/* Reactions */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '8px' }}>
-                        {[
-                          { type: 'thumbsup', emoji: '👍' },
-                          { type: 'congrats', emoji: '🎉' },
-                          { type: 'fire', emoji: '🔥' }
-                        ].map(react => {
-                          const list = feed.reactions?.[react.type] || [];
-                          const hasReacted = list.includes(currentUser.name);
-                          return (
-                            <button
-                              key={react.type}
-                              onClick={() => handleToggleReaction(feed.id, react.type)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: hasReacted ? 'rgba(41, 182, 246, 0.15)' : 'rgba(255,255,255,0.03)',
-                                border: '1px solid',
-                                borderColor: hasReacted ? 'var(--vbt-sky)' : 'var(--border-light)',
-                                padding: '4px 8px',
-                                borderRadius: '20px',
-                                color: hasReacted ? 'var(--vbt-sky)' : 'var(--text-secondary)',
-                                fontSize: '0.7rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                              title={list.join(', ') || 'No reactions'}
-                            >
-                              {react.emoji} {list.length}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })
+                announcements.map((feed) => (
+                  <FeedMessage
+                    key={feed.id}
+                    message={{
+                      id: feed.id,
+                      text: feed.text,
+                      sender: feed.sender,
+                      senderRole: feed.senderRole || 'viewer',
+                      type: feed.type,
+                      timestamp: feed.timestamp,
+                      imageUrl: feed.image || feed.imageUrl,
+                      reactions: {
+                        '👍': feed.reactions?.thumbsup || [],
+                        '🎉': feed.reactions?.congrats || [],
+                        '🔥': feed.reactions?.fire || []
+                      }
+                    }}
+                    currentUser={currentUser?.name}
+                    onReact={(id, emoji) => {
+                      const emojiToKey = {
+                        '👍': 'thumbsup',
+                        '🎉': 'congrats',
+                        '🔥': 'fire'
+                      };
+                      handleToggleReaction(id, emojiToKey[emoji]);
+                    }}
+                  />
+                ))
               )}
             </div>
           </div>
+        )}
+
+        {/* Photo Feed Enhancement for Timeline */}
+        {currentTab === 'timeline' && (
+          <PhotoFeed
+            announcements={announcements}
+            currentUser={currentUser}
+            eventCode={currentEventCode}
+            onAddAnnouncement={(text, sender, type, imageUrl) => addAnnouncement(currentEventCode, text, sender, type, imageUrl, currentUser?.role)}
+            onUpdateReactions={(announcementId, reactions) => updateAnnouncementReactions(currentEventCode, announcementId, reactions)}
+          />
         )}
 
         {/* Tab 5: Stats & Deductions */}
@@ -4908,6 +5026,15 @@ export default function App() {
                 </div>
               );
             })()}
+
+            {/* Enhanced Analytics Charts Component */}
+            {statsSubTab === 'charts' && (
+              <StandingsAnalytics
+                campState={campState}
+                campData={campData}
+                eventConfig={eventConfig}
+              />
+            )}
 
             {statsSubTab === 'deductions' && currentUser.role !== 'referee' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -5138,6 +5265,12 @@ export default function App() {
                 <MapIcon size={14} /> Map Key
               </button>
               <button 
+                className={`toggle-btn ${infoSubTab === 'gps' ? 'active' : ''}`}
+                onClick={() => setInfoSubTab('gps')}
+              >
+                <Navigation size={14} /> GPS Map
+              </button>
+              <button 
                 className={`toggle-btn ${infoSubTab === 'timeline' ? 'active' : ''}`}
                 onClick={() => setInfoSubTab('timeline')}
               >
@@ -5154,24 +5287,25 @@ export default function App() {
             {/* Sub-tab Content: Map */}
             {infoSubTab === 'map' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="glass-panel" style={{ padding: '12px', textAlign: 'center' }}>
-                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', marginBottom: '12px' }}>Camp Map & Layout</h3>
-                  
-                  {/* Interactive Map display */}
-                  <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '10px', background: '#ffffff', padding: '4px' }}>
-                    <img 
-                      src="/image1.png" 
-                      alt="Camp Map Layout" 
-                      style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px' }} 
-                    />
-                  </div>
-                </div>
+                {/* Interactive SVG Map Component */}
+                <InteractiveMap
+                  liveLocationStatus={liveLocationStatus}
+                  campData={campData}
+                  campState={campState}
+                  eventConfig={eventConfig}
+                  currentTime={currentTime}
+                  getTeamColorHex={getTeamColorHex}
+                  isServiceMode={eventConfig.eventType === 'service'}
+                  mapConfig={mapConfig}
+                  eventCode={currentEventCode}
+                  currentUser={currentUser}
+                />
 
                 {/* Location Key Interactive List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <h3 style={{ fontSize: '0.9rem', color: '#ffffff', paddingLeft: '4px' }}>Tap a Location to See Schedule</h3>
                   
-                  {locationKey.map((loc, idx) => {
+                  {(eventConfig.locationKey || locationKey).map((loc, idx) => {
                     const isSelected = selectedMapLocation?.id === loc.id;
                     
                     return (
@@ -5208,7 +5342,8 @@ export default function App() {
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No specific team matchups scheduled at this location.</p>
                               ) : (
                                 mapLocationMatches.map((m, mIdx) => {
-                                  const isActive = isTimeSlotActive(m.time, `Block ${m.block}`);
+                                  const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                                  const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                                   return (
                                     <div 
                                       key={mIdx} 
@@ -5236,6 +5371,17 @@ export default function App() {
                   })}
                 </div>
               </div>
+            )}
+
+            {infoSubTab === 'gps' && (
+              <GPSMap
+                eventCode={currentEventCode}
+                currentUser={currentUser}
+                campData={campData}
+                eventConfig={eventConfig}
+                getTeamColorHex={getTeamColorHex}
+                currentTime={currentTime}
+              />
             )}
 
             {/* Sub-tab Content: Day Timeline Schedule Image */}
@@ -5304,10 +5450,61 @@ export default function App() {
           </div>
         )}
 
+        {currentTab === 'walkie' && (
+          <WalkieTalkie
+            eventCode={currentEventCode}
+            currentUser={currentUser}
+          />
+        )}
+
+        {currentTab === 'logistics' && (
+          <LogisticsPanel
+            eventCode={currentEventCode}
+            currentUser={currentUser}
+            eventConfig={eventConfig}
+            campData={campData}
+          />
+        )}
+
         {/* Tab 7: Settings */}
         {currentTab === 'settings' && currentUser && currentUser.role === 'admin' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff' }}>Control Panel</h2>
+
+            {/* Sub-tab selection for Settings */}
+            <div className="toggle-group" style={{ 
+              display: 'flex',
+              background: 'rgba(0,0,0,0.2)',
+              padding: '4px',
+              borderRadius: '10px',
+              border: '1px solid var(--border-light)'
+            }}>
+              <button 
+                className={`toggle-btn ${settingsSubTab === 'config' ? 'active' : ''}`}
+                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+                onClick={() => setSettingsSubTab('config')}
+              >
+                ⚙️ Service Setup
+              </button>
+              <button 
+                className={`toggle-btn ${settingsSubTab === 'builder' ? 'active' : ''}`}
+                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+                onClick={() => setSettingsSubTab('builder')}
+              >
+                📅 Schedule Builder
+              </button>
+            </div>
+
+            {settingsSubTab === 'config' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Dynamic Configurator - Church Service Adaptability */}
+                <DynamicConfigurator
+              eventConfig={eventConfig}
+              onSaveConfig={async (updates) => {
+                await updateEventConfig(currentEventCode, updates);
+              }}
+              campData={campData}
+            />
 
             {eventConfig.eventType === 'service' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -5318,15 +5515,28 @@ export default function App() {
                   </p>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
-                      <input
-                        type="number"
-                        value={editKidCount}
-                        onChange={(e) => setEditKidCount(parseInt(e.target.value, 10) || '')}
-                        placeholder="e.g. 100"
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
+                        <input
+                          type="number"
+                          value={editKidCount}
+                          onChange={(e) => setEditKidCount(parseInt(e.target.value, 10) || '')}
+                          placeholder="e.g. 100"
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Days of Event</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={editDaysCount}
+                          onChange={(e) => setEditDaysCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
                     </div>
 
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
@@ -5917,18 +6127,186 @@ export default function App() {
 
             {/* ── EVENT SETUP CARD ────────────────────────────────────────── */}
 
-            {currentUser.role === 'admin' && editEventConfig && (
+            {currentUser.role === 'admin' && editEventConfig && (() => {
+              // Ensure teams array exists in editEventConfig
+              const DEFAULT_TEAM_PRESETS = [
+                { name: 'Red', color: '#ef4444' },
+                { name: 'White', color: '#f8fafc' },
+                { name: 'Black', color: '#94a3b8' },
+                { name: 'Blue', color: '#29b6f6' },
+                { name: 'Green', color: '#22c55e' },
+                { name: 'Yellow', color: '#facc15' },
+                { name: 'Purple', color: '#a78bfa' },
+                { name: 'Orange', color: '#f97316' },
+              ];
+              const COLOR_SWATCHES = ['#ef4444','#f8fafc','#94a3b8','#29b6f6','#22c55e','#facc15','#a78bfa','#f97316','#ec4899','#14b8a6','#6366f1','#84cc16'];
+              
+              const teams = editEventConfig.teams || (
+                eventConfig.eventType === 'service'
+                  ? [
+                      { name: eventConfig.teamNames?.red || 'Red', color: '#ef4444' },
+                      { name: eventConfig.teamNames?.white || 'White', color: '#f8fafc' },
+                      { name: eventConfig.teamNames?.black || 'Black', color: '#94a3b8' },
+                      { name: eventConfig.teamNames?.blue || 'Blue', color: '#29b6f6' },
+                    ]
+                  : [
+                      { name: editEventConfig.side1Name || eventConfig.side1Name || 'Shakes', color: '#00b0ff' },
+                      { name: editEventConfig.side2Name || eventConfig.side2Name || 'Fries', color: '#ff9100' },
+                    ]
+              );
+
+              const updateTeams = (newTeams) => {
+                setEditEventConfig(prev => ({ ...prev, teams: newTeams }));
+              };
+              const addTeam = () => {
+                const nextPreset = DEFAULT_TEAM_PRESETS[teams.length] || { name: `Team ${teams.length + 1}`, color: COLOR_SWATCHES[teams.length % COLOR_SWATCHES.length] };
+                updateTeams([...teams, nextPreset]);
+              };
+              const removeTeam = (idx) => {
+                if (teams.length <= 2) return;
+                updateTeams(teams.filter((_, i) => i !== idx));
+              };
+              const updateTeam = (idx, key, value) => {
+                const updated = teams.map((t, i) => i === idx ? { ...t, [key]: value } : t);
+                updateTeams(updated);
+              };
+
+              return (
               <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(41,182,246,0.2)', background: 'rgba(41,182,246,0.03)' }}>
                 <h3 style={{ fontSize: '0.9rem', color: '#29b6f6', marginBottom: '4px' }}>⚙️ Event Setup</h3>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Customize this event's branding, team names, and access passcodes.</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Standard config fields */}
                   {[['Event Name', 'eventName', 'e.g. VBT Summer Camp 2027'],
                     ['Description', 'description', 'e.g. Live scoring & team management'],
                     ['Event Date', 'eventDate', 'e.g. June 20, 2027'],
-                    ['Side 1 Name (left team)', 'side1Name', 'e.g. Shakes, Red, Lions'],
-                    ['Side 2 Name (right team)', 'side2Name', 'e.g. Fries, Blue, Tigers'],
-                    ['Coordinator Passcode', 'passcodeCoordinator', 'Admin passcode'],
+                  ].map(([label, field, ph]) => (
+                    <div key={field}>
+                      <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px' }}>{label}</label>
+                      <input
+                        type="text"
+                        value={editEventConfig[field] || ''}
+                        onChange={(e) => setEditEventConfig(prev => ({ ...prev, [field]: e.target.value }))}
+                        placeholder={ph}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                      />
+                    </div>
+                  ))}
+
+                  {/* ── DYNAMIC TEAMS EDITOR ──────────────────────────── */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#29b6f6', fontWeight: '700' }}>
+                        Teams ({teams.length})
+                      </label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => { if (teams.length > 2) updateTeams(teams.slice(0, -1)); }}
+                          disabled={teams.length <= 2}
+                          style={{
+                            width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-light)',
+                            background: teams.length <= 2 ? 'rgba(0,0,0,0.2)' : 'rgba(239,68,68,0.15)', color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
+                            fontSize: '1rem', fontWeight: '700', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >−</button>
+                        <button
+                          type="button"
+                          onClick={addTeam}
+                          disabled={teams.length >= 8}
+                          style={{
+                            width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-light)',
+                            background: teams.length >= 8 ? 'rgba(0,0,0,0.2)' : 'rgba(41,182,246,0.15)', color: teams.length >= 8 ? 'var(--text-muted)' : '#29b6f6',
+                            fontSize: '1rem', fontWeight: '700', cursor: teams.length >= 8 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >+</button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {teams.map((team, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          padding: '8px 10px', borderRadius: '10px',
+                          background: 'rgba(0,0,0,0.2)', border: `1px solid ${team.color}33`
+                        }}>
+                          {/* Color indicator + picker */}
+                          <div style={{ position: 'relative', flexShrink: 0 }}>
+                            <div
+                              style={{
+                                width: '32px', height: '32px', borderRadius: '8px',
+                                background: team.color, border: '2px solid rgba(255,255,255,0.2)',
+                                cursor: 'pointer', position: 'relative', overflow: 'hidden'
+                              }}
+                            >
+                              <input
+                                type="color"
+                                value={team.color}
+                                onChange={(e) => updateTeam(idx, 'color', e.target.value)}
+                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Team number badge */}
+                          <span style={{
+                            fontSize: '0.65rem', fontWeight: '800', color: team.color,
+                            minWidth: '14px', textAlign: 'center'
+                          }}>
+                            {idx + 1}
+                          </span>
+
+                          {/* Name input */}
+                          <input
+                            type="text"
+                            value={team.name}
+                            onChange={(e) => updateTeam(idx, 'name', e.target.value)}
+                            placeholder={`Team ${idx + 1}`}
+                            style={{
+                              flex: 1, padding: '7px 10px', borderRadius: '6px',
+                              background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                              color: '#ffffff', fontSize: '0.85rem', outline: 'none',
+                              fontFamily: 'var(--font-body)'
+                            }}
+                          />
+
+                          {/* Color quick-swatches (top 6) */}
+                          <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                            {COLOR_SWATCHES.slice(0, 4).map((c) => (
+                              <div
+                                key={c}
+                                onClick={() => updateTeam(idx, 'color', c)}
+                                style={{
+                                  width: '14px', height: '14px', borderRadius: '3px',
+                                  background: c, cursor: 'pointer',
+                                  border: team.color === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.15)',
+                                  transition: 'transform 0.15s',
+                                }}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => removeTeam(idx)}
+                            disabled={teams.length <= 2}
+                            style={{
+                              width: '24px', height: '24px', borderRadius: '6px',
+                              border: 'none', background: teams.length <= 2 ? 'transparent' : 'rgba(239,68,68,0.15)',
+                              color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
+                              fontSize: '0.8rem', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                            }}
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Passcode fields */}
+                  {[['Coordinator Passcode', 'passcodeCoordinator', 'Admin passcode'],
                     ['Game Leader Passcode', 'passcodeGameLeader', 'Referee passcode'],
                     ['Team Leader Passcode', 'passcodeTeamLeader', 'Leader passcode']
                   ].map(([label, field, ph]) => (
@@ -5939,11 +6317,7 @@ export default function App() {
                         value={editEventConfig[field] || ''}
                         onChange={(e) => setEditEventConfig(prev => ({ ...prev, [field]: e.target.value }))}
                         placeholder={ph}
-                        style={{
-                          width: '100%', padding: '9px 12px', borderRadius: '8px',
-                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                          color: '#ffffff', fontSize: '0.85rem', outline: 'none'
-                        }}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
                       />
                     </div>
                   ))}
@@ -5980,6 +6354,21 @@ export default function App() {
                   </button>
                 </div>
               </div>
+              );
+            })()}
+            </div>
+            )}
+
+            {settingsSubTab === 'builder' && (
+              <ScheduleBuilder
+                eventCode={currentEventCode}
+                eventConfig={eventConfig}
+                campData={campData}
+                getTeamColorHex={getTeamColorHex}
+                onPublish={(docs) => {
+                  playChime('schedule');
+                }}
+              />
             )}
           </div>
         )}

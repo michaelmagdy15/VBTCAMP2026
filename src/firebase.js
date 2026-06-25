@@ -289,7 +289,7 @@ export function subscribeToAnnouncements(eventCode, callback, maxItems = 50) {
  * @param {string} type
  * @param {string|null} image
  */
-export async function addAnnouncement(eventCode, text, sender, type = 'announcement', image = null) {
+export async function addAnnouncement(eventCode, text, sender, type = 'announcement', image = null, senderRole = null) {
   const colRef = collection(db, eventAnnouncementsPath(eventCode));
   try {
     await addDoc(colRef, {
@@ -297,6 +297,7 @@ export async function addAnnouncement(eventCode, text, sender, type = 'announcem
       sender,
       type,
       image,
+      senderRole,
       reactions: { thumbsup: [], congrats: [], fire: [] },
       timestamp: new Date().toISOString()
     });
@@ -635,58 +636,65 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     4: "04:15 PM"
   };
 
-  // Generate Rotational Matchups (4 Rounds)
+  // Generate Rotational Matchups (4 Rounds) for each day
   const numLocations = Math.max(4, P);
-  for (let r = 1; r <= 4; r++) {
-    for (let p = 0; p < P; p++) {
-      const teamA = teamListForPairs[2 * p];
-      const teamB = teamListForPairs[2 * p + 1];
+  const daysCount = configData.daysCount || 1;
 
-      // Station index: circular shift per round to prevent collisions
-      const stationIdx = (p + r - 1) % numLocations;
+  for (let d = 1; d <= daysCount; d++) {
+    for (let r = 1; r <= 4; r++) {
+      for (let p = 0; p < P; p++) {
+        const teamA = teamListForPairs[2 * p];
+        const teamB = teamListForPairs[2 * p + 1];
 
-      let gameName = "Rest & Quiz";
-      let locName = "Rest Area";
+        // Station index: circular shift per round to prevent collisions
+        const stationIdx = (p + r - 1) % numLocations;
 
-      if (stationIdx < 4) {
-        const stKey = `station_${stationIdx + 1}`;
-        gameName = stations[stKey].name;
-        locName = stations[stKey].location;
+        let gameName = "Rest & Quiz";
+        let locName = "Rest Area";
+
+        if (stationIdx < 4) {
+          const stKey = `station_${stationIdx + 1}`;
+          gameName = stations[stKey].name;
+          locName = stations[stKey].location;
+        }
+
+        matchups.push({
+          day: d,
+          block: 1, // block 1 is rotational rounds
+          round: r,
+          game: gameName,
+          time: roundTimes[r],
+          shakes: teamA,
+          fries: teamB,
+          location: locName
+        });
       }
-
-      matchups.push({
-        block: 1, // block 1 is rotational rounds
-        round: r,
-        game: gameName,
-        time: roundTimes[r],
-        shakes: teamA,
-        fries: teamB,
-        location: locName
-      });
     }
+
+    // Add Big Game (Block 2)
+    matchups.push({
+      day: d,
+      block: 2,
+      round: 1,
+      game: bigGameName,
+      time: "04:35 PM",
+      shakes: "All Teams",
+      fries: "Referees",
+      location: bigGameLoc
+    });
+
+    // Add Reflection (Block 3)
+    matchups.push({
+      day: d,
+      block: 3,
+      round: 1,
+      game: reflectionName,
+      time: "05:10 PM",
+      shakes: "All Teams",
+      fries: "Bible Discussion",
+      location: reflectionLoc
+    });
   }
-
-  // Add Big Game (Block 2)
-  matchups.push({
-    block: 2,
-    round: 1,
-    game: bigGameName,
-    time: "04:35 PM",
-    shakes: "All Teams",
-    fries: "Referees",
-    location: bigGameLoc
-  });
-
-  // Add Reflection (Block 3)
-  matchups.push({
-    block: 3,
-    round: 1,
-    game: reflectionName,
-    time: "05:10 PM",
-    shakes: "All Teams",
-    fries: "Bible Discussion",
-    location: reflectionLoc
-  });
 
   // Construct schedule data payload
   const scheduleData = {

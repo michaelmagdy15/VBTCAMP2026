@@ -1,7 +1,10 @@
 {
   "name": "VBT Sports Camp '26",
   "short_name": "VBT Camp",
+  "description": "Live scoring, schedule & team management for VBT Sports Camp",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#070a13",

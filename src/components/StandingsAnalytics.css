@@ -1,0 +1,250 @@
+/* ===== StandingsAnalytics.css ===== */
+
+.analytics-container {
+  width: 100%;
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ---- Toggle Group ---- */
+.analytics-toggle-group {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  background: rgba(13, 20, 38, 0.55);
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  width: fit-content;
+  margin: 0 auto;
+}
+
+.analytics-toggle-btn {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  color: #94a3b8;
+  background: transparent;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.analytics-toggle-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.analytics-toggle-btn.active {
+  color: #f8fafc;
+  background: rgba(41, 182, 246, 0.18);
+  box-shadow: 0 0 12px rgba(41, 182, 246, 0.12);
+}
+
+/* ---- Canvas Container ---- */
+.analytics-canvas-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 16px;
+  background: rgba(13, 20, 38, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.analytics-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Aspect ratio wrapper for the chart canvas */
+.analytics-chart-aspect {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  min-height: 220px;
+  max-height: 420px;
+}
+
+.analytics-chart-aspect canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---- Section Title ---- */
+.analytics-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0 0 0.75rem 0;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.analytics-section-title svg {
+  opacity: 0.6;
+}
+
+/* ---- Empty State ---- */
+.analytics-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  color: #64748b;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.88rem;
+  text-align: center;
+  gap: 0.5rem;
+  min-height: 160px;
+}
+
+.analytics-empty span {
+  opacity: 0.7;
+}
+
+/* ---- Deduction Bar Chart ---- */
+.analytics-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.55rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.analytics-bar-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #f8fafc;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.analytics-bar-track {
+  flex: 1;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.analytics-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 2px;
+}
+
+.analytics-bar-value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f8fafc;
+  min-width: 32px;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+/* ---- Token Card Grid ---- */
+.analytics-token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.analytics-token-card {
+  border-radius: 14px;
+  padding: 1.1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.analytics-token-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.analytics-token-card-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.analytics-token-count {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.analytics-token-points {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.8;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 600px) {
+  .analytics-toggle-btn {
+    font-size: 0.72rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .analytics-chart-aspect {
+    aspect-ratio: 5 / 3;
+    min-height: 180px;
+  }
+
+  .analytics-token-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-bar-label {
+    min-width: 42px;
+    font-size: 0.72rem;
+  }
+
+  .analytics-canvas-wrap {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .analytics-toggle-group {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .analytics-token-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .analytics-token-card {
+    padding: 0.85rem 0.6rem;
+  }
+}

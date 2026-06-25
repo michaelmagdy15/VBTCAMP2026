@@ -1,5 +1,17 @@
 {
-  "firestore": {
-    "rules": "firestore.rules"
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules",
+      "indexes": "firestore-default.indexes.json"
+    },
+    {
+      "database": "db-vbt",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
   }
 }

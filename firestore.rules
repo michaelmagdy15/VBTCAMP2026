@@ -29,6 +29,12 @@ service cloud.firestore {
     match /vbt_push_tokens/{tokenId} {
       allow read, write: if true;
     }
+    match /vbt_servants/{servantId} {
+      allow read, write: if true;
+    }
+    match /vbt_service_templates/{templateId} {
+      allow read, write: if true;
+    }
 
     // ===============================================================
     // Global Auth Helpers

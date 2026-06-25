@@ -1,11 +1,13 @@
-const CACHE_NAME = 'vbt-sports-camp-v2';
+const CACHE_NAME = 'vbt-sports-camp-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/favicon.svg',
   '/Final VBT Re-Branding 2026-02 (3).png',
   '/image1.png',
-  '/image2.jpg'
+  '/image2.jpg',
+  '/manifest.json',
+  '/icons.svg'
 ];
 
 // Install Event
@@ -140,5 +142,18 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+});
+
+// Background Sync Event
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'vbt-offline-sync') {
+    event.waitUntil(
+      self.clients.matchAll().then((allClients) => {
+        allClients.forEach((client) => {
+          client.postMessage({ type: 'SYNC_READY' });
+        });
+      })
+    );
   }
 });
