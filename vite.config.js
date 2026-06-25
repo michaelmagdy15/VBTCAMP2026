@@ -14,6 +14,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
+        importScripts: ['sw-push.js'], // ← injects our push/notificationclick handlers
         // Cache all app assets including audio files for offline use
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,mp3,wav,webm,ogg}'],
         maximumFileSizeToCacheInBytes: 15000000, // 15MB — covers all sound files

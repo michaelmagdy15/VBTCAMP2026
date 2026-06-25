@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import html2canvas from 'html2canvas';
-import { Share2, Download, Loader } from 'lucide-react';
+import jsPDF from 'jspdf';
+import { Loader } from 'lucide-react';
 
 const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -17,48 +18,67 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
         logging: false,
       });
 
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          setIsGenerating(false);
-          return;
-        }
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
 
-        const file = new File([blob], 'schedule.png', { type: 'image/png' });
+      // A4 page in portrait, units in px at 96dpi
+      // We fit the rendered image width-first across however many pages are needed.
+      const pdfWidthPt = 595.28;   // A4 width  in pt  (72pt = 1 inch)
+      const pdfHeightPt = 841.89;  // A4 height in pt
 
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: eventConfig?.eventName || 'VBT Schedule',
-              text: 'Check out the schedule!',
-            });
-          } catch (err) {
-            if (err.name !== 'AbortError') {
-              downloadBlob(blob);
-            }
-          }
-        } else {
-          downloadBlob(blob);
-        }
+      // Scale factor: map canvas px → pdf pt
+      const ratio = pdfWidthPt / imgWidth;
+      const scaledImgHeightPt = imgHeight * ratio;
 
-        setIsGenerating(false);
-      }, 'image/png');
+      const pdf = new jsPDF({
+        orientation: scaledImgHeightPt > pdfHeightPt ? 'portrait' : 'portrait',
+        unit: 'pt',
+        format: 'a4',
+      });
+
+      let yOffset = 0;
+      let remainingHeight = scaledImgHeightPt;
+      let pageIndex = 0;
+
+      // Slice canvas across multiple pages if the schedule is tall
+      while (remainingHeight > 0) {
+        if (pageIndex > 0) pdf.addPage();
+
+        // Height of this slice in canvas pixels
+        const sliceHeightPx = Math.min(
+          Math.round(pdfHeightPt / ratio),
+          imgHeight - Math.round(yOffset / ratio)
+        );
+        const sliceTopPx = Math.round(yOffset / ratio);
+
+        // Draw only the slice using a temp canvas
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = imgWidth;
+        sliceCanvas.height = sliceHeightPx;
+        const ctx = sliceCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, sliceTopPx, imgWidth, sliceHeightPx, 0, 0, imgWidth, sliceHeightPx);
+
+        const sliceData = sliceCanvas.toDataURL('image/png');
+        const sliceHeightPt = sliceHeightPx * ratio;
+        pdf.addImage(sliceData, 'PNG', 0, 0, pdfWidthPt, sliceHeightPt);
+
+        yOffset += pdfHeightPt;
+        remainingHeight -= pdfHeightPt;
+        pageIndex++;
+      }
+
+      const fileName = `${eventConfig?.eventName || 'VBT-Schedule'}.pdf`
+        .replace(/\s+/g, '-')
+        .replace(/[^a-zA-Z0-9\-_.]/g, '');
+
+      pdf.save(fileName);
     } catch (err) {
-      console.error('Export failed:', err);
+      console.error('PDF export failed:', err);
+    } finally {
       setIsGenerating(false);
     }
   }, [eventConfig]);
-
-  const downloadBlob = (blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'schedule.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -76,6 +96,8 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
   };
 
   const matchups = campData?.matchups || [];
+  const side1Label = eventConfig?.side1Name || 'Side 1';
+  const side2Label = eventConfig?.side2Name || 'Side 2';
 
   return (
     <>
@@ -108,11 +130,11 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
         {isGenerating ? (
           <>
             <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
-            Generating…
+            Generating PDF…
           </>
         ) : (
           <>
-            📤 Share Schedule
+            📄 Export PDF
           </>
         )}
       </button>
@@ -342,7 +364,7 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {shakeTeams.length === 2 && (
                       <TeamMatchupRow
-                        label="Shakes"
+                        label={side1Label}
                         team1={shakeTeams[0]?.trim()}
                         team2={shakeTeams[1]?.trim()}
                         getTeamColorHex={getTeamColorHex}
@@ -350,7 +372,7 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
                     )}
                     {friesTeams.length === 2 && (
                       <TeamMatchupRow
-                        label="Fries"
+                        label={side2Label}
                         team1={friesTeams[0]?.trim()}
                         team2={friesTeams[1]?.trim()}
                         getTeamColorHex={getTeamColorHex}

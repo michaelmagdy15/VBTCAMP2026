@@ -313,6 +313,16 @@ export async function addAnnouncement(eventCode, text, sender, type = 'announcem
       reactions: { thumbsup: [], congrats: [], fire: [] },
       timestamp: new Date().toISOString()
     });
+
+    // Fire push notification to all subscribed devices (best-effort)
+    const isUrgent = type === 'ping' || type === 'urgent';
+    const emoji = isUrgent ? '🚨' : type === 'round_start' ? '🏐' : type === 'schedule' ? '📅' : '📢';
+    sendWebPushNotification(
+      `${emoji} ${sender}`,
+      text,
+      type
+    ).catch(() => {}); // never block the Firestore write
+
   } catch (error) {
     console.error("Error adding announcement:", error);
   }
@@ -334,70 +344,119 @@ export async function updateAnnouncementReactions(eventCode, id, reactions) {
 }
 
 // ─────────────────────────────────────────────
-// PUSH NOTIFICATIONS
+// WEB PUSH (using standard PushManager API)
+// Works on iOS 16.4+ Safari PWA and Android Chrome
 // ─────────────────────────────────────────────
 
+// URL of the deployed Cloud Run notification service
+// This will be updated automatically after the first deploy
+export const NOTIFY_SERVICE_URL = 'https://vbt-notify-service-430356395102.europe-west1.run.app';
+
+export const VAPID_PUBLIC_KEY = 'BE7Vwn_moGbtJ4gXEFj61BnvQ5HEnbmaaLneCm-65ITNq2CyzcdxtwqfrfyDar_EjMT8IpP1B_AmnPxk9NDYeTw';
+
 /**
- * Lazily loads and returns the Firebase Messaging instance if supported.
+ * Subscribe this browser to Web Push and register with the notify service.
+ * Call after notification permission is granted.
+ * @param {string} uid  - user identifier
+ * @param {string} name - display name
+ * @param {string} role - user role
  */
+export async function subscribeToWebPush(uid, name, role) {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn('[Push] PushManager not supported in this browser');
+      return null;
+    }
+    const registration = await navigator.serviceWorker.ready;
+
+    // Convert base64 VAPID key to Uint8Array
+    const urlBase64ToUint8Array = (base64String) => {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+    };
+
+    // Always unsubscribe any existing subscription first.
+    // This prevents VAPID-key mismatch if a prior FCM subscription exists.
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) await existing.unsubscribe();
+
+    const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    // Register subscription with our Cloud Run notification service
+    const res = await fetch(`${NOTIFY_SERVICE_URL}/subscribe`, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ uid, name, role, subscription }),
+    });
+
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    console.log('[Push] Web Push subscription registered successfully');
+    return subscription;
+  } catch (err) {
+    console.error('[Push] Failed to subscribe to Web Push:', err);
+    return null;
+  }
+}
+
+/**
+ * Send a push notification to all subscribed devices via the notify service.
+ * Called automatically by addAnnouncement — no need to call manually.
+ */
+export async function sendWebPushNotification(title, body, type = 'announcement') {
+  try {
+    await fetch(`${NOTIFY_SERVICE_URL}/notify`, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ title, body, type }),
+    });
+  } catch (err) {
+    // Non-blocking — network may be down, Firestore write already succeeded
+    console.warn('[Push] Failed to send push notification:', err);
+  }
+}
+
+// Legacy FCM helpers (kept for compatibility)
 export async function getFirebaseMessaging() {
   try {
     const supported = await isSupported();
-    if (supported) {
-      return getMessaging(app);
-    }
+    if (supported) return getMessaging(app);
   } catch (e) {
-    console.warn("FCM is not supported in this environment:", e);
+    console.warn('FCM not supported:', e);
   }
   return null;
 }
 
-/**
- * Saves a device push token (web FCM or native APNs/FCM) to Firestore.
- */
 export async function registerDevicePushToken(userId, role, tokenOrVapidKey, platform = 'web') {
   try {
     let token = null;
-
     if (platform === 'native') {
-      // Native APNs/FCM token is passed directly from Capacitor
       token = tokenOrVapidKey;
     } else {
-      // Web PWA FCM token requires fetching via the Web VAPID key
       const messaging = await getFirebaseMessaging();
       if (!messaging) return null;
-
       if (Notification.permission !== 'granted') {
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          console.warn("Notification permission was denied by the user.");
-          return null;
-        }
+        if (permission !== 'granted') return null;
       }
-
       const registration = await navigator.serviceWorker.ready;
-      token = await getToken(messaging, {
-        vapidKey: tokenOrVapidKey,
-        serviceWorkerRegistration: registration
-      });
+      token = await getToken(messaging, { vapidKey: tokenOrVapidKey, serviceWorkerRegistration: registration });
     }
-
     if (token) {
       const tokenRef = doc(db, 'vbt_push_tokens', token);
       await setDoc(tokenRef, {
-        token,
-        userId: userId || 'anonymous',
-        role: role || 'viewer',
-        platform: platform,
-        userAgent: navigator.userAgent,
-        updatedAt: new Date().toISOString()
+        token, userId: userId || 'anonymous', role: role || 'viewer',
+        platform, userAgent: navigator.userAgent, updatedAt: new Date().toISOString()
       }, { merge: true });
-      
-      console.log(`[Push] Registered ${platform} push token in Firestore:`, token);
+      console.log(`[Push] Registered ${platform} FCM token`);
       return token;
     }
   } catch (error) {
-    console.error(`Failed to register ${platform} push token:`, error);
+    console.error(`Failed to register push token:`, error);
   }
   return null;
 }

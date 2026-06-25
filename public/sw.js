@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vbt-sports-camp-v4';
+const CACHE_NAME = 'vbt-sports-camp-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

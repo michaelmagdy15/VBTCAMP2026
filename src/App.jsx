@@ -52,7 +52,9 @@ import {
   updateServant,
   addServant,
   deleteServant,
-  generateAndSaveServiceSchedule
+  generateAndSaveServiceSchedule,
+  subscribeToWebPush,
+  NOTIFY_SERVICE_URL
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -206,23 +208,14 @@ function showLocalNotification(title, body) {
 // Trigger remote push notifications for all registered devices
 const triggerRemotePushNotification = async (title, body, targetUrl = '/') => {
   try {
-    const res = await fetch('https://sync-vbt-sheet-75ez7bhuzq-ew.a.run.app', {
+    const res = await fetch(`${NOTIFY_SERVICE_URL}/notify`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action: 'send_push',
-        title,
-        body,
-        url: targetUrl
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body, url: targetUrl })
     });
-    if (!res.ok) {
-      console.error("Failed to send remote push notification:", res.status);
-    }
+    if (!res.ok) console.error('Failed to send remote push:', res.status);
   } catch (err) {
-    console.error("Error triggering remote push:", err);
+    console.error('Error triggering remote push:', err);
   }
 };
 
@@ -722,11 +715,44 @@ export default function App() {
     }
   }, [campData, eventConfig]);
 
-  // Set up push notifications (Web PWA or Native Capacitor iOS) on user login
+  // Set up push notifications on first user gesture after login
+  // iOS Safari PWA blocks both Notification.requestPermission() and pushManager.subscribe()
+  // unless triggered from a direct user gesture (tap/click). This mirrors the audio unlock pattern.
   useEffect(() => {
-    if (currentUser) {
-      setupPushNotifications(currentUser, WEBPUSH_VAPID_KEY);
+    if (!currentUser) return;
+    // If already granted, subscribe immediately via a micro-task (works on Android/desktop)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      const uid  = currentUser.uid  || currentUser.name || 'user';
+      const name = currentUser.name || 'Unknown';
+      const role = currentUser.role || 'viewer';
+      subscribeToWebPush(uid, name, role).catch(() => {});
+      return;
     }
+
+    // For iOS: wait for the first user gesture then request permission + subscribe
+    const handleGesture = async () => {
+      window.removeEventListener('click',      handleGesture);
+      window.removeEventListener('touchstart', handleGesture);
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+        const uid  = currentUser.uid  || currentUser.name || 'user';
+        const name = currentUser.name || 'Unknown';
+        const role = currentUser.role || 'viewer';
+        await subscribeToWebPush(uid, name, role);
+        console.log('[Push] Subscribed via gesture handler');
+      } catch (err) {
+        console.warn('[Push] Gesture-based subscribe failed:', err);
+      }
+    };
+
+    window.addEventListener('click',      handleGesture, { once: true });
+    window.addEventListener('touchstart', handleGesture, { once: true });
+
+    return () => {
+      window.removeEventListener('click',      handleGesture);
+      window.removeEventListener('touchstart', handleGesture);
+    };
   }, [currentUser]);
 
   // Listen for native push notifications in the foreground
