@@ -1,29 +1,18 @@
-// ─── WalkieTalkie.jsx ──────────────────────────────────────────────────
-// Walkie-talkie style voice messaging panel for VBT Sports Camp
-// ────────────────────────────────────────────────────────────────────────
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Mic,
-  MicOff,
-  Play,
-  Pause,
-  Radio,
-  Users,
-  Shield,
-  Globe,
-  Trash2,
-} from 'lucide-react';
+import { Mic, MicOff, Play, Pause, Radio, Users, Shield, Globe, Trash2 } from 'lucide-react';
 import {
   VoiceRecorder,
   uploadVoiceMessage,
   subscribeToVoiceMessages,
+  clearVoiceMessages,
   CHANNELS,
   getChannelLabel,
-  getChannelColor,
-  clearVoiceMessages,
+  getChannelColor
 } from '../voip';
 import { playChime } from '../chimes';
+import { agoraClient, AGORA_APP_ID } from '../agoraConfig';
+import { acquireChannelLock, releaseChannelLock, subscribeToChannelLock } from '../liveAudio';
+import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks, usePublish } from "agora-rtc-react";
 
 // ── Design tokens (inline) ─────────────────────────────────────────────
 const T = {
@@ -55,7 +44,6 @@ const CHANNEL_META = [
   { key: CHANNELS.GLOBAL, icon: Globe, color: '#22c55e' },
 ];
 
-/** Which channels each role can access. */
 function getAllowedChannels(role) {
   switch ((role || '').toLowerCase()) {
     case 'admin':
@@ -89,20 +77,12 @@ function relativeTime(ts) {
 
 function avatarInitials(name) {
   if (!name) return '?';
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+  return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 }
-
-// Keyframes are now handled globally in index.css
-
 
 // ── Sub-components ─────────────────────────────────────────────────────
 
-/** Individual voice-message bubble */
+/** Individual voice-message bubble (for Replay History) */
 function MessageBubble({ msg, channelColor }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -277,13 +257,13 @@ function MessageBubble({ msg, channelColor }) {
           cursor: 'pointer',
           flexShrink: 0,
           transition: 'transform 0.15s',
-      }}
-      onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-      onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-      onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-      onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-      aria-label={playing ? 'Pause' : 'Play'}
-    >
+        }}
+        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+        onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        aria-label={playing ? 'Pause' : 'Play'}
+      >
         {playing ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
       </button>
 
@@ -293,7 +273,7 @@ function MessageBubble({ msg, channelColor }) {
   );
 }
 
-/** Waveform animation shown while recording */
+/** Waveform animation shown while talking */
 function Waveform() {
   const bars = 20;
   return (
@@ -315,7 +295,6 @@ function Waveform() {
   );
 }
 
-/** Spinner shown during upload */
 function Spinner({ size = 22, color = '#fff' }) {
   return (
     <div
@@ -331,98 +310,61 @@ function Spinner({ size = 22, color = '#fff' }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────
+// ── Main component Inner ───────────────────────────────────────────────
 
-export default function WalkieTalkie({ eventCode, currentUser }) {
-  // currentUser shape: { name, role, uid? }
+function WalkieTalkieInner({ eventCode, currentUser }) {
   const allowed = getAllowedChannels(currentUser?.role);
   const [activeChannel, setActiveChannel] = useState(allowed[0] || CHANNELS.GLOBAL);
-  const [messages, setMessages] = useState([]);
-  const [recording, setRecording] = useState(false);
-  const [recordTimer, setRecordTimer] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
+  
+  const [mySessionId] = useState(() => currentUser?.uid || Math.random().toString(36).slice(2));
+  const [channelLock, setChannelLock] = useState({ isBusy: false, currentSpeakerUid: null, currentSpeakerName: null });
+  const [amISpeaking, setAmISpeaking] = useState(false);
 
+  const [messages, setMessages] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const recorderRef = useRef(new VoiceRecorder());
   const feedRef = useRef(null);
-  const timerRef = useRef(null);
-  const lastPlayedIdRef = useRef(null);
-  const initialLoadRef = useRef(true);
-  const liveAudioRef = useRef(null);
 
-  // Unlock audio context and HTML5 audio element on user interaction for iOS support
-  const unlockAudio = useCallback(() => {
-    const a = liveAudioRef.current;
-    if (a && !a.src) {
-      // 1 second of silent mp3
-      a.src = 'data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRbAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsTOAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsUAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsWAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsXAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsYAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsZAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsaAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQscAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsdAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQseAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsfAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsgAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQshAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsiAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsjAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQskAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQslAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsmAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsnAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsoAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQspAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsqAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQssAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQstAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsuAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsvAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQswAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsxAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsyAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQszAAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs0AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs1AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs2AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs3AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs4AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs5AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs6AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs7AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs8AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
-      a.play().catch(() => {});
-    }
-  }, []);
+  // Agora Integration
+  useJoin({
+    appid: AGORA_APP_ID,
+    channel: `${eventCode}_${activeChannel}`,
+    token: null,
+  }, !!eventCode && !!activeChannel);
 
-  // Globally attach unlockAudio to the first interaction so users don't have to press a button
+  const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
+  usePublish([localMicrophoneTrack]);
+
+  const remoteUsers = useRemoteUsers();
+  const { audioTracks } = useRemoteAudioTracks(remoteUsers);
+
+  // Auto-play incoming audio
   useEffect(() => {
-    const handleFirstInteraction = () => {
-      unlockAudio();
-      window.removeEventListener('click', handleFirstInteraction, true);
-      window.removeEventListener('touchstart', handleFirstInteraction, true);
-    };
-    
-    // Use capture phase to ensure it fires as early as possible
-    window.addEventListener('click', handleFirstInteraction, true);
-    window.addEventListener('touchstart', handleFirstInteraction, true);
-    
-    return () => {
-      window.removeEventListener('click', handleFirstInteraction, true);
-      window.removeEventListener('touchstart', handleFirstInteraction, true);
-    };
-  }, [unlockAudio]);
+    audioTracks.forEach((track) => track.play());
+  }, [audioTracks]);
 
-  // Real-time subscription
+  // Sync Mute state
+  useEffect(() => {
+    if (localMicrophoneTrack) {
+      localMicrophoneTrack.setMuted(!amISpeaking);
+    }
+  }, [amISpeaking, localMicrophoneTrack]);
+
+  // Subscribe to channel lock
   useEffect(() => {
     if (!eventCode) return;
-    initialLoadRef.current = true;
-    const unsub = subscribeToVoiceMessages(eventCode, activeChannel, (msgs) => {
-      setMessages(msgs);
+    return subscribeToChannelLock(`${eventCode}_${activeChannel}`, (data) => {
+      setChannelLock(data);
     });
-    return unsub;
   }, [eventCode, activeChannel]);
 
-  // Real-time autoplay for incoming messages
+  // Subscribe to voice messages for the replay feed
   useEffect(() => {
-    if (messages.length === 0) return;
-    const newestMsg = messages[0]; // descending order, newest is at index 0
-    
-    if (initialLoadRef.current) {
-      lastPlayedIdRef.current = newestMsg.id;
-      initialLoadRef.current = false;
-      return;
-    }
-
-    if (newestMsg.id !== lastPlayedIdRef.current) {
-      lastPlayedIdRef.current = newestMsg.id;
-      
-      // Auto-play if enabled and message is from someone else
-      if (autoplayEnabled && newestMsg.sender !== currentUser?.name && newestMsg.audioUrl) {
-        // Play the walkie talkie beep first
-        playChime('walkie');
-        
-        // Wait 350ms for beep, then play voice message
-        setTimeout(() => {
-          const a = liveAudioRef.current;
-          if (a) {
-            a.src = newestMsg.audioUrl;
-            const playPromise = a.play();
-            if (playPromise !== undefined) {
-              playPromise.catch((err) => {
-                console.warn('Autoplay blocked by browser. User interaction required.', err);
-              });
-            }
-          }
-        }, 350);
-      }
-    }
-  }, [messages, autoplayEnabled, currentUser]);
+    if (!eventCode) return;
+    return subscribeToVoiceMessages(eventCode, activeChannel, (msgs) => {
+      setMessages(msgs);
+    });
+  }, [eventCode, activeChannel]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -430,65 +372,77 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // Recording timer
+  // Play a beep for listeners when someone starts broadcasting
   useEffect(() => {
-    if (recording) {
-      setRecordTimer(0);
-      timerRef.current = setInterval(() => setRecordTimer((t) => t + 1), 1000);
+    if (channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId) {
+      playChime('walkie');
+    }
+  }, [channelLock.isBusy, channelLock.currentSpeakerUid, mySessionId]);
+
+  // PTT Handlers
+  const handleStartTalk = async () => {
+    if (channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId) {
+      // Someone else is talking!
+      playChime('error');
+      return;
+    }
+    const success = await acquireChannelLock(`${eventCode}_${activeChannel}`, currentUser?.role || 'viewer', currentUser?.name || 'Unknown', mySessionId);
+    if (success) {
+      playChime('walkie');
+      setAmISpeaking(true);
+      
+      // Start recording locally for the replay feed
+      try {
+        await recorderRef.current.startRecording();
+      } catch (err) {
+        console.error('Microphone access denied for recording', err);
+      }
     } else {
-      clearInterval(timerRef.current);
+      playChime('error');
     }
-    return () => clearInterval(timerRef.current);
-  }, [recording]);
+  };
 
-  // ── Handlers ─────────────────────────────────────────────────────────
-  const handleStartRecording = useCallback(async () => {
-    unlockAudio();
-    try {
-      await recorderRef.current.startRecording();
-      setRecording(true);
-    } catch (err) {
-      console.error('Microphone access denied', err);
+  const handleStopTalk = async () => {
+    if (amISpeaking) {
+      setAmISpeaking(false);
+      await releaseChannelLock(`${eventCode}_${activeChannel}`, mySessionId);
+      
+      // Stop recording and upload for replay history
+      if (recorderRef.current.isRecording()) {
+        try {
+          setUploading(true);
+          const { blob, duration } = await recorderRef.current.stopRecording();
+          await uploadVoiceMessage(
+            blob,
+            eventCode,
+            activeChannel,
+            currentUser?.name || 'Unknown',
+            currentUser?.role || 'viewer',
+            duration
+          );
+        } catch (err) {
+          console.error('Upload failed', err);
+        } finally {
+          setUploading(false);
+        }
+      }
     }
-  }, []);
+  };
 
-  const handleStopRecording = useCallback(async () => {
-    if (!recorderRef.current.isRecording()) return;
-    try {
-      setRecording(false);
-      setUploading(true);
-      const { blob, duration } = await recorderRef.current.stopRecording();
-      await uploadVoiceMessage(
-        blob,
-        eventCode,
-        activeChannel,
-        currentUser?.name || 'Unknown',
-        currentUser?.role || 'viewer',
-      );
-    } catch (err) {
-      console.error('Upload failed', err);
-    } finally {
-      setUploading(false);
-    }
-  }, [eventCode, activeChannel, currentUser]);
-
-  const handleCancelRecording = useCallback(() => {
-    recorderRef.current.cancel();
-    setRecording(false);
-  }, []);
-
-  // Toggle mode (tap to start / tap to stop)
-  const handlePTTClick = useCallback(() => {
-    if (recording) {
-      handleStopRecording();
-    } else {
-      handleStartRecording();
-    }
-  }, [recording, handleStartRecording, handleStopRecording]);
+  // Global mouse up for safety
+  useEffect(() => {
+    const onEnd = () => handleStopTalk();
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchend', onEnd);
+    return () => {
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, [amISpeaking, activeChannel, eventCode, mySessionId, currentUser]);
 
   const channelColor = getChannelColor(activeChannel);
+  const isSomeoneElseSpeaking = channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId;
 
-  // ── Render ───────────────────────────────────────────────────────────
   return (
     <div
       className="wt-outer-container"
@@ -503,8 +457,6 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
         fontFamily: T.fontBody,
         color: T.textPrimary,
         width: '100%',
-        minWidth: 0,
-        maxWidth: '100%',
         boxSizing: 'border-box',
       }}
     >
@@ -531,7 +483,7 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Walkie-Talkie
+            Live Walkie-Talkie
           </span>
           {currentUser?.role === 'admin' && (
             <button
@@ -559,39 +511,10 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
             </button>
           )}
         </div>
-
-        {/* Live Autoplay Toggle */}
-        <button
-          onClick={() => {
-            unlockAudio();
-            setAutoplayEnabled((prev) => !prev);
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            borderRadius: 8,
-            border: `1px solid ${autoplayEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`,
-            background: autoplayEnabled ? 'rgba(34,197,94,0.1)' : 'transparent',
-            color: autoplayEnabled ? '#22c55e' : T.textSecondary,
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: autoplayEnabled ? '#22c55e' : '#ef4444',
-              display: 'inline-block',
-            }}
-          />
-          {autoplayEnabled ? 'Live On' : 'Live Muted'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e', fontWeight: 600 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'wt-pulse 1.4s ease-in-out infinite' }} />
+          Live
+        </div>
       </div>
 
       {/* ── Channel Selector ──────────────────────────────────────── */}
@@ -602,13 +525,9 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
           gap: 8,
           padding: '14px 20px',
           overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
           borderBottom: `1px solid ${T.borderLight}`,
           boxSizing: 'border-box',
           width: '100%',
-          minWidth: 0,
         }}
       >
         {CHANNEL_META.filter((ch) => allowed.includes(ch.key)).map(({ key, icon: Icon, color }) => {
@@ -630,7 +549,6 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
                 fontWeight: 700,
                 fontSize: 14,
                 cursor: 'pointer',
-                flexShrink: 0,
                 whiteSpace: 'nowrap',
                 transition: 'all 0.2s',
                 boxShadow: isActive ? `0 0 14px ${color}33` : 'none',
@@ -638,25 +556,12 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
             >
               <Icon size={16} />
               {getChannelLabel(key)}
-              {isActive && (
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: color,
-                    display: 'inline-block',
-                    boxShadow: `0 0 8px ${color}`,
-                    marginLeft: 2,
-                  }}
-                />
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* ── Messages Feed ─────────────────────────────────────────── */}
+      {/* ── Feed Area ─────────────────────────────────── */}
       <div
         ref={feedRef}
         style={{
@@ -665,13 +570,84 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
           padding: '16px 20px',
           display: 'flex',
           flexDirection: 'column',
-          minWidth: 0,
-          width: '100%',
-          maxWidth: '100%',
-          boxSizing: 'border-box',
+          gap: 12,
         }}
       >
-        {messages.length === 0 && (
+        
+        {/* Remote Active Speaker */}
+        {channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId && (
+          <div
+            style={{
+              ...T.glass,
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              border: `1px solid ${channelColor}`,
+              background: `${channelColor}22`,
+            }}
+          >
+            <div
+              style={{
+                width: 44, height: 44, borderRadius: '50%',
+                background: channelColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: T.fontTitle, fontWeight: 700, fontSize: 16, color: '#fff',
+                boxShadow: `0 0 15px ${channelColor}`,
+              }}
+            >
+              {avatarInitials(channelLock.currentSpeakerName || 'User')}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: T.fontTitle, fontWeight: 650, fontSize: 16, color: T.textPrimary }}>
+                {channelLock.currentSpeakerName || 'Unknown User'}
+              </div>
+              <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
+                Talking right now...
+              </div>
+            </div>
+            <Waveform />
+          </div>
+        )}
+
+        {/* Local Active Speaker */}
+        {amISpeaking && (
+          <div
+            style={{
+              ...T.glass,
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              border: `1px solid #ef4444`,
+              background: 'rgba(239, 68, 68, 0.1)',
+            }}
+          >
+            <div
+              style={{
+                width: 44, height: 44, borderRadius: '50%',
+                background: channelColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: T.fontTitle, fontWeight: 700, fontSize: 16, color: '#fff',
+                boxShadow: `0 0 15px #ef4444`,
+              }}
+            >
+              {avatarInitials(currentUser?.name || 'Me')}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: T.fontTitle, fontWeight: 650, fontSize: 16, color: T.textPrimary }}>
+                {currentUser?.name || 'Me'} (You)
+              </div>
+              <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
+                Talking...
+              </div>
+            </div>
+            <Waveform />
+          </div>
+        )}
+
+        {/* Replay History */}
+        {messages.length === 0 && !channelLock.isBusy && !amISpeaking && (
           <div
             style={{
               flex: 1,
@@ -682,63 +658,19 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
               gap: 10,
               color: T.textSecondary,
               fontSize: 14,
+              padding: '20px 0'
             }}
           >
             <MicOff size={32} style={{ opacity: 0.3 }} />
-            <span>No messages yet on this channel</span>
+            <span>No recent broadcasts on this channel</span>
           </div>
         )}
 
-        {/* Render oldest first (array is desc from Firestore) */}
+        {/* Render oldest first */}
         {[...messages].reverse().map((msg) => (
           <MessageBubble key={msg.id} msg={msg} channelColor={channelColor} />
         ))}
       </div>
-
-      {/* ── Recording indicator / waveform ────────────────────────── */}
-      {recording && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 14,
-            padding: '10px 20px',
-            borderTop: `1px solid ${T.borderLight}`,
-            background: 'rgba(239,68,68,0.06)',
-          }}
-        >
-          <Waveform />
-          <span
-            style={{
-              fontFamily: T.fontTitle,
-              fontWeight: 700,
-              fontSize: 16,
-              color: '#ef4444',
-              minWidth: 42,
-              textAlign: 'center',
-            }}
-          >
-            {fmtTime(recordTimer)}
-          </span>
-          <button
-            onClick={handleCancelRecording}
-            style={{
-              fontSize: 11,
-              fontFamily: T.fontBody,
-              fontWeight: 600,
-              color: T.textSecondary,
-              background: 'rgba(255,255,255,0.06)',
-              border: 'none',
-              borderRadius: 8,
-              padding: '4px 12px',
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
 
       {/* ── Push-to-Talk Button ────────────────────────────────────── */}
       <div
@@ -752,41 +684,33 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
         }}
       >
         <button
-          onClick={handlePTTClick}
-          disabled={uploading}
-          onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.93)')}
-          onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-          onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.93)')}
-          onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          onMouseDown={handleStartTalk}
+          onTouchStart={(e) => { e.preventDefault(); handleStartTalk(); }}
           style={{
             width: 70,
             height: 70,
             borderRadius: '50%',
-            border: recording ? '3px solid #ef4444' : `3px solid ${channelColor}`,
-            background: recording
+            border: amISpeaking ? '3px solid #ef4444' : `3px solid ${channelColor}`,
+            background: amISpeaking
               ? 'radial-gradient(circle, #ef4444 0%, #b91c1c 100%)'
-              : T.gradientVbt,
+              : (isSomeoneElseSpeaking ? '#333' : T.gradientVbt),
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: uploading ? 'wait' : 'pointer',
-            transition: 'transform 0.15s, box-shadow 0.3s, border-color 0.3s',
-            animation: recording ? 'wt-pulse 1.4s ease-in-out infinite' : 'none',
-            boxShadow: recording
+            cursor: isSomeoneElseSpeaking || uploading ? 'not-allowed' : 'pointer',
+            transition: 'all 0.15s',
+            animation: amISpeaking ? 'wt-pulse 1.4s ease-in-out infinite' : 'none',
+            boxShadow: amISpeaking
               ? '0 0 24px rgba(239,68,68,0.4)'
-              : `0 0 20px ${channelColor}33`,
-            opacity: uploading ? 0.6 : 1,
+              : (isSomeoneElseSpeaking ? 'none' : `0 0 20px ${channelColor}33`),
+            opacity: isSomeoneElseSpeaking || uploading ? 0.5 : 1,
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
-          aria-label={recording ? 'Stop recording' : 'Start recording'}
+          aria-label="Push to talk"
         >
-          {uploading ? (
-            <Spinner size={24} />
-          ) : recording ? (
-            <MicOff size={28} />
-          ) : (
-            <Mic size={28} />
-          )}
+          {uploading ? <Spinner size={24} /> : isSomeoneElseSpeaking ? <MicOff size={28} /> : <Mic size={28} />}
         </button>
 
         <span
@@ -794,50 +718,25 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
             fontSize: 14,
             fontFamily: T.fontBody,
             fontWeight: 600,
-            color: T.textSecondary,
+            color: isSomeoneElseSpeaking ? '#ef4444' : T.textSecondary,
           }}
         >
-          {uploading
-            ? 'Sending…'
-            : recording
-            ? 'Tap to send • or Cancel'
-            : 'Tap to record'}
+          {uploading 
+            ? 'Saving replay...' 
+            : isSomeoneElseSpeaking 
+              ? `${channelLock.currentSpeakerName || 'Someone'} is talking...`
+              : 'Hold to Talk'}
         </span>
       </div>
-
-      {/* ── Status Bar ────────────────────────────────────────────── */}
-      <div
-        style={{
-          padding: '10px 20px',
-          borderTop: `1px solid ${T.borderLight}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          fontSize: 11,
-          fontFamily: T.fontBody,
-          color: T.textSecondary,
-        }}
-      >
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: '50%',
-            background: channelColor,
-            display: 'inline-block',
-            boxShadow: `0 0 6px ${channelColor}`,
-          }}
-        />
-        <span>
-          Channel: <strong style={{ color: channelColor }}>{getChannelLabel(activeChannel)}</strong>
-        </span>
-        <span style={{ margin: '0 4px', opacity: 0.3 }}>•</span>
-        <span>{messages.length} message{messages.length !== 1 ? 's' : ''}</span>
-      </div>
-
-      {/* Hidden audio element for live incoming messages */}
-      <audio ref={liveAudioRef} playsInline />
     </div>
+  );
+}
+
+// ── Export Wrapper ─────────────────────────────────────────────────────
+export default function WalkieTalkie(props) {
+  return (
+    <AgoraRTCProvider client={agoraClient}>
+      <WalkieTalkieInner {...props} />
+    </AgoraRTCProvider>
   );
 }

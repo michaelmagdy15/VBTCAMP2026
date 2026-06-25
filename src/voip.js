@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────
 
 import { getApps } from 'firebase/app';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   collection,
   addDoc,
@@ -120,7 +120,7 @@ export class VoiceRecorder {
       }
     };
 
-    this._mediaRecorder.start(250); // collect data every 250 ms
+    this._mediaRecorder.start(); // DO NOT use timeslice, it corrupts MP4 on iOS Safari
     this._recording = true;
     this._startTime = Date.now();
   }
@@ -191,7 +191,7 @@ export class VoiceRecorder {
  * @param {string} senderRole – admin | team leader | referee | viewer
  * @returns {Promise<{audioUrl: string, docId: string}>}
  */
-export async function uploadVoiceMessage(blob, eventCode, channel, sender, senderRole) {
+export async function uploadVoiceMessage(blob, eventCode, channel, sender, senderRole, duration) {
   // 1. Upload to Storage
   const extension = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('aac') ? 'aac' : 'webm';
   const filename = `${Date.now()}_${sender}.${extension}`;
@@ -199,8 +199,8 @@ export async function uploadVoiceMessage(blob, eventCode, channel, sender, sende
   await uploadBytes(storageRef, blob, { contentType: blob.type });
   const audioUrl = await getDownloadURL(storageRef);
 
-  // 2. Estimate duration from blob size (rough: webm ≈ 6 kB/s at default quality)
-  const duration = Math.round(blob.size / 6000) || 1;
+  // 2. Use exact duration from args, fallback to size guess only if undefined
+  const finalDuration = duration !== undefined ? duration : (Math.round(blob.size / 6000) || 1);
 
   // 3. Create Firestore doc
   const colRef = collection(db, 'vbt_events', eventCode, 'voice_messages');
@@ -210,7 +210,7 @@ export async function uploadVoiceMessage(blob, eventCode, channel, sender, sende
     senderRole,
     channel,
     timestamp: serverTimestamp(),
-    duration,
+    duration: finalDuration,
   });
 
   return { audioUrl, docId: docRef.id };
@@ -254,9 +254,20 @@ export async function clearVoiceMessages(eventCode, channel) {
   const q = query(colRef, where('channel', '==', channel));
   try {
     const snapshot = await getDocs(q);
-    const deletePromises = snapshot.docs.map((document) => 
-      deleteDoc(doc(db, 'vbt_events', eventCode, 'voice_messages', document.id))
-    );
+    const deletePromises = snapshot.docs.map(async (document) => {
+      const data = document.data();
+      // Delete from Firebase Storage if URL exists
+      if (data.audioUrl) {
+        try {
+          const fileRef = ref(storage, data.audioUrl);
+          await deleteObject(fileRef);
+        } catch (storageErr) {
+          console.warn('Could not delete audio file from storage:', storageErr);
+        }
+      }
+      // Delete from Firestore
+      return deleteDoc(doc(db, 'vbt_events', eventCode, 'voice_messages', document.id));
+    });
     await Promise.all(deletePromises);
   } catch (error) {
     console.error('Error clearing voice messages:', error);
