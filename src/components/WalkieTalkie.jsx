@@ -12,7 +12,7 @@ import {
 import { playChime, unlockAudioContext, getSharedAudioContext } from '../chimes';
 import { agoraClient, AGORA_APP_ID, generateAgoraToken } from '../agoraConfig';
 import { acquireChannelLock, releaseChannelLock, subscribeToChannelLock } from '../liveAudio';
-import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks, usePublish } from "agora-rtc-react";
+import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks } from "agora-rtc-react";
 
 // ── Design tokens (inline) ─────────────────────────────────────────────
 const T = {
@@ -369,7 +369,30 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   }, !!eventCode && !!activeChannel && !!token && connected);
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(connected);
-  usePublish([localMicrophoneTrack]);
+  
+  // Manual publish instead of usePublish (which crashes with data channel ID error)
+  const publishedRef = useRef(false);
+  useEffect(() => {
+    if (localMicrophoneTrack && connected && !publishedRef.current) {
+      // Mute first, then publish
+      localMicrophoneTrack.setMuted(true);
+      agoraClient.publish([localMicrophoneTrack])
+        .then(() => {
+          publishedRef.current = true;
+          console.log('[WalkieTalkie] Audio track published successfully');
+        })
+        .catch(err => {
+          console.error('[WalkieTalkie] Publish failed:', err);
+          publishedRef.current = false;
+        });
+    }
+    return () => {
+      if (publishedRef.current && localMicrophoneTrack) {
+        agoraClient.unpublish([localMicrophoneTrack]).catch(() => {});
+        publishedRef.current = false;
+      }
+    };
+  }, [localMicrophoneTrack, connected]);
 
   const remoteUsers = useRemoteUsers();
   const { audioTracks } = useRemoteAudioTracks(remoteUsers);
@@ -378,14 +401,11 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   useEffect(() => {
     audioTracks.forEach((track) => {
       try {
-        // Ensure AudioContext is active before playing
         unlockAudioContext();
         track.play();
-        // On iOS, boost volume to help with earpiece routing
         if (track.setVolume) track.setVolume(100);
       } catch (e) {
         console.warn('[WalkieTalkie] Remote track play failed, retrying:', e);
-        // Retry after a short delay — iOS sometimes needs a moment
         setTimeout(() => {
           try { track.play(); } catch (e2) { console.error('[WalkieTalkie] Remote track retry failed:', e2); }
         }, 300);
@@ -828,7 +848,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
       >
         <button
           onMouseDown={handleStartTalk}
-          onTouchStart={(e) => { e.preventDefault(); handleStartTalk(); }}
+          onTouchStart={handleStartTalk}
           style={{
             width: 70,
             height: 70,
