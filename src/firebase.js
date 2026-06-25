@@ -707,15 +707,97 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     4: "04:15 PM"
   };
 
-  // Generate Rotational Matchups (4 Rounds) for each day
+  // ─── Matchup Generator with Same-Color Prevention ──────────────────
+  // Helper to extract base color (e.g. "Red 1" -> "Red")
+  const getBaseColor = (name) => {
+    const parts = name.split(' ');
+    if (parts.length > 1) {
+      return parts.slice(0, -1).join(' ');
+    }
+    return name;
+  };
+
+  // Backtracking solver to generate 4 rounds of collision-free matchups
+  const generateFourRoundMatchups = (teamList) => {
+    const T_size = teamList.length;
+    const P_size = T_size / 2;
+    const rounds = [];
+    const playedPairs = new Set();
+    const getPairKey = (tA, tB) => [tA, tB].sort().join('||');
+
+    const solveRound = (roundIdx, currentRoundPairs, usedInRound, depth = 0) => {
+      if (currentRoundPairs.length === P_size) return true;
+      if (depth > 200) return false; // Fail-safe recursion guard
+
+      let firstUnused = -1;
+      for (let i = 0; i < T_size; i++) {
+        if (!usedInRound.has(teamList[i])) {
+          firstUnused = i;
+          break;
+        }
+      }
+      if (firstUnused === -1) return false;
+
+      const teamA = teamList[firstUnused];
+      const colorA = getBaseColor(teamA);
+
+      for (let j = firstUnused + 1; j < T_size; j++) {
+        const teamB = teamList[j];
+        if (usedInRound.has(teamB)) continue;
+
+        const colorB = getBaseColor(teamB);
+        // Constraint: Teams of the same base color cannot play each other
+        if (colorA === colorB && colorA !== 'Servants') continue;
+
+        const pairKey = getPairKey(teamA, teamB);
+        const isDuplicate = playedPairs.has(pairKey);
+
+        usedInRound.add(teamA);
+        usedInRound.add(teamB);
+        currentRoundPairs.push([teamA, teamB]);
+        if (!isDuplicate) playedPairs.add(pairKey);
+
+        if (solveRound(roundIdx, currentRoundPairs, usedInRound, depth + 1)) {
+          return true;
+        }
+
+        if (!isDuplicate) playedPairs.delete(pairKey);
+        currentRoundPairs.pop();
+        usedInRound.delete(teamA);
+        usedInRound.delete(teamB);
+      }
+      return false;
+    };
+
+    for (let r = 0; r < 4; r++) {
+      const currentRoundPairs = [];
+      const usedInRound = new Set();
+      let success = solveRound(r, currentRoundPairs, usedInRound, 0);
+      if (!success) {
+        // Relax duplicate opponent constraint if we run out of unique matchups, but keep same-color restriction
+        playedPairs.clear();
+        solveRound(r, currentRoundPairs, usedInRound, 0);
+      }
+      rounds.push(currentRoundPairs);
+      currentRoundPairs.forEach(([tA, tB]) => playedPairs.add(getPairKey(tA, tB)));
+    }
+    return rounds;
+  };
+
   const numLocations = Math.max(4, P);
   const daysCount = configData.daysCount || 1;
 
   for (let d = 1; d <= daysCount; d++) {
+    // Generate fresh pairings for the 4 rounds of this day
+    const dayPairings = generateFourRoundMatchups(teamListForPairs);
+
     for (let r = 1; r <= 4; r++) {
+      const roundPairs = dayPairings[r - 1] || [];
+
       for (let p = 0; p < P; p++) {
-        const teamA = teamListForPairs[2 * p];
-        const teamB = teamListForPairs[2 * p + 1];
+        const pair = roundPairs[p] || [teamListForPairs[2 * p], teamListForPairs[2 * p + 1]];
+        const teamA = pair[0];
+        const teamB = pair[1];
 
         // Station index: circular shift per round to prevent collisions
         const stationIdx = (p + r - 1) % numLocations;
