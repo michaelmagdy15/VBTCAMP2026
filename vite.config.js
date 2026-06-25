@@ -14,10 +14,28 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
-        maximumFileSizeToCacheInBytes: 10000000
+        // Cache all app assets including audio files for offline use
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,mp3,wav,webm,ogg}'],
+        maximumFileSizeToCacheInBytes: 15000000, // 15MB — covers all sound files
+        // Range request support for audio scrubbing on iOS
+        runtimeCaching: [
+          {
+            urlPattern: /\/sounds\/.+\.(mp3|wav|webm|ogg)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'vbt-audio-cache',
+              rangeRequests: true, // Required for iOS audio seeking
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.+/i,
+            handler: 'NetworkFirst', // Walkie-talkie voice messages — always fresh
+            options: { cacheName: 'vbt-voice-cache', networkTimeoutSeconds: 5 },
+          },
+        ],
       },
-      manifest: false // Use existing manifest.json
+      manifest: false // Use existing public/manifest.json
     })
   ],
 })

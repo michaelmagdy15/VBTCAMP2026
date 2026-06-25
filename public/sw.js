@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vbt-sports-camp-v3';
+const CACHE_NAME = 'vbt-sports-camp-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -7,7 +7,18 @@ const STATIC_ASSETS = [
   '/image1.png',
   '/image2.jpg',
   '/manifest.json',
-  '/icons.svg'
+  '/icons.svg',
+  // Sound files (Howler.js pre-loads these — cache for offline use)
+  '/sounds/announcement.mp3',
+  '/sounds/score.mp3',
+  '/sounds/urgent.mp3',
+  '/sounds/schedule.mp3',
+  '/sounds/round_start.mp3',
+  '/sounds/walkie.mp3',
+  '/sounds/notification.mp3',
+  '/sounds/success.mp3',
+  '/sounds/error.mp3',
+  '/sounds/countdown.mp3',
 ];
 
 // Install Event
@@ -41,6 +52,23 @@ self.addEventListener('activate', (event) => {
 // Fetch Event
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Range request passthrough for audio files (required for iOS audio buffering)
+  // Pattern from: github.com/daffinm/audio-cache-test
+  if (/\.(mp3|wav|webm|ogg|m4a|aac)$/i.test(url.pathname)) {
+    event.respondWith(
+      caches.match(event.request).then(async (cached) => {
+        if (cached) return cached;
+        const response = await fetch(event.request);
+        if (response && response.status === 200) {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(event.request, response.clone());
+        }
+        return response;
+      })
+    );
+    return;
+  }
 
   // Bypass Firebase / Firestore / WebSockets / non-HTTP requests
   const isFirebase = url.hostname.includes('firebase') || url.hostname.includes('googleapis') || url.pathname.includes('firestore');
