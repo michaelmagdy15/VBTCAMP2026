@@ -95,37 +95,8 @@ function avatarInitials(name) {
     .slice(0, 2);
 }
 
-// ── Keyframe injection (runs once) ─────────────────────────────────────
-const STYLE_ID = '__walkie-talkie-keyframes';
-function ensureKeyframes() {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    @keyframes wt-pulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-      50%     { box-shadow: 0 0 0 18px rgba(239,68,68,0); }
-    }
-    @keyframes wt-wave {
-      0%   { transform: scaleY(0.4); }
-      50%  { transform: scaleY(1);   }
-      100% { transform: scaleY(0.4); }
-    }
-    @keyframes wt-spin {
-      to { transform: rotate(360deg); }
-    }
-    .wt-channel-scroller::-webkit-scrollbar {
-      display: none !important;
-    }
-    @media screen and (max-width: 768px) {
-      .wt-outer-container {
-        margin-bottom: 80px !important;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-}
+// Keyframes are now handled globally in index.css
+
 
 // ── Sub-components ─────────────────────────────────────────────────────
 
@@ -189,6 +160,10 @@ function MessageBubble({ msg, channelColor }) {
         gap: '12px',
         marginBottom: '10px',
         transition: 'border-color 0.2s',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
       }}
     >
       {/* Avatar */}
@@ -382,9 +357,6 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
       a.play().catch(() => {});
     }
   }, []);
-
-  // Inject keyframes once
-  useEffect(() => ensureKeyframes(), []);
 
   // Real-time subscription
   useEffect(() => {
@@ -649,6 +621,9 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
           display: 'flex',
           flexDirection: 'column',
           minWidth: 0,
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {messages.length === 0 && (
