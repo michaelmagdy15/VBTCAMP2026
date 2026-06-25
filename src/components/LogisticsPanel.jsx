@@ -42,6 +42,9 @@ const glassPanel = {
   ...T.glass,
   padding: '24px',
   marginBottom: '16px',
+  boxSizing: 'border-box',
+  width: '100%',
+  overflowX: 'hidden',
 };
 
 const inputStyle = {
@@ -289,7 +292,7 @@ function MaterialsTab({ eventCode, campData }) {
           </table>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <button style={btnPrimary} onClick={handleAdd}>
             <Plus size={15} /> Add Material
           </button>
@@ -593,7 +596,7 @@ function BalanceSheetTab({ eventCode }) {
           </table>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', gap: '10px' }}>
           <button style={btnPrimary} onClick={addIncome}>
             <Plus size={15} /> Add Income
           </button>
@@ -614,6 +617,8 @@ function BalanceSheetTab({ eventCode }) {
           flexWrap: 'wrap',
           gap: '20px',
           background: 'rgba(13,20,38,0.75)',
+          boxSizing: 'border-box',
+          width: '100%',
         }}
       >
         <div style={{ textAlign: 'center' }}>
