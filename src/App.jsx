@@ -3397,7 +3397,8 @@ export default function App() {
         onSubmitScore={handleDumbSubmitScore}
         onPostAnnouncement={async (text) => {
           if (text.trim()) {
-            await addAnnouncement(currentEventCode, text, currentUser.name, 'announcement');
+            await addAnnouncement(currentEventCode, text, currentUser.name, 'announcement', null, currentUser.role);
+            await triggerRemotePushNotification(`${eventConfig.eventName}: ${currentUser.name}`, text);
           }
         }}
         announcements={announcements}
@@ -3463,9 +3464,10 @@ export default function App() {
         alert={urgentAlert}
         onDismiss={() => setUrgentAlert({ show: false, text: '', type: 'urgent', timestamp: '' })}
         isAdmin={currentUser?.role === 'admin'}
-        onCreateAlert={(text) => {
+        onCreateAlert={async (text) => {
           setUrgentAlert({ show: true, text, type: 'urgent', timestamp: new Date().toISOString() });
-          addAnnouncement(currentEventCode, `🚨 URGENT: ${text}`, currentUser?.name || 'Admin', 'ping');
+          await addAnnouncement(currentEventCode, `🚨 URGENT: ${text}`, currentUser?.name || 'Admin', 'ping');
+          await triggerRemotePushNotification("🚨 URGENT ALERT", text);
         }}
       />
       {/* Header */}
@@ -4557,7 +4559,7 @@ export default function App() {
                     onClick={async () => {
                       if (window.confirm("Broadcast ROUND START ping to all devices?")) {
                         const msg = "🚨 ROUND STARTING NOW! Please move to your next location immediately.";
-                        await addAnnouncement(msg, currentUser.name, 'ping');
+                        await addAnnouncement(currentEventCode, msg, currentUser.name, 'ping');
                         await triggerRemotePushNotification("VBT Round Sync Alert", msg);
                       }
                     }}
@@ -4582,7 +4584,7 @@ export default function App() {
                     onClick={async () => {
                       if (window.confirm("Broadcast ROUND END ping to all devices?")) {
                         const msg = "🚨 ROUND ENDING! Wrap up your games and report scores.";
-                        await addAnnouncement(msg, currentUser.name, 'ping');
+                        await addAnnouncement(currentEventCode, msg, currentUser.name, 'ping');
                         await triggerRemotePushNotification("VBT Round Sync Alert", msg);
                       }
                     }}
