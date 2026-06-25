@@ -5455,16 +5455,17 @@ export default function App() {
               </div>
             )}
 
-            {infoSubTab === 'gps' && (
-              <GPSMap
-                eventCode={currentEventCode}
-                currentUser={currentUser}
-                campData={campData}
-                eventConfig={eventConfig}
-                getTeamColorHex={getTeamColorHex}
-                currentTime={currentTime}
-              />
-            )}
+             {infoSubTab === 'gps' && (
+               <GPSMap
+                 eventCode={currentEventCode}
+                 currentUser={currentUser}
+                 campData={campData}
+                 eventConfig={eventConfig}
+                 getTeamColorHex={getTeamColorHex}
+                 currentTime={currentTime}
+                 liveLocationStatus={liveLocationStatus}
+               />
+             )}
 
 
 

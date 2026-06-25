@@ -336,6 +336,7 @@ export default function GPSMap({
   eventConfig,
   getTeamColorHex,
   currentTime,
+  liveLocationStatus, // Passed in from App.jsx
 }) {
   const isAdmin = currentUser?.role === 'admin';
 
@@ -350,7 +351,67 @@ export default function GPSMap({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ── Find nearest waypoint (derived state) ──
+  // ── Route & Team Guidance State ──
+  // Extract list of all subteams
+  const activeTeamsList = useMemo(() => {
+    if (!campData?.matchups) return [];
+    const teams = new Set();
+    campData.matchups.forEach(m => {
+      if (m.shakes && m.shakes !== 'Servants') teams.add(m.shakes);
+      if (m.fries && m.fries !== 'Servants') teams.add(m.fries);
+    });
+    return Array.from(teams).sort();
+  }, [campData]);
+
+  const [highlightedTeam, setHighlightedTeam] = useState(currentUser?.teamCode || '');
+
+  useEffect(() => {
+    if (currentUser?.teamCode) {
+      setHighlightedTeam(currentUser.teamCode);
+    }
+  }, [currentUser]);
+
+  // Find if the highlighted team has an active matchup in the current slot
+  const activeTargetLocation = useMemo(() => {
+    if (!highlightedTeam || !liveLocationStatus) return null;
+    
+    for (const loc of liveLocationStatus) {
+      const match = loc.activeMatchup;
+      if (match && (match.shakes === highlightedTeam || match.fries === highlightedTeam)) {
+        return {
+          locationName: loc.name,
+          game: match.game,
+          opponent: match.shakes === highlightedTeam ? match.fries : match.shakes,
+          time: match.time,
+        };
+      }
+    }
+    return null;
+  }, [highlightedTeam, liveLocationStatus]);
+
+  // Find the waypoint corresponding to the active location/game
+  const activeTargetWaypoint = useMemo(() => {
+    if (!activeTargetLocation || waypoints.length === 0) return null;
+    
+    const locName = activeTargetLocation.locationName.toLowerCase();
+    const gameName = activeTargetLocation.game.toLowerCase();
+    
+    return waypoints.find(wp => {
+      const label = (wp.label || '').toLowerCase();
+      const game = (wp.game || '').toLowerCase();
+      return label.includes(locName) || locName.includes(label) || game.includes(gameName) || gameName.includes(game);
+    });
+  }, [activeTargetLocation, waypoints]);
+
+  // Calculate distance & bearing to the target waypoint
+  const targetDistanceInfo = useMemo(() => {
+    if (!userPos || !activeTargetWaypoint) return null;
+    const dist = haversine(userPos, activeTargetWaypoint);
+    const bearingDeg = bearing(userPos, activeTargetWaypoint);
+    return { distance: dist, bearing: bearingDeg };
+  }, [userPos, activeTargetWaypoint]);
+
+  // ── Find nearest waypoint (fallback derived state) ──
   const nearest = useMemo(() => {
     if (!userPos || waypoints.length === 0) return null;
     let minDist = Infinity;
@@ -364,6 +425,7 @@ export default function GPSMap({
     });
     return closest;
   }, [userPos, waypoints]);
+
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [adminPanelExpanded, setAdminPanelExpanded] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
 
@@ -447,7 +509,9 @@ export default function GPSMap({
     };
   }, [mapConfig]);
 
-  // ── Render waypoint markers ──
+  const routingPolylineRef = useRef(null);
+
+  // ── Render waypoint markers & active target routes ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -455,6 +519,12 @@ export default function GPSMap({
     // Clear old markers
     markersRef.current.forEach((m) => map.removeLayer(m));
     markersRef.current = [];
+
+    // Clear old polyline
+    if (routingPolylineRef.current) {
+      map.removeLayer(routingPolylineRef.current);
+      routingPolylineRef.current = null;
+    }
 
     waypoints.forEach((wp, idx) => {
       // Determine color — match team currently at this station
@@ -472,15 +542,36 @@ export default function GPSMap({
         }
       }
 
+      // Check if this waypoint is the active target station for the selected team
+      const isActiveTarget = activeTargetWaypoint && activeTargetWaypoint.id === wp.id;
+
       const marker = L.marker([wp.lat, wp.lng], {
-        icon: makeCircleIcon(color, 20),
+        icon: isActiveTarget 
+          ? L.divIcon({
+              className: '',
+              html: `<div style="position:relative;width:24px;height:24px;">
+                <div style="
+                  position:absolute;inset:2px;border-radius:50%;
+                  background:${color};border:2.5px solid #ffffff;
+                  box-shadow:0 0 12px ${color};z-index:2;
+                "></div>
+                <div style="
+                  position:absolute;inset:-6px;border-radius:50%;
+                  background:${color}33;
+                  animation:gpsPulse 1.2s ease-out infinite;z-index:1;
+                "></div>
+              </div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            })
+          : makeCircleIcon(color, 20),
         draggable: isAdmin,
       }).addTo(map);
 
-      marker.bindTooltip(wp.label || wp.game || `Station ${idx + 1}`, {
-        permanent: false,
+      marker.bindTooltip(isActiveTarget ? `🎯 CURRENT STATION: ${wp.label || wp.game}` : (wp.label || wp.game || `Station ${idx + 1}`), {
+        permanent: isActiveTarget, // Always visible for active station
         direction: 'top',
-        className: '',
+        className: isActiveTarget ? 'active-target-tooltip' : '',
         offset: [0, -12],
       });
 
@@ -498,6 +589,24 @@ export default function GPSMap({
 
       markersRef.current.push(marker);
     });
+
+    // Draw active target path from user to target waypoint
+    if (userPos && activeTargetWaypoint) {
+      let teamColor = '#ffb300';
+      if (getTeamColorHex && highlightedTeam) {
+        teamColor = getTeamColorHex(highlightedTeam) || '#ffb300';
+      }
+      
+      const polyline = L.polyline([[userPos.lat, userPos.lng], [activeTargetWaypoint.lat, activeTargetWaypoint.lng]], {
+        color: teamColor,
+        dashArray: '8, 8',
+        weight: 4.5,
+        opacity: 0.85,
+        lineJoin: 'round',
+      }).addTo(map);
+
+      routingPolylineRef.current = polyline;
+    }
 
     // Render temporary search/import marker if it exists
     if (tempMarkerPos) {
@@ -523,7 +632,7 @@ export default function GPSMap({
       tempMarker.bindTooltip('Imported Location', { permanent: true, direction: 'top', offset: [0, -14] });
       markersRef.current.push(tempMarker);
     }
-  }, [waypoints, isAdmin, getTeamColorHex, currentTime, campData, eventConfig, tempMarkerPos]);
+  }, [waypoints, isAdmin, getTeamColorHex, currentTime, campData, eventConfig, tempMarkerPos, userPos, activeTargetWaypoint, highlightedTeam]);
 
   // ── GPS tracking ──
   useEffect(() => {
@@ -716,6 +825,66 @@ export default function GPSMap({
 
   return (
     <div style={S.wrapper}>
+      {/* ── Active Team Route Guidance Selector ── */}
+      {activeTeamsList.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '10px 14px',
+          background: 'rgba(20, 27, 47, 0.95)',
+          borderBottom: '1px solid rgba(41, 182, 246, 0.15)',
+          fontSize: 13,
+          color: '#ffffff',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontWeight: '700', color: 'rgba(255,255,255,0.7)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            🧭 Route Guidance:
+          </span>
+          <select
+            value={highlightedTeam}
+            onChange={(e) => setHighlightedTeam(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'rgba(0,0,0,0.3)',
+              border: '1px solid rgba(41,182,246,0.25)',
+              color: '#ffffff',
+              fontSize: '0.8rem',
+              outline: 'none',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            <option value="">-- View All Stations --</option>
+            {activeTeamsList.map((t) => (
+              <option key={t} value={t}>
+                {t} (Highlight Active Game)
+              </option>
+            ))}
+          </select>
+          {activeTargetLocation ? (
+            <span style={{ 
+              fontSize: '0.75rem', 
+              color: '#ffb300', 
+              marginLeft: 'auto', 
+              fontWeight: '700',
+              background: 'rgba(255, 179, 0, 0.12)',
+              border: '1px solid rgba(255, 179, 0, 0.2)',
+              padding: '3px 8px',
+              borderRadius: '12px'
+            }}>
+              🎯 Active: {activeTargetLocation.game}
+            </span>
+          ) : highlightedTeam ? (
+            <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginLeft: 'auto' }}>
+              No active game scheduled right now
+            </span>
+          ) : null}
+        </div>
+      )}
+
       {/* ── Google Maps Location Import Search Bar ── */}
       <div style={S.searchBar}>
         <input
@@ -899,29 +1068,57 @@ export default function GPSMap({
       )}
 
       {/* ── Distance Banner / Nav ── */}
-      {userPos && nearest && (
-        <div style={S.distanceBanner}>
+      {userPos && (activeTargetWaypoint || nearest) && (
+        <div style={{
+          ...S.distanceBanner,
+          borderTop: activeTargetWaypoint ? '1px solid rgba(255, 179, 0, 0.3)' : S.distanceBanner.borderTop,
+          background: activeTargetWaypoint ? 'rgba(20, 27, 47, 0.93)' : S.distanceBanner.background
+        }}>
           <Navigation
             size={16}
             style={{
-              color: '#29b6f6',
-              transform: `rotate(${bearing(userPos, nearest)}deg)`,
+              color: activeTargetWaypoint ? '#ffb300' : '#29b6f6',
+              transform: `rotate(${bearing(userPos, activeTargetWaypoint || nearest)}deg)`,
               transition: 'transform 0.4s ease',
             }}
           />
-          <span>
-            <strong style={{ color: '#ffffff' }}>{nearest.label || nearest.game}</strong>
-            {' — '}
-            {nearest.distance < 1000
-              ? `${Math.round(nearest.distance)} m away`
-              : `${(nearest.distance / 1000).toFixed(1)} km away`}
-          </span>
-
-          {!isAdmin && (
-            <button style={S.navBtn} onClick={handleNavigate}>
-              <Navigation size={14} /> Navigate
-            </button>
+          {activeTargetWaypoint ? (
+            <span>
+              🎯 Head to <strong style={{ color: '#ffffff' }}>{activeTargetLocation.game}</strong> ({activeTargetLocation.locationName})
+              {' — '}
+              <strong style={{ color: '#ffb300' }}>
+                {targetDistanceInfo?.distance < 1000
+                  ? `${Math.round(targetDistanceInfo.distance)} m away`
+                  : `${(targetDistanceInfo.distance / 1000).toFixed(1)} km away`}
+              </strong>
+              <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>
+                (Matchup: {highlightedTeam} vs {activeTargetLocation.opponent})
+              </span>
+            </span>
+          ) : (
+            <span>
+              <strong style={{ color: '#ffffff' }}>{nearest.label || nearest.game}</strong>
+              {' — '}
+              {nearest.distance < 1000
+                ? `${Math.round(nearest.distance)} m away`
+                : `${(nearest.distance / 1000).toFixed(1)} km away`}
+            </span>
           )}
+
+          <button 
+            style={{
+              ...S.navBtn,
+              background: activeTargetWaypoint ? 'linear-gradient(135deg, #ffb300, #ffa000)' : S.navBtn.background,
+              color: activeTargetWaypoint ? '#070a13' : '#ffffff'
+            }} 
+            onClick={() => {
+              const dest = activeTargetWaypoint || nearest;
+              const url = `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}&travelmode=walking`;
+              window.open(url, '_blank');
+            }}
+          >
+            <Navigation size={14} /> Guide Me
+          </button>
         </div>
       )}
 
