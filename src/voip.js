@@ -101,14 +101,17 @@ export class VoiceRecorder {
     });
     this._chunks = [];
 
-    let mimeType = 'audio/webm;codecs=opus';
+    // Prefer MP4 for universal compatibility (Safari + Chrome 130+)
+    // WebM is fallback only — iOS Safari cannot play WebM files
+    let mimeType = 'audio/mp4';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
-      if (MediaRecorder.isTypeSupported('audio/webm')) {
-        mimeType = 'audio/webm';
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        mimeType = 'audio/mp4';
-      } else {
-        mimeType = ''; // fallback to browser default
+      mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else {
+          mimeType = ''; // fallback to browser default
+        }
       }
     }
 

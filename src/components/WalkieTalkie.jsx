@@ -9,7 +9,7 @@ import {
   getChannelLabel,
   getChannelColor
 } from '../voip';
-import { playChime } from '../chimes';
+import { playChime, unlockAudioContext, getSharedAudioContext } from '../chimes';
 import { agoraClient, AGORA_APP_ID, generateAgoraToken } from '../agoraConfig';
 import { acquireChannelLock, releaseChannelLock, subscribeToChannelLock } from '../liveAudio';
 import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks, usePublish } from "agora-rtc-react";
@@ -374,9 +374,23 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   const remoteUsers = useRemoteUsers();
   const { audioTracks } = useRemoteAudioTracks(remoteUsers);
 
-  // Auto-play incoming audio
+  // Auto-play incoming audio — with iOS retry logic
   useEffect(() => {
-    audioTracks.forEach((track) => track.play());
+    audioTracks.forEach((track) => {
+      try {
+        // Ensure AudioContext is active before playing
+        unlockAudioContext();
+        track.play();
+        // On iOS, boost volume to help with earpiece routing
+        if (track.setVolume) track.setVolume(100);
+      } catch (e) {
+        console.warn('[WalkieTalkie] Remote track play failed, retrying:', e);
+        // Retry after a short delay — iOS sometimes needs a moment
+        setTimeout(() => {
+          try { track.play(); } catch (e2) { console.error('[WalkieTalkie] Remote track retry failed:', e2); }
+        }, 300);
+      }
+    });
   }, [audioTracks]);
 
   // Sync Mute state
@@ -629,9 +643,30 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
           </p>
           <button
             onClick={() => {
+              // CRITICAL: Unlock audio on this user gesture BEFORE connecting
+              // iOS Safari requires a user gesture to unlock AudioContext + allow autoplay
+              unlockAudioContext();
+              
+              // Play a silent buffer through the shared AudioContext to fully unlock on iOS
+              const ctx = getSharedAudioContext();
+              if (ctx) {
+                try {
+                  const buffer = ctx.createBuffer(1, 1, 22050);
+                  const source = ctx.createBufferSource();
+                  source.buffer = buffer;
+                  source.connect(ctx.destination);
+                  source.start(0);
+                } catch(e) { /* ignore */ }
+              }
+              
+              // Also unlock HTML5 Audio for iOS speaker routing
+              try {
+                const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+                silentAudio.play().catch(() => {});
+              } catch(e) { /* ignore */ }
+              
               setConnected(true);
-              // Pre-initialize audio context on user gesture for iOS
-              import('../chimes').then(m => m.playChime('notification'));
+              playChime('notification');
             }}
             style={{
               background: channelColor,
