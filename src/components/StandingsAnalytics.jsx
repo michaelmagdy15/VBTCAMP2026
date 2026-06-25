@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { BarChart3 } from 'lucide-react';
 import './StandingsAnalytics.css';
 
@@ -46,7 +46,7 @@ function deriveRoundKeys(blockScores) {
  *  Returns { labels: string[], series: { [side]: number[] } } */
 function buildScoreSeries(campState, campData, eventConfig) {
   const { blockScores = {} } = campState || {};
-  const { gamePoints = {}, matchups = [] } = campData || {};
+  const { gamePoints = {} } = campData || {};
   const service = isService(eventConfig);
 
   const roundKeys = deriveRoundKeys(blockScores);
@@ -267,10 +267,14 @@ function ScoreCurveCanvas({ campState, campData, eventConfig }) {
   }, [data, eventConfig]);
 
   useEffect(() => {
-    draw();
-    const onResize = () => draw();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const ro = new ResizeObserver(() => {
+      draw();
+    });
+    ro.observe(wrap);
+    return () => ro.disconnect();
   }, [draw]);
 
   if (!data) {
@@ -295,10 +299,9 @@ function ScoreCurveCanvas({ campState, campData, eventConfig }) {
 
 function DeductionLeaderboard({ campState, campData, eventConfig }) {
   const { teamDeductions = {} } = campState || {};
-  const teams = campData?.teams || {};
-  const service = isService(eventConfig);
-
   const sorted = useMemo(() => {
+    const teams = campData?.teams || {};
+    const service = isService(eventConfig);
     return Object.entries(teamDeductions)
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
@@ -316,7 +319,7 @@ function DeductionLeaderboard({ campState, campData, eventConfig }) {
         }
         return { code, value: val, color, name: team?.name || code };
       });
-  }, [teamDeductions, teams, service]);
+  }, [teamDeductions, campData?.teams, eventConfig]);
 
   if (sorted.length === 0) {
     return (
@@ -357,10 +360,9 @@ function DeductionLeaderboard({ campState, campData, eventConfig }) {
 /* ── TokenContributionGrid ───────────────────────────── */
 
 function TokenContributionGrid({ campState, eventConfig }) {
-  const tokens = campState?.tokens || {};
-  const service = isService(eventConfig);
-
   const cards = useMemo(() => {
+    const tokens = campState?.tokens || {};
+    const service = isService(eventConfig);
     if (service) {
       return Object.entries(SERVICE_COLORS).map(([key, color]) => ({
         key,
@@ -386,7 +388,7 @@ function TokenContributionGrid({ campState, eventConfig }) {
         textColor: '#f8fafc',
       },
     ];
-  }, [tokens, service, eventConfig]);
+  }, [campState?.tokens, eventConfig]);
 
   const anyTokens = cards.some((c) => c.count > 0);
 

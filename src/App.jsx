@@ -3656,10 +3656,10 @@ export default function App() {
             {scoreViewMode === 'block' && [1, 2, 3, 4].map((blockNum) => {
               const isOpen = expandedBlocks[blockNum];
               const blockTitle = 
-                blockNum === 1 ? 'Block 1 - Temporary Fill' :
-                blockNum === 2 ? 'Block 2 - Busy vs Blessed' :
-                blockNum === 3 ? 'Block 3 - The Mask we Wear' :
-                'Block 4 - Crowd Trap (Day 2)';
+                blockNum === 1 ? 'Block 1' :
+                blockNum === 2 ? 'Block 2' :
+                blockNum === 3 ? 'Block 3' :
+                'Block 4';
                 
               const bScores = scoreCalculations[`b${blockNum}`];
               
@@ -5306,7 +5306,7 @@ export default function App() {
                 className={`toggle-btn ${infoSubTab === 'faq' ? 'active' : ''}`}
                 onClick={() => setInfoSubTab('faq')}
               >
-                <HelpCircle size={14} /> FAQs
+                <HelpCircle size={14} /> FAQ and rules
               </button>
             </div>
 
@@ -5412,7 +5412,7 @@ export default function App() {
 
             {/* Sub-tab Content: Day Timeline Schedule Image */}
             {infoSubTab === 'timeline' && (
-              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '100%', overflowX: 'hidden' }}>
                 <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>Full Day Program Timeline</h3>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Pinch or scroll to zoom</span>
@@ -7152,7 +7152,7 @@ export default function App() {
                   transition: 'background 0.2s'
                 }}
               >
-                <HelpCircle size={18} color="var(--vbt-sky)" /> FAQs & Camp Rules
+                <HelpCircle size={18} color="var(--vbt-sky)" /> FAQ and rules
               </button>
 
               <hr style={{ border: 'none', height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '8px 0' }} />

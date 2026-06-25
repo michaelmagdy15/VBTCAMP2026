@@ -61,6 +61,9 @@ const styles = {
     maxWidth: 840,
     margin: '0 auto',
     padding: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
   },
   header: {
     display: 'flex',

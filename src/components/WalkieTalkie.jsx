@@ -141,7 +141,10 @@ function MessageBubble({ msg, channelColor }) {
     if (playing) {
       a.pause();
     } else {
-      a.play();
+      const playPromise = a.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => console.warn('Audio play error:', e));
+      }
     }
   };
 
@@ -297,16 +300,18 @@ function MessageBubble({ msg, channelColor }) {
           cursor: 'pointer',
           flexShrink: 0,
           transition: 'transform 0.15s',
-        }}
-        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-        aria-label={playing ? 'Pause' : 'Play'}
-      >
+      }}
+      onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+      onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+      onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+      onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+      aria-label={playing ? 'Pause' : 'Play'}
+    >
         {playing ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
       </button>
 
       {/* Hidden audio element */}
-      <audio ref={audioRef} src={msg.audioUrl} preload="metadata" />
+      <audio ref={audioRef} src={msg.audioUrl} preload="metadata" playsInline />
     </div>
   );
 }
@@ -402,9 +407,13 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
         // Wait 350ms for beep, then play voice message
         setTimeout(() => {
           const audio = new Audio(newestMsg.audioUrl);
-          audio.play().catch((err) => {
-            console.warn('Autoplay blocked by browser. User interaction required.', err);
-          });
+          audio.playsInline = true;
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn('Autoplay blocked by browser. User interaction required.', err);
+            });
+          }
         }, 350);
       }
     }
@@ -487,6 +496,8 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
         overflow: 'hidden',
         fontFamily: T.fontBody,
         color: T.textPrimary,
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {/* ── Header ────────────────────────────────────────────────── */}
@@ -702,6 +713,8 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
           disabled={uploading}
           onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.93)')}
           onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.93)')}
+          onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           style={{
             width: 70,
             height: 70,

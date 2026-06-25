@@ -182,7 +182,7 @@ function MaterialsTab({ eventCode, campData }) {
   const games = campData?.games || campData?.stations || [];
 
   return (
-    <div>
+    <div style={{ width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* ── Inventory Table ── */}
       <div style={glassPanel}>
         <h3 style={{ fontFamily: T.fontTitle, color: T.textPrimary, margin: '0 0 16px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -463,7 +463,7 @@ function BalanceSheetTab({ eventCode }) {
   }));
 
   return (
-    <div>
+    <div style={{ width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* ── EXPENSES ── */}
       <div style={glassPanel}>
         <h3 style={{ fontFamily: T.fontTitle, color: T.textPrimary, margin: '0 0 16px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -813,7 +813,7 @@ export default function LogisticsPanel({ eventCode, currentUser, eventConfig, ca
 
   // ── Authorized View ──
   return (
-    <div>
+    <div style={{ width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Tab bar */}
       <div
         style={{
