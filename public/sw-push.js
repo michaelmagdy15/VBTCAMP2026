@@ -1,7 +1,5 @@
 // ── VBT Push Notification Handler ─────────────────────────────────────
-// This file is imported by the Workbox-generated service worker via
-// importScripts() in vite.config.js. It adds push + notificationclick
-// event handlers without interfering with Workbox caching logic.
+// Imported by the Workbox-generated service worker via importScripts().
 // ──────────────────────────────────────────────────────────────────────
 
 self.addEventListener('push', (event) => {
@@ -11,22 +9,41 @@ self.addEventListener('push', (event) => {
     catch (e) { data = { title: event.data.text() }; }
   }
 
-  const title = data.title || 'VBT Sports Camp 🏐';
-  const body  = data.body  ||
-                (data.notification && data.notification.body) ||
-                'New update from VBT Sports Camp!';
+  const title    = data.title || 'VBT SERVICE';
+  const body     = data.body  ||
+                   (data.notification && data.notification.body) ||
+                   'New update from VBT Sports Camp!';
+  const type     = (data.data && data.data.type) || 'announcement';
+  const isUrgent = type === 'urgent' || type === 'ping';
 
-  // Keep options minimal for maximum iOS compatibility
-  const options = {
-    body,
-    icon : '/vbt-icon-192.png',
-    badge: '/vbt-icon-192.png',
-    tag  : 'vbt-' + Date.now(),
-    data : { url: (data.data && data.data.url) || '/' },
-  };
+  // Urgent alerts: aggressive vibration + stay on screen
+  const options = isUrgent
+    ? {
+        body,
+        icon            : '/vbt-icon-192.png',
+        badge           : '/vbt-icon-192.png',
+        tag             : 'vbt-urgent',          // replaces previous urgent banner
+        renotify        : true,
+        requireInteraction: true,                // stays on screen until dismissed
+        vibrate         : [300,100,300,100,500,100,500,100,800], // long escalating buzz
+        data            : { url: (data.data && data.data.url) || '/', type },
+      }
+    : {
+        body,
+        icon  : '/vbt-icon-192.png',
+        badge : '/vbt-icon-192.png',
+        tag   : 'vbt-' + Date.now(),
+        data  : { url: (data.data && data.data.url) || '/', type },
+      };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    self.registration.showNotification(title, options).then(() => {
+      // If the app is open in the background, tell it to play the urgent sound
+      if (isUrgent) {
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+          .then(clients => clients.forEach(c => c.postMessage({ type: 'PLAY_URGENT_SOUND' })));
+      }
+    })
   );
 });
 

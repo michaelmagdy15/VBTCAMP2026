@@ -774,6 +774,22 @@ export default function App() {
     return () => window.removeEventListener('vbt-push-notification', handleNativePush);
   }, []);
 
+  // Listen for urgent sound trigger from the service worker
+  // When an urgent push arrives the SW broadcasts PLAY_URGENT_SOUND to all open clients
+  useEffect(() => {
+    const handleSwMessage = (event) => {
+      if (event.data && event.data.type === 'PLAY_URGENT_SOUND') {
+        playLoudDoubleChime();
+        vibrate(VIBRATE_URGENT);
+        console.log('[App] Urgent sound triggered by service worker push');
+      }
+    };
+    navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker && navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, []);
+
   // Set up offline sync queue flush on reconnect
   useEffect(() => {
     const cleanup = setupOnlineListener(async () => {

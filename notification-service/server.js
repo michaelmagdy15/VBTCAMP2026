@@ -132,8 +132,8 @@ app.post('/test', async (req, res) => {
       });
     }
     const stats = await sendToAll({
-      title : '🏐 VBT Test Notification',
-      body  : 'Push is working! You\'re all set for camp tomorrow.',
+      title : 'VBT SERVICE',
+      body  : 'Push notifications are working! You are all set for camp.',
       data  : { type: 'test', url: '/' },
     });
     res.json({ success: true, ...stats });
