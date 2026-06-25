@@ -2291,7 +2291,7 @@ export default function App() {
         {/* Top Header */}
         <header style={{
           position: 'sticky',
-          top: '12px',
+          top: 'calc(12px + env(safe-area-inset-top, 0px))',
           width: '100%',
           maxWidth: '850px',
           background: 'rgba(13, 20, 38, 0.45)',
@@ -3430,7 +3430,7 @@ export default function App() {
       {activePingAlert.show && (
         <div style={{
           position: 'fixed',
-          top: '20px',
+          top: 'calc(20px + env(safe-area-inset-top, 0px))',
           left: '50%',
           transform: 'translateX(-50%)',
           width: '90%',
@@ -3477,7 +3477,8 @@ export default function App() {
         borderTop: 'none',
         borderLeft: 'none',
         borderRight: 'none',
-        background: 'rgba(13, 20, 38, 0.8)'
+        background: 'rgba(13, 20, 38, 0.8)',
+        paddingTop: 'env(safe-area-inset-top, 0px)'
       }}>
         <div className="header-container" style={{
           maxWidth: '600px',
