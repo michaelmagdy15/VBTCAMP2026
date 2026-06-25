@@ -1149,7 +1149,7 @@ export default function App() {
         teamCode = 'ADMIN';
         name = servant.name || 'Coordinator';
       } else if (servant.defaultRole === 'coordinator' || roleCode === 'coordinator') {
-        resolvedRole = 'service_leader';
+        resolvedRole = 'admin';
         teamCode = 'ADMIN';
         name = servant.name || 'Coordinator';
       } else if (roleCode.startsWith('team_')) {
@@ -1160,7 +1160,7 @@ export default function App() {
         teamCode = `${color} ${idx}`; // "White 1"
         side = color;
         grade = '3/4';
-      } else if (roleCode.startsWith('station_') || roleCode.startsWith('big_game_') || roleCode === 'reflection') {
+      } else if (roleCode.startsWith('station_') || roleCode.startsWith('big_game_') || roleCode === 'reflection' || roleCode === 'volunteer') {
         resolvedRole = 'referee';
         teamCode = 'REF';
         side = 'System';
