@@ -147,71 +147,13 @@ const faqsList = [
   }
 ];
 
-// Bell chime functions — now using the shared AudioContext from chimes.js
-// to avoid creating duplicate AudioContext instances
+// Bell chime functions — delegate to chimes.js (plays real WAV files with oscillator fallback)
 function playBellChime() {
-  try {
-    const ctx = getSharedAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const fundamental = 880; // A5
-    const frequencies = [fundamental, fundamental * 1.2, fundamental * 1.5, fundamental * 2.0];
-    const gains = [0.4, 0.2, 0.15, 0.1];
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.4, now);
-    masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
-    masterGain.connect(ctx.destination);
-    frequencies.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const oscGain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now);
-      oscGain.gain.setValueAtTime(gains[i], now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + (1.8 - i * 0.2));
-      osc.connect(oscGain);
-      oscGain.connect(masterGain);
-      osc.start(now);
-      osc.stop(now + 2.0);
-    });
-  } catch (err) {
-    console.error("Audio Synthesis error:", err);
-  }
+  playChime('announcement'); // → Chord2.wav from akx/Notifications (CC0)
 }
 
 function playLoudDoubleChime() {
-  try {
-    playBellChime();
-    setTimeout(() => {
-      try {
-        const ctx = getSharedAudioContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const fundamental = 1046.50; // C6
-        const frequencies = [fundamental, fundamental * 1.2, fundamental * 1.5, fundamental * 2.0];
-        const gains = [0.5, 0.25, 0.2, 0.1];
-        const masterGain = ctx.createGain();
-        masterGain.gain.setValueAtTime(0.5, now);
-        masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
-        masterGain.connect(ctx.destination);
-        frequencies.forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const oscGain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now);
-          oscGain.gain.setValueAtTime(gains[i], now);
-          oscGain.gain.exponentialRampToValueAtTime(0.001, now + (1.8 - i * 0.2));
-          osc.connect(oscGain);
-          oscGain.connect(masterGain);
-          osc.start(now);
-          osc.stop(now + 2.0);
-        });
-      } catch (err) {
-        console.error("Second chime error:", err);
-      }
-    }, 400);
-  } catch (err) {
-    console.error("Audio Synthesis error:", err);
-  }
+  playChime('urgent'); // → Alarmed.wav from akx/Notifications (CC0)
 }
 
 // Request notification permission
