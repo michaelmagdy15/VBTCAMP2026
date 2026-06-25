@@ -250,10 +250,11 @@ function hexToRgb(hex) {
  * Extract servants that match a given prefix from globalServants array.
  * globalServants is expected to be an array of { name, role } objects.
  */
-function filterServants(globalServants, rolePrefix) {
+function filterServants(globalServants, rolePrefixes) {
   if (!Array.isArray(globalServants)) return [];
+  const prefixes = Array.isArray(rolePrefixes) ? rolePrefixes : [rolePrefixes];
   return globalServants.filter(
-    (s) => s?.role && s.role.toLowerCase().startsWith(rolePrefix),
+    (s) => s?.role && prefixes.some(prefix => s.role.toLowerCase().startsWith(prefix))
   );
 }
 
@@ -304,7 +305,7 @@ export default function RoleLogin({
 
   // Servants filtered by role prefix
   const refereeServants = useMemo(
-    () => filterServants(globalServants, 'referee'),
+    () => filterServants(globalServants, ['referee', 'station_', 'big_game_', 'reflection', 'media']),
     [globalServants],
   );
   const leaderServants = useMemo(
