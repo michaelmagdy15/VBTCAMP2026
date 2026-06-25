@@ -11,8 +11,8 @@
   --border-light: rgba(255, 255, 255, 0.06);
   
   --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
   
   /* Team Colors */
   --color-shakes: #00b0ff;
@@ -264,7 +264,7 @@ h1, h2, h3, h4, h5, h6 {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 68px;
+  height: calc(68px + env(safe-area-inset-bottom, 0px));
   background: rgba(13, 20, 38, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -273,7 +273,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-around;
   align-items: center;
   z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .mobile-nav-item {
@@ -282,14 +282,14 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  font-size: 0.7rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   background: transparent;
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  width: 60px;
-  height: 50px;
+  width: 72px;
+  height: 52px;
   gap: 4px;
 }
 
@@ -303,7 +303,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .content-area {
   padding: 16px;
-  padding-bottom: 90px; /* offset for bottom navbar */
+  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); /* offset for bottom navbar + safe area */
   max-width: 600px;
   margin: 0 auto;
 }
@@ -505,6 +505,216 @@ h1, h2, h3, h4, h5, h6 {
 select, select option {
   background-color: #0d1426 !important;
   color: #f8fafc !important;
+  padding: 12px 14px !important;
+}
+
+/* Global touch target and legibility enhancements for seniors */
+select, input, textarea {
+  min-height: 44px;
+}
+
+button {
+  min-height: 40px;
+}
+
+/* Hide elements on mobile devices (e.g. text labels next to icons in header) */
+@media screen and (max-width: 480px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Permanent visible thin scrollbar for mobile navigation bar */
+.mobile-nav-bar::-webkit-scrollbar {
+  height: 4px !important;
+  display: block !important;
+}
+.mobile-nav-bar::-webkit-scrollbar-track {
+  background: rgba(13, 20, 38, 0.4) !important;
+}
+.mobile-nav-bar::-webkit-scrollbar-thumb {
+  background: var(--vbt-sky) !important;
+  border-radius: 2px !important;
+  box-shadow: 0 0 4px var(--vbt-sky);
+}
+
+/* Custom Responsive Rules */
+.config-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.config-grid-teams {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media screen and (max-width: 500px) {
+  .standings-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .config-grid-2col, .config-grid-teams {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .block-header-responsive {
+    padding: 12px !important;
+  }
+  .block-content-responsive {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+  .matchup-card-wrapper {
+    padding: 12px 10px !important;
+  }
+  .matchup-header-responsive {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+  }
+  .matchup-header-responsive > div:last-child {
+    align-self: flex-end !important;
+  }
+  .winner-selector {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+    padding: 4px !important;
+  }
+  .winner-option {
+    flex: 1 1 calc(50% - 4px) !important;
+    padding: 8px 6px !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-height: 36px !important;
+  }
+  .timer-controls-buttons-container {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .timer-resume-pause-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 12px !important;
+  }
+  .timer-adjust-row {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+  }
+  .timer-adjust-row button {
+    flex: 1 !important;
+    padding: 10px 12px !important;
+    font-size: 0.8rem !important;
+    text-align: center !important;
+  }
+  .service-edit-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .service-edit-bar button {
+    width: 100% !important;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .header-container {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
+  }
+  .header-branding h2 {
+    font-size: 0.85rem !important;
+  }
+  .header-branding img {
+    height: 26px !important;
+  }
+  .header-actions {
+    gap: 6px !important;
+  }
+  .header-user-info p:first-child {
+    font-size: 0.72rem !important;
+  }
+  .header-user-info p:last-child {
+    font-size: 0.58rem !important;
+  }
+  .schedule-filter-dropdowns {
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .schedule-filter-dropdowns select {
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: 120px !important;
+  }
+  .broadcast-sync-container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+  .broadcast-sync-container > span {
+    text-align: center !important;
+    margin-bottom: 2px !important;
+  }
+  .broadcast-sync-container button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 12px !important;
+  }
+  .service-group-edit-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .service-group-edit-row input[type="text"] {
+    flex: 1 1 55% !important;
+  }
+  .service-group-edit-row input[type="number"] {
+    width: 60px !important;
+    flex: 1 1 20% !important;
+  }
+  .game-detail-header-btn {
+    padding: 10px 8px !important;
+  }
+  .game-detail-header-btn > div {
+    gap: 6px !important;
+  }
+  .game-detail-header-btn span {
+    font-size: 0.8rem !important;
+  }
+}
+
+.live-location-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media screen and (max-width: 600px) {
+  .live-location-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Quick Add Servant form layout on mobile */
+@media screen and (max-width: 480px) {
+  .quick-add-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .quick-add-row input, .quick-add-row button {
+    width: 100% !important;
+  }
 }
 
 

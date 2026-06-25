@@ -375,6 +375,14 @@ export default function App() {
   const [editEventConfig, setEditEventConfig] = useState(null);
   const [savingEventConfig, setSavingEventConfig] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
   const side1Name = eventConfig.side1Name || 'Shakes';
   const side2Name = eventConfig.side2Name || 'Fries';
@@ -3405,7 +3413,7 @@ export default function App() {
         borderRight: 'none',
         background: 'rgba(13, 20, 38, 0.8)'
       }}>
-        <div style={{
+        <div className="header-container" style={{
           maxWidth: '600px',
           margin: '0 auto',
           padding: '12px 16px',
@@ -3413,7 +3421,7 @@ export default function App() {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="header-branding" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <img src={eventConfig.logoUrl || '/Final VBT Re-Branding 2026-02 (3).png'} alt="Logo" style={{ height: '32px', width: 'auto' }} />
             <div>
               <h2 style={{ fontSize: '0.95rem', color: '#ffffff', lineHeight: 1.1 }}>{eventConfig.eventName || 'VBT CAMP'}</h2>
@@ -3424,7 +3432,7 @@ export default function App() {
             </div>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Notification Permission Request */}
             {('Notification' in window) && Notification.permission !== 'granted' && (
               <button
@@ -3454,7 +3462,7 @@ export default function App() {
                 <Bell size={12} style={{ animation: 'pulse-glow 1.5s infinite' }} /> Enable Alerts
               </button>
             )}
-            <div style={{ textAlign: 'right' }}>
+            <div className="header-user-info" style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: '600' }}>{currentUser.name}</p>
               <p style={{ fontSize: '0.65rem', color: currentUser.side === 'Shakes' ? 'var(--color-shakes)' : 'var(--color-fries)', fontWeight: '700' }}>
                 {currentUser.side.toUpperCase()} ({currentUser.teamCode})
@@ -3495,7 +3503,7 @@ export default function App() {
                     <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
                   </div>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <div className="standings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                     {scoreCalculations.colors.map(colorName => {
                       const colorHex = getTeamColorHex(colorName);
                       const score = scoreCalculations.finalScores[colorName] || 0;
@@ -3678,7 +3686,7 @@ export default function App() {
               return (
                 <div key={blockNum} className="glass-panel" style={{ overflow: 'hidden' }}>
                   <div 
-                    className="block-header" 
+                    className="block-header block-header-responsive" 
                     onClick={() => setExpandedBlocks({ ...expandedBlocks, [blockNum]: !isOpen })}
                   >
                     <div>
@@ -3708,7 +3716,7 @@ export default function App() {
                   </div>
                   
                   {isOpen && (
-                    <div className="block-content" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(0,0,0,0.1)' }}>
+                    <div className="block-content block-content-responsive" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(0,0,0,0.1)' }}>
                       {Array.from(new Set(campData.matchups.filter(m => m.block === blockNum && m.game.toUpperCase() !== 'SPLIT').map(m => m.round))).map(roundNum => {
                         const roundMatches = campData.matchups.filter(m => m.block === blockNum && m.round === roundNum && m.game.toUpperCase() !== 'SPLIT');
                         
@@ -3727,8 +3735,8 @@ export default function App() {
                                 const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                                 
                                 return (
-                                  <div key={idx} className="glass-panel" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)' }}>
-                                    <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <div key={idx} className="glass-panel matchup-card-wrapper" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)' }}>
+                                    <div className="matchup-header-responsive" style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                       <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                           <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ffffff' }}>{m.game}</span>
@@ -3841,7 +3849,7 @@ export default function App() {
               return (
                 <div key={gameName} className="glass-panel" style={{ overflow: 'hidden' }}>
                   <div 
-                    className="block-header" 
+                    className="block-header block-header-responsive" 
                     onClick={() => setExpandedGames({ ...expandedGames, [gameName]: !isOpen })}
                     style={{ background: 'linear-gradient(90deg, rgba(20, 65, 161, 0.08) 0%, rgba(13, 20, 38, 0.15) 100%)' }}
                   >
@@ -3855,7 +3863,7 @@ export default function App() {
                   </div>
                   
                   {isOpen && (
-                    <div className="block-content" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)', padding: '12px' }}>
+                    <div className="block-content block-content-responsive" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)', padding: '12px' }}>
                       {gameMatches.map((m, idx) => {
                         const key = `${m.block}_${m.round}_${m.game}`;
                         const winner = (campState.blockScores || {})[key] || 'NA';
@@ -3863,8 +3871,8 @@ export default function App() {
                         const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                         
                         return (
-                          <div key={idx} className="glass-panel" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <div key={idx} className="glass-panel matchup-card-wrapper" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div className="matchup-header-responsive" style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                               <div>
                                 <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--vbt-sky)' }}>
                                   Block {m.block} • Round {m.round}
@@ -4288,7 +4296,7 @@ export default function App() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <h2 style={{ fontSize: '1.2rem', color: '#ffffff' }}>Matchups & Locations</h2>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="schedule-filter-dropdowns" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {eventConfig.eventType === 'service' ? (
                   <select 
                     value={scheduleBlockFilter}
@@ -4398,9 +4406,10 @@ export default function App() {
                     </span>
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="timer-controls-buttons-container" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button 
                       onClick={handleToggleTimer}
+                      className="timer-resume-pause-btn"
                       style={{
                         padding: '8px 10px',
                         borderRadius: '6px',
@@ -4419,7 +4428,7 @@ export default function App() {
                       {campState.isTimerPaused ? '▶️ Resume' : '⏸️ Pause'}
                     </button>
 
-                    <div style={{ display: 'flex', gap: '2px' }}>
+                    <div className="timer-adjust-row" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <button 
                         onClick={() => handleAdjustTimeShift(-5)}
                         disabled={(campState.timeShiftMinutes || 0) <= 0}
@@ -4453,29 +4462,28 @@ export default function App() {
                       >
                         +5m
                       </button>
+                      <button 
+                        onClick={handleResetTimeShift}
+                        disabled={getEffectiveTimeShift() === 0}
+                        style={{
+                          padding: '8px 8px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: getEffectiveTimeShift() === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.08)',
+                          color: getEffectiveTimeShift() === 0 ? 'var(--text-muted)' : '#ffffff',
+                          fontWeight: '700',
+                          fontSize: '0.75rem',
+                          cursor: getEffectiveTimeShift() === 0 ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        Reset
+                      </button>
                     </div>
-
-                    <button 
-                      onClick={handleResetTimeShift}
-                      disabled={getEffectiveTimeShift() === 0}
-                      style={{
-                        padding: '8px 8px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: getEffectiveTimeShift() === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.08)',
-                        color: getEffectiveTimeShift() === 0 ? 'var(--text-muted)' : '#ffffff',
-                        fontWeight: '700',
-                        fontSize: '0.75rem',
-                        cursor: getEffectiveTimeShift() === 0 ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      Reset
-                    </button>
                   </div>
                 </div>
 
                 {/* Broadcast Sync Pings (Centralized Bell) */}
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', marginTop: '4px' }}>
+                <div className="broadcast-sync-container" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', marginTop: '4px' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>🚨 Broadcast Round Sync:</span>
                   <button 
                     onClick={async () => {
@@ -4576,7 +4584,7 @@ export default function App() {
                 </div>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+              <div className="live-location-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
                 {liveLocationStatus.map((loc) => {
                   const active = loc.activeMatchup;
                   return (
@@ -5553,7 +5561,7 @@ export default function App() {
                   </p>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="config-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
                         <input
@@ -5579,7 +5587,7 @@ export default function App() {
 
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
                       <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Rename Teams</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                      <div className="config-grid-teams" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.65rem', color: '#ef4444', marginBottom: '4px', fontWeight: '700' }}>Red Team</label>
                           <input type="text" value={editTeamRed} onChange={(e) => setEditTeamRed(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
@@ -5616,25 +5624,38 @@ export default function App() {
                         {globalServants.sort((a,b) => a.name.localeCompare(b.name)).map(s => {
                           const isAttending = editAttending.includes(s.id);
                           return (
-                            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', borderRadius: '6px', background: isAttending ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.01)', border: '1px solid ' + (isAttending ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.02)') }}>
-                              <input
-                                type="checkbox"
-                                checked={isAttending}
-                                onChange={() => {
-                                  const updated = editAttending.includes(s.id)
-                                    ? editAttending.filter(id => id !== s.id)
-                                    : [...editAttending, s.id];
-                                  setEditAttending(updated);
-                                }}
-                                style={{ width: '14px', height: '14px', cursor: 'pointer' }}
-                              />
-                              <span style={{ fontSize: '0.8rem', color: '#ffffff', flex: 1, fontWeight: isAttending ? '700' : 'normal' }}>{s.name}</span>
+                            <div key={s.id} style={{ 
+                              display: 'flex', 
+                              flexDirection: 'row', 
+                              flexWrap: 'wrap', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between',
+                              gap: '8px', 
+                              padding: '6px', 
+                              borderRadius: '6px', 
+                              background: isAttending ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.01)', 
+                              border: '1px solid ' + (isAttending ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.02)') 
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '150px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isAttending}
+                                  onChange={() => {
+                                    const updated = editAttending.includes(s.id)
+                                      ? editAttending.filter(id => id !== s.id)
+                                      : [...editAttending, s.id];
+                                    setEditAttending(updated);
+                                  }}
+                                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                <span style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: isAttending ? '700' : 'normal' }}>{s.name}</span>
+                              </div>
                               
                               {isAttending && (
                                 <select
                                   value={editRoles[s.id] || 'volunteer'}
                                   onChange={(e) => setEditRoles(prev => ({ ...prev, [s.id]: e.target.value }))}
-                                  style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.72rem', cursor: 'pointer', outline: 'none', maxWidth: '140px' }}
+                                  style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', width: '100%', maxWidth: '160px', minHeight: '32px' }}
                                 >
                                   <option value="volunteer">Volunteer/Ref</option>
                                   <option value="coordinator">Coordinator</option>
@@ -5663,7 +5684,7 @@ export default function App() {
                       {/* Quick Add Servant form inside Controls tab */}
                       <div style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#a78bfa' }}>➕ Add New Servant to Directory</span>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                        <div className="quick-add-row" style={{ display: 'flex', gap: '6px' }}>
                           <input
                             type="text"
                             value={quickServantName}
@@ -5996,7 +6017,7 @@ export default function App() {
                 <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '8px' }}>Camp Tokens (+2 pts each)</h3>
                 
                 {eventConfig.eventType === 'service' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="config-grid-2col" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                     {['red', 'white', 'black', 'blue'].map(colorKey => {
                       const colorNameCapitalized = colorKey.charAt(0).toUpperCase() + colorKey.slice(1);
                       const customName = eventConfig.teamNames?.[colorKey] || colorNameCapitalized;
@@ -6126,23 +6147,23 @@ export default function App() {
                 {rosterEditMode && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {editRoster.map((entry, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <div key={idx} style={{ display: 'flex', gap: isMobile ? '4px' : '6px', alignItems: 'center' }}>
                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `hsl(${(idx * 53) % 360}, 55%, 40%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: '800', color: '#fff', flexShrink: 0 }}>{idx + 1}</div>
                         <input
                           type="text"
                           value={entry.name}
                           onChange={e => handleRosterEntryChange(idx, 'name', e.target.value)}
-                          placeholder="Full name (e.g. Shady Shahir / Mary F.)"
-                          style={{ flex: 2, padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.82rem', outline: 'none' }}
+                          placeholder="Full name"
+                          style={{ flex: 2, padding: isMobile ? '6px 8px' : '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: isMobile ? '0.74rem' : '0.82rem', outline: 'none' }}
                         />
                         <input
                           type="text"
                           value={entry.groupLabel}
                           onChange={e => handleRosterEntryChange(idx, 'groupLabel', e.target.value)}
-                          placeholder="Group (e.g. F5.2)"
-                          style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#a78bfa', fontSize: '0.82rem', outline: 'none', textAlign: 'center' }}
+                          placeholder="Group"
+                          style={{ flex: 1, padding: isMobile ? '6px 8px' : '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#a78bfa', fontSize: isMobile ? '0.74rem' : '0.82rem', outline: 'none', textAlign: 'center' }}
                         />
-                        <button onClick={() => handleRemoveRosterEntry(idx)} style={{ padding: '7px', borderRadius: '6px', border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', flexShrink: 0 }}>
+                        <button onClick={() => handleRemoveRosterEntry(idx)} style={{ padding: isMobile ? '5px' : '7px', borderRadius: '6px', border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', flexShrink: 0 }}>
                           <Minus size={11} />
                         </button>
                       </div>
@@ -6265,79 +6286,118 @@ export default function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {teams.map((team, idx) => (
                         <div key={idx} style={{
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          padding: '8px 10px', borderRadius: '10px',
-                          background: 'rgba(0,0,0,0.2)', border: `1px solid ${team.color}33`
+                          display: 'flex',
+                          flexDirection: isMobile ? 'column' : 'row',
+                          alignItems: isMobile ? 'stretch' : 'center',
+                          gap: '8px',
+                          padding: isMobile ? '10px 12px' : '8px 10px',
+                          borderRadius: '10px',
+                          background: 'rgba(0,0,0,0.2)',
+                          border: `1px solid ${team.color}33`
                         }}>
-                          {/* Color indicator + picker */}
-                          <div style={{ position: 'relative', flexShrink: 0 }}>
-                            <div
-                              style={{
-                                width: '32px', height: '32px', borderRadius: '8px',
-                                background: team.color, border: '2px solid rgba(255,255,255,0.2)',
-                                cursor: 'pointer', position: 'relative', overflow: 'hidden'
-                              }}
-                            >
-                              <input
-                                type="color"
-                                value={team.color}
-                                onChange={(e) => updateTeam(idx, 'color', e.target.value)}
-                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Team number badge */}
-                          <span style={{
-                            fontSize: '0.65rem', fontWeight: '800', color: team.color,
-                            minWidth: '14px', textAlign: 'center'
-                          }}>
-                            {idx + 1}
-                          </span>
-
-                          {/* Name input */}
-                          <input
-                            type="text"
-                            value={team.name}
-                            onChange={(e) => updateTeam(idx, 'name', e.target.value)}
-                            placeholder={`Team ${idx + 1}`}
-                            style={{
-                              flex: 1, padding: '7px 10px', borderRadius: '6px',
-                              background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                              color: '#ffffff', fontSize: '0.85rem', outline: 'none',
-                              fontFamily: 'var(--font-body)'
-                            }}
-                          />
-
-                          {/* Color quick-swatches (top 6) */}
-                          <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
-                            {COLOR_SWATCHES.slice(0, 4).map((c) => (
+                          {/* Top Row: Color Picker, Badge, Input, Delete Button */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                            {/* Color indicator + picker */}
+                            <div style={{ position: 'relative', flexShrink: 0 }}>
                               <div
-                                key={c}
-                                onClick={() => updateTeam(idx, 'color', c)}
                                 style={{
-                                  width: '14px', height: '14px', borderRadius: '3px',
-                                  background: c, cursor: 'pointer',
-                                  border: team.color === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.15)',
-                                  transition: 'transform 0.15s',
+                                  width: '32px', height: '32px', borderRadius: '8px',
+                                  background: team.color, border: '2px solid rgba(255,255,255,0.2)',
+                                  cursor: 'pointer', position: 'relative', overflow: 'hidden'
                                 }}
-                              />
-                            ))}
+                              >
+                                <input
+                                  type="color"
+                                  value={team.color}
+                                  onChange={(e) => updateTeam(idx, 'color', e.target.value)}
+                                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Team number badge */}
+                            <span style={{
+                              fontSize: '0.65rem', fontWeight: '800', color: team.color,
+                              minWidth: '14px', textAlign: 'center'
+                            }}>
+                              {idx + 1}
+                            </span>
+
+                            {/* Name input */}
+                            <input
+                              type="text"
+                              value={team.name}
+                              onChange={(e) => updateTeam(idx, 'name', e.target.value)}
+                              placeholder={`Team ${idx + 1}`}
+                              style={{
+                                flex: 1, padding: '7px 10px', borderRadius: '6px',
+                                background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                                color: '#ffffff', fontSize: '0.85rem', outline: 'none',
+                                fontFamily: 'var(--font-body)'
+                              }}
+                            />
+
+                            {/* Remove button (Desktop inline) */}
+                            {!isMobile && (
+                              <button
+                                type="button"
+                                onClick={() => removeTeam(idx)}
+                                disabled={teams.length <= 2}
+                                style={{
+                                  width: '24px', height: '24px', borderRadius: '6px',
+                                  border: 'none', background: teams.length <= 2 ? 'transparent' : 'rgba(239,68,68,0.15)',
+                                  color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
+                                  fontSize: '0.8rem', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                }}
+                              >✕</button>
+                            )}
                           </div>
 
-                          {/* Remove button */}
-                          <button
-                            type="button"
-                            onClick={() => removeTeam(idx)}
-                            disabled={teams.length <= 2}
-                            style={{
-                              width: '24px', height: '24px', borderRadius: '6px',
-                              border: 'none', background: teams.length <= 2 ? 'transparent' : 'rgba(239,68,68,0.15)',
-                              color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
-                              fontSize: '0.8rem', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                            }}
-                          >✕</button>
+                          {/* Bottom Row / Inline Color Swatches & mobile actions */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px',
+                            paddingLeft: isMobile ? '40px' : '0px',
+                            marginTop: isMobile ? '2px' : '0px'
+                          }}>
+                            {/* Color swatches */}
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                              {isMobile && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginRight: '4px' }}>Color:</span>}
+                              {COLOR_SWATCHES.slice(0, isMobile ? 8 : 4).map((c) => (
+                                <div
+                                  key={c}
+                                  onClick={() => updateTeam(idx, 'color', c)}
+                                  style={{
+                                    width: isMobile ? '18px' : '14px',
+                                    height: isMobile ? '18px' : '14px',
+                                    borderRadius: '3px',
+                                    background: c, cursor: 'pointer',
+                                    border: team.color === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.15)',
+                                    transition: 'transform 0.15s',
+                                  }}
+                                />
+                              ))}
+                            </div>
+
+                            {/* Remove button (Mobile bottom right) */}
+                            {isMobile && (
+                              <button
+                                type="button"
+                                onClick={() => removeTeam(idx)}
+                                disabled={teams.length <= 2}
+                                style={{
+                                  padding: '4px 10px', borderRadius: '6px',
+                                  border: 'none', background: teams.length <= 2 ? 'transparent' : 'rgba(239,68,68,0.15)',
+                                  color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
+                                  fontSize: '0.75rem', fontWeight: '700', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer',
+                                  display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
+                              >✕ Remove</button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -6434,7 +6494,7 @@ export default function App() {
 
             {/* ── COORDINATOR EDIT BAR ─────────────────────────────── */}
             {currentUser && currentUser.role === 'admin' && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="service-edit-bar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
                   onClick={() => {
                     setEditServiceBrief(serviceData.serviceBrief);
@@ -6578,7 +6638,7 @@ export default function App() {
               {serviceEditMode && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {editGroups.map((group, idx) => (
-                    <div key={idx} style={{
+                    <div key={idx} className="service-group-edit-row" style={{
                       display: 'flex', gap: '8px', alignItems: 'center',
                       background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px'
                     }}>
@@ -6669,6 +6729,7 @@ export default function App() {
                           {/* Accordion header */}
                           <button
                             onClick={() => setExpandedServiceGame(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                            className="game-detail-header-btn"
                             style={{
                               width: '100%', padding: '13px 14px', background: 'none', border: 'none',
                               display: 'flex', alignItems: 'center', justifyContent: 'space-between',

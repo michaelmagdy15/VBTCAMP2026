@@ -12,7 +12,7 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Plus, Minus, Trash2, Save, Palette } from 'lucide-react';
 import { saveAsTemplate, loadTemplates, deleteTemplate, PRESET_TEMPLATES } from '../templates';
 import { calculateTimeSlots } from '../matchupEngine';
@@ -321,6 +321,14 @@ const styles = {
 // ── Component ─────────────────────────────────────────────────
 
 export default function DynamicConfigurator({ eventConfig, onSaveConfig, campData }) {
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // ── Team State ──────────────────────────────────────────────
   const [teamCount, setTeamCount] = useState(eventConfig?.teamCount || 4);
   const [teams, setTeams] = useState(() => {
@@ -370,15 +378,17 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
 
   // ── Sync team count with teams array ────────────────────────
   useEffect(() => {
-    setTeams((prev) => {
-      if (teamCount > prev.length) {
-        const additional = Array.from({ length: teamCount - prev.length }, (_, i) => ({
-          name: `Team ${prev.length + i + 1}`,
-          color: PRESET_TEAM_COLORS[(prev.length + i) % PRESET_TEAM_COLORS.length].hex,
-        }));
-        return [...prev, ...additional];
-      }
-      return prev.slice(0, teamCount);
+    Promise.resolve().then(() => {
+      setTeams((prev) => {
+        if (teamCount > prev.length) {
+          const additional = Array.from({ length: teamCount - prev.length }, (_, i) => ({
+            name: `Team ${prev.length + i + 1}`,
+            color: PRESET_TEAM_COLORS[(prev.length + i) % PRESET_TEAM_COLORS.length].hex,
+          }));
+          return [...prev, ...additional];
+        }
+        return prev.slice(0, teamCount);
+      });
     });
   }, [teamCount]);
 
@@ -474,7 +484,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
   const timePreview = getTimePreview();
 
   return (
-    <div style={styles.container}>
+    <div style={{ ...styles.container, padding: isMobile ? '0 12px' : 0 }}>
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerIcon}>
@@ -484,7 +494,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       </div>
 
       {/* ═══════ Section 1: Team Count ═══════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
         <div style={styles.sectionTitle}>
           <Palette size={16} color={COLORS.sky} />
           Teams
@@ -520,10 +530,11 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             style={{
               ...styles.teamCard,
               borderLeft: `3px solid ${team.color}`,
+              padding: isMobile ? 12 : 16,
             }}
           >
-            <div style={styles.teamGrid}>
-              <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+            <div style={{ ...styles.teamGrid, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'start' }}>
+              <div style={{ flex: isMobile ? 'none' : '1 1 240px', minWidth: 0, width: isMobile ? '100%' : 'auto' }}>
                 <label style={styles.label}>Team Name</label>
                 <input
                   style={styles.input}
@@ -532,14 +543,28 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                   placeholder={`Team ${idx + 1}`}
                 />
                 <label style={{ ...styles.label, marginTop: 10 }}>Color</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: isMobile ? 'column' : 'row', 
+                  alignItems: isMobile ? 'stretch' : 'center', 
+                  gap: 10 
+                }}>
                   <input
-                    style={{ ...styles.inputSmall, width: 80, flexShrink: 0 }}
+                    style={{ 
+                      ...(isMobile ? styles.input : styles.inputSmall), 
+                      width: isMobile ? '100%' : 80, 
+                      textAlign: isMobile ? 'left' : 'center' 
+                    }}
                     value={team.color}
                     onChange={(e) => updateTeam(idx, 'color', e.target.value)}
                     placeholder="#hex"
                   />
-                  <div style={styles.swatchRow}>
+                  <div style={{ 
+                    ...styles.swatchRow, 
+                    marginTop: isMobile ? 4 : 6, 
+                    justifyContent: isMobile ? 'space-between' : 'flex-start',
+                    width: isMobile ? '100%' : 'auto'
+                  }}>
                     {PRESET_TEAM_COLORS.map((preset) => (
                       <div
                         key={preset.hex}
@@ -551,10 +576,10 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                   </div>
                 </div>
               </div>
-              <div style={{ flex: '0 0 auto' }}>
+              <div style={{ flex: isMobile ? 'none' : '0 0 auto', width: isMobile ? '100%' : 'auto', marginTop: isMobile ? 12 : 0 }}>
                 <label style={styles.label}>Logo</label>
-                <button style={styles.uploadBtn}>
-                  <span>Upload</span>
+                <button style={{ ...styles.uploadBtn, width: isMobile ? '100%' : 56, height: isMobile ? 44 : 56 }}>
+                  <span>{isMobile ? 'Upload Logo' : 'Upload'}</span>
                 </button>
               </div>
             </div>
@@ -563,30 +588,60 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       </div>
 
       {/* ═══════ Section 2: Score Categories ═══════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
         <div style={styles.sectionTitle}>Score Categories</div>
 
         {categories.map((cat, idx) => (
-          <div key={idx} style={styles.categoryRow}>
-            <span style={{ flex: 1, fontSize: 14, color: COLORS.textPrimary }}>
+          <div 
+            key={idx} 
+            style={{ 
+              ...styles.categoryRow, 
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+              gap: isMobile ? 8 : 10,
+              padding: isMobile ? 12 : '8px 12px'
+            }}
+          >
+            <span style={{ flex: 1, fontSize: 14, color: COLORS.textPrimary, textAlign: isMobile ? 'center' : 'left' }}>
               {cat.name}
             </span>
-            <span style={{ fontSize: 13, color: COLORS.sky, fontWeight: 600, minWidth: 50, textAlign: 'right' }}>
-              {cat.points} pts
-            </span>
-            <button
-              style={{ ...styles.btn, ...styles.btnDanger, ...styles.btnSmall }}
-              onClick={() => removeCategory(idx)}
-            >
-              <Trash2 size={12} />
-            </button>
+            <div style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+              gap: isMobile ? 8 : 10,
+              marginLeft: isMobile ? 0 : 'auto'
+            }}>
+              <span style={{ 
+                fontSize: 13, 
+                color: COLORS.sky, 
+                fontWeight: 600, 
+                minWidth: isMobile ? 'none' : 50, 
+                textAlign: isMobile ? 'center' : 'right' 
+              }}>
+                {cat.points} pts
+              </span>
+              <button
+                style={{ 
+                  ...styles.btn, 
+                  ...styles.btnDanger, 
+                  ...styles.btnSmall,
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center'
+                }}
+                onClick={() => removeCategory(idx)}
+              >
+                <Trash2 size={12} />
+                {isMobile && <span style={{ marginLeft: 6 }}>Remove Category</span>}
+              </button>
+            </div>
           </div>
         ))}
 
         <hr style={styles.divider} />
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 140 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 8, alignItems: isMobile ? 'stretch' : 'flex-end' }}>
+          <div style={{ flex: isMobile ? 'none' : 1, minWidth: isMobile ? 0 : 140, width: isMobile ? '100%' : 'auto' }}>
             <label style={styles.label}>Category Name</label>
             <input
               style={styles.input}
@@ -596,10 +651,13 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
               onKeyDown={(e) => e.key === 'Enter' && addCategory()}
             />
           </div>
-          <div style={{ width: 80 }}>
+          <div style={{ width: isMobile ? '100%' : 80 }}>
             <label style={styles.label}>Points</label>
             <input
-              style={styles.inputSmall}
+              style={{ 
+                ...(isMobile ? styles.input : styles.inputSmall), 
+                width: '100%' 
+              }}
               type="number"
               value={newCatPoints}
               onChange={(e) => setNewCatPoints(e.target.value)}
@@ -607,7 +665,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             />
           </div>
           <button
-            style={{ ...styles.btn, ...styles.btnPrimary }}
+            style={{ ...styles.btn, ...styles.btnPrimary, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}
             onClick={addCategory}
           >
             <Plus size={14} />
@@ -621,23 +679,30 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       </div>
 
       {/* ═══════ Section 3: Service Time Profile ═══════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
         <div style={styles.sectionTitle}>Service Time Profile</div>
 
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-          <div>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, marginBottom: 16 }}>
+          <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
             <label style={styles.label}>Start Time</label>
             <input
-              style={{ ...styles.inputSmall, width: 130 }}
+              style={{ 
+                ...(isMobile ? styles.input : styles.inputSmall), 
+                width: '100%', 
+                textAlign: isMobile ? 'left' : 'center' 
+              }}
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
             />
           </div>
-          <div>
+          <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
             <label style={styles.label}>Round Duration (min)</label>
             <input
-              style={styles.inputSmall}
+              style={{ 
+                ...(isMobile ? styles.input : styles.inputSmall), 
+                width: '100%' 
+              }}
               type="number"
               value={roundDuration}
               onChange={(e) => setRoundDuration(Number(e.target.value) || 1)}
@@ -645,10 +710,13 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
               max={120}
             />
           </div>
-          <div>
+          <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
             <label style={styles.label}>Break Between (min)</label>
             <input
-              style={styles.inputSmall}
+              style={{ 
+                ...(isMobile ? styles.input : styles.inputSmall), 
+                width: '100%' 
+              }}
               type="number"
               value={breakTime}
               onChange={(e) => setBreakTime(Number(e.target.value) || 0)}
@@ -673,14 +741,14 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       </div>
 
       {/* ═══════ Section 4: Template Management ═══════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
         <div style={styles.sectionTitle}>
           <Save size={16} color={COLORS.sky} />
           Templates
         </div>
 
         {/* Save as template */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16 }}>
           <input
             style={{ ...styles.input, flex: 1 }}
             value={templateName}
@@ -692,6 +760,8 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             style={{
               ...styles.btn,
               ...styles.btnPrimary,
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center',
               opacity: isSaving || !templateName.trim() ? 0.5 : 1,
               pointerEvents: isSaving || !templateName.trim() ? 'none' : 'auto',
             }}
@@ -711,14 +781,29 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           <>
             <label style={{ ...styles.label, marginBottom: 8 }}>Saved Templates</label>
             {savedTemplates.map((t) => (
-              <div key={t.id} style={styles.templateCard}>
-                <div style={styles.templateInfo}>
+              <div 
+                key={t.id} 
+                style={{ 
+                  ...styles.templateCard,
+                  flexDirection: isMobile ? 'column' : 'row',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  gap: isMobile ? 12 : 0,
+                  padding: isMobile ? 12 : '12px 16px',
+                }}
+              >
+                <div style={{ ...styles.templateInfo, marginRight: isMobile ? 0 : 12 }}>
                   <div style={styles.templateName}>{t.name}</div>
                   {t.description && <div style={styles.templateDesc}>{t.description}</div>}
                 </div>
-                <div style={styles.templateActions}>
+                <div style={{ ...styles.templateActions, justifyContent: isMobile ? 'stretch' : 'flex-start', gap: 6 }}>
                   <button
-                    style={{ ...styles.btn, ...styles.btnGhost, ...styles.btnSmall }}
+                    style={{ 
+                      ...styles.btn, 
+                      ...styles.btnGhost, 
+                      ...styles.btnSmall, 
+                      flex: isMobile ? 1 : 'none', 
+                      justifyContent: 'center' 
+                    }}
                     onClick={() => {
                       if (onSaveConfig) onSaveConfig({ ...buildConfig(), _loadedTemplateId: t.id });
                     }}
@@ -726,10 +811,17 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
                     Load
                   </button>
                   <button
-                    style={{ ...styles.btn, ...styles.btnDanger, ...styles.btnSmall }}
+                    style={{ 
+                      ...styles.btn, 
+                      ...styles.btnDanger, 
+                      ...styles.btnSmall, 
+                      flex: isMobile ? 1 : 'none', 
+                      justifyContent: 'center' 
+                    }}
                     onClick={() => handleDeleteTemplate(t.id)}
                   >
                     <Trash2 size={12} />
+                    {isMobile && <span style={{ marginLeft: 6 }}>Delete</span>}
                   </button>
                 </div>
               </div>
@@ -749,14 +841,29 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           <span style={styles.presetBadge}>Built-in</span>
         </label>
         {PRESET_TEMPLATES.map((preset) => (
-          <div key={preset.id} style={styles.templateCard}>
-            <div style={styles.templateInfo}>
+          <div 
+            key={preset.id} 
+            style={{ 
+              ...styles.templateCard,
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+              gap: isMobile ? 12 : 0,
+              padding: isMobile ? 12 : '12px 16px',
+            }}
+          >
+            <div style={{ ...styles.templateInfo, marginRight: isMobile ? 0 : 12 }}>
               <div style={styles.templateName}>{preset.name}</div>
-              <div style={styles.templateDesc}>{preset.description}</div>
+              <div style={preset.description ? styles.templateDesc : { display: 'none' }}>{preset.description}</div>
             </div>
-            <div style={styles.templateActions}>
+            <div style={{ ...styles.templateActions, justifyContent: isMobile ? 'stretch' : 'flex-start' }}>
               <button
-                style={{ ...styles.btn, ...styles.btnGhost, ...styles.btnSmall }}
+                style={{ 
+                  ...styles.btn, 
+                  ...styles.btnGhost, 
+                  ...styles.btnSmall, 
+                  flex: isMobile ? 1 : 'none', 
+                  justifyContent: 'center' 
+                }}
                 onClick={() => {
                   setTeamCount(preset.config.teamCount || 4);
                   if (onSaveConfig) onSaveConfig({ ...buildConfig(), ...preset.config });
@@ -770,7 +877,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       </div>
 
       {/* ── Section: Location Map Key ── */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? 16 : 24, borderRadius: isMobile ? 12 : 16 }}>
         <div style={styles.sectionTitle}>
           <Palette size={18} /> Location Map Key Configurator
         </div>
@@ -779,8 +886,17 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
         </p>
 
         {locations.map((loc, idx) => (
-          <div key={loc.id || idx} style={{ ...styles.teamCard, border: '1px solid rgba(41, 182, 246, 0.15)', background: 'rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+          <div 
+            key={loc.id || idx} 
+            style={{ 
+              ...styles.teamCard, 
+              border: '1px solid rgba(41, 182, 246, 0.15)', 
+              background: 'rgba(0,0,0,0.15)',
+              padding: isMobile ? 12 : 16,
+              marginBottom: 12
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 10 }}>
               <div>
                 <label style={styles.label}>Location ID (unique, e.g. 1, MH)</label>
                 <input
@@ -813,7 +929,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
               </div>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.5fr', gap: 12, marginBottom: 10 }}>
               <div>
                 <label style={styles.label}>Internal Name (e.g. Football Field)</label>
                 <input
@@ -846,15 +962,17 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', marginTop: isMobile ? 8 : 0 }}>
               <button
                 style={{ 
                   ...styles.btn, 
                   background: COLORS.dangerBg, 
                   color: COLORS.danger, 
-                  borderColor: COLORS.danger,
-                  padding: '4px 10px', 
-                  fontSize: 11 
+                  border: `1px solid ${COLORS.danger}30`,
+                  padding: isMobile ? '10px 14px' : '4px 10px', 
+                  fontSize: isMobile ? 13 : 11,
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center'
                 }}
                 onClick={() => {
                   setLocations(prev => prev.filter((_, i) => i !== idx));
@@ -866,9 +984,9 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           </div>
         ))}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, marginTop: 12 }}>
           <button
-            style={{ ...styles.btn, width: '50%', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}
+            style={{ ...styles.btn, width: isMobile ? '100%' : '50%', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}
             onClick={() => {
               setLocations(prev => [
                 ...prev,
@@ -880,7 +998,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           </button>
           
           <button
-            style={{ ...styles.btn, width: '50%', justifyContent: 'center', background: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}
+            style={{ ...styles.btn, width: isMobile ? '100%' : '50%', justifyContent: 'center', background: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}
             onClick={() => {
               if (window.confirm('Reset all map locations to the default 6 camp locations?')) {
                 setLocations([

@@ -1,8 +1,8 @@
 // ─── GPSMap — Interactive Satellite Map Component ───
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Navigation, Plus, Trash2, Save, Crosshair, Search, Globe, Camera } from 'lucide-react';
+import { MapPin, Navigation, Plus, Trash2, Save, Crosshair, Search, Camera, ChevronDown, ChevronUp } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import {
   subscribeToMapConfig,
@@ -347,9 +347,34 @@ export default function GPSMap({
   const [formLabel, setFormLabel] = useState('');
   const [formGame, setFormGame] = useState(GAME_OPTIONS[0]);
   const [userPos, setUserPos] = useState(null);
-  const [nearest, setNearest] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // ── Find nearest waypoint (derived state) ──
+  const nearest = useMemo(() => {
+    if (!userPos || waypoints.length === 0) return null;
+    let minDist = Infinity;
+    let closest = null;
+    waypoints.forEach((wp) => {
+      const d = haversine(userPos, wp);
+      if (d < minDist) {
+        minDist = d;
+        closest = { ...wp, distance: d };
+      }
+    });
+    return closest;
+  }, [userPos, waypoints]);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [adminPanelExpanded, setAdminPanelExpanded] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ── Import Location Search State ──
   const [importInput, setImportInput] = useState('');
@@ -365,9 +390,15 @@ export default function GPSMap({
   const geoWatchRef = useRef(null);
 
   const addModeRef = useRef(addMode);
-  addModeRef.current = addMode;
   const isAdminRef = useRef(isAdmin);
-  isAdminRef.current = isAdmin;
+
+  useEffect(() => {
+    addModeRef.current = addMode;
+  }, [addMode]);
+
+  useEffect(() => {
+    isAdminRef.current = isAdmin;
+  }, [isAdmin]);
 
   // ── Subscribe to Firestore config ──
   useEffect(() => {
@@ -414,7 +445,6 @@ export default function GPSMap({
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapConfig]);
 
   // ── Render waypoint markers ──
@@ -437,7 +467,7 @@ export default function GPSMap({
         try {
           const teamColor = resolveStationTeamColor(wp, campData, eventConfig, getTeamColorHex, currentTime);
           if (teamColor) color = teamColor;
-        } catch (_) {
+        } catch {
           /* keep default */
         }
       }
@@ -515,7 +545,7 @@ export default function GPSMap({
     };
   }, []);
 
-  // ── User position marker + nearest calc ──
+  // ── User position marker updates ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !userPos) return;
@@ -529,21 +559,7 @@ export default function GPSMap({
       }).addTo(map);
       userMarkerRef.current.bindTooltip('You', { permanent: false, direction: 'top', offset: [0, -12] });
     }
-
-    // Find nearest waypoint
-    if (waypoints.length > 0) {
-      let minDist = Infinity;
-      let closest = null;
-      waypoints.forEach((wp) => {
-        const d = haversine(userPos, wp);
-        if (d < minDist) {
-          minDist = d;
-          closest = { ...wp, distance: d };
-        }
-      });
-      setNearest(closest);
-    }
-  }, [userPos, waypoints]);
+  }, [userPos]);
 
   // ── Actions ──
   const handleSetCenter = useCallback(() => {
@@ -767,8 +783,33 @@ export default function GPSMap({
         </div>
       )}
 
-      {/* ── Admin Toolbar ── */}
+      {/* ── Admin Toolbar (Collapsible Toggle) ── */}
       {isAdmin && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 14px',
+            background: 'rgba(20, 27, 47, 0.95)',
+            borderBottom: '1px solid rgba(41, 182, 246, 0.15)',
+            cursor: 'pointer',
+            userSelect: 'none',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            transition: 'background 0.2s ease',
+          }}
+          onClick={() => setAdminPanelExpanded(!adminPanelExpanded)}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#29b6f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <MapPin size={16} /> Admin Settings & Waypoints
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+            {adminPanelExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </div>
+      )}
+
+      {isAdmin && adminPanelExpanded && (
         <div style={S.toolbar}>
           <button
             style={S.btn(false)}
@@ -810,7 +851,7 @@ export default function GPSMap({
       )}
 
       {/* ── Map ── */}
-      <div ref={mapElRef} style={S.mapContainer} />
+      <div ref={mapElRef} style={{ ...S.mapContainer, height: isMobile ? 350 : 500 }} />
 
       {/* ── Add Waypoint Modal ── */}
       {isAdmin && pendingLatLng && (
@@ -885,7 +926,7 @@ export default function GPSMap({
       )}
 
       {/* ── Admin Waypoint List ── */}
-      {isAdmin && waypoints.length > 0 && (
+      {isAdmin && adminPanelExpanded && waypoints.length > 0 && (
         <div style={S.panel}>
           <div style={S.heading}>Stations</div>
           {waypoints.map((wp) => (

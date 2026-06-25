@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 //  ScheduleBuilder.jsx  –  Admin Schedule Builder
 // ─────────────────────────────────────────────
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calendar,
   Plus,
@@ -205,17 +205,18 @@ const S = {
     background: bg,
     color,
   }),
-  roundRow: (isDragOver) => ({
+  roundRow: (isDragOver, isMobile) => ({
     ...T.glass,
-    padding: '14px 16px',
+    padding: isMobile ? '12px 10px' : '14px 16px',
     marginBottom: 8,
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: isMobile ? 'column' : 'row',
+    alignItems: isMobile ? 'stretch' : 'center',
     gap: 12,
     transition: 'box-shadow 0.2s, transform 0.15s',
     boxShadow: isDragOver ? `0 0 0 2px ${T.vbtSky}` : 'none',
     transform: isDragOver ? 'scale(1.005)' : 'none',
-    cursor: 'grab',
+    cursor: isMobile ? 'default' : 'grab',
   }),
   matchupChip: {
     background: 'rgba(255,255,255,0.05)',
@@ -296,20 +297,20 @@ const S = {
 /* ════════════════════════════════════════════
    NumberStepper sub-component
    ════════════════════════════════════════════ */
-function NumberStepper({ value, onChange, min = 1, max = 99, label }) {
+function NumberStepper({ value, onChange, min = 1, max = 99, label, isMobile }) {
   return (
-    <div style={S.fieldGroup}>
+    <div style={{ ...S.fieldGroup, width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 0 : 120 }}>
       {label && <span style={S.label}>{label}</span>}
-      <div style={S.stepper}>
+      <div style={{ ...S.stepper, justifyContent: isMobile ? 'space-between' : 'flex-start' }}>
         <button
-          style={S.btnIcon}
+          style={{ ...S.btnIcon, width: isMobile ? 42 : 32, height: isMobile ? 42 : 32, fontSize: isMobile ? 18 : 14 }}
           onClick={() => onChange(Math.max(min, value - 1))}
           aria-label="Decrease"
         >
           –
         </button>
         <input
-          style={S.stepperValue}
+          style={{ ...S.stepperValue, width: isMobile ? '100%' : 48, maxWidth: isMobile ? 80 : 'none', height: isMobile ? 42 : 32 }}
           type="number"
           value={value}
           min={min}
@@ -320,7 +321,7 @@ function NumberStepper({ value, onChange, min = 1, max = 99, label }) {
           }}
         />
         <button
-          style={S.btnIcon}
+          style={{ ...S.btnIcon, width: isMobile ? 42 : 32, height: isMobile ? 42 : 32, fontSize: isMobile ? 18 : 14 }}
           onClick={() => onChange(Math.min(max, value + 1))}
           aria-label="Increase"
         >
@@ -341,6 +342,14 @@ export default function ScheduleBuilder({
   onPublish,
   getTeamColorHex = () => T.vbtBlue,
 }) {
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   /* ── derived data ── */
   const teamsList = useMemo(() => {
     if (eventConfig.teams) {
@@ -547,12 +556,12 @@ export default function ScheduleBuilder({
       {/* ═══════════ 1. Setup Panel ═══════════ */}
       <div style={S.panel}>
         <div style={S.panelTitle}>⚙️ Setup</div>
-        <div style={S.row}>
-          <div style={S.fieldGroup}>
+        <div style={{ ...S.row, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? 12 : 16 }}>
+          <div style={{ ...S.fieldGroup, width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 0 : 120 }}>
             <span style={S.label}>Start Time</span>
             <input
               type="time"
-              style={{ ...S.input, width: 140 }}
+              style={{ ...S.input, width: isMobile ? '100%' : 140, minHeight: isMobile ? '42px' : '32px' }}
               value={startTime}
               onChange={(e) => handleStartTime(e.target.value)}
             />
@@ -563,6 +572,7 @@ export default function ScheduleBuilder({
             onChange={handleRoundDuration}
             min={5}
             max={60}
+            isMobile={isMobile}
           />
           <NumberStepper
             label="Break Duration (min)"
@@ -570,6 +580,7 @@ export default function ScheduleBuilder({
             onChange={handleBreakDuration}
             min={0}
             max={30}
+            isMobile={isMobile}
           />
           <NumberStepper
             label="Number of Rounds"
@@ -577,13 +588,15 @@ export default function ScheduleBuilder({
             onChange={handleRoundCount}
             min={1}
             max={30}
+            isMobile={isMobile}
           />
-          <div style={S.fieldGroup}>
+          <div style={{ ...S.fieldGroup, width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 0 : 80 }}>
             <span style={S.label}>Teams</span>
             <div
               style={{
                 ...S.input,
-                width: 80,
+                width: isMobile ? '100%' : 80,
+                minHeight: isMobile ? '42px' : '32px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -600,10 +613,10 @@ export default function ScheduleBuilder({
 
       {/* ═══════════ 2. Games / Stations Editor ═══════════ */}
       <div style={S.panel}>
-        <div style={{ ...S.panelTitle, justifyContent: 'space-between' }}>
+        <div style={{ ...S.panelTitle, justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 10 : 0 }}>
           <span>🎮 Games / Stations</span>
           <button
-            style={S.btnPrimary}
+            style={{ ...S.btnPrimary, justifyContent: 'center' }}
             onClick={() => setShowAddGame((v) => !v)}
           >
             <Plus size={15} /> Add Game
@@ -617,7 +630,7 @@ export default function ScheduleBuilder({
         )}
 
         {schedule.games.map((game) => (
-          <div key={game.id} style={S.gameRow}>
+          <div key={game.id} style={{ ...S.gameRow, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 10 : 12 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{game.name}</div>
               {game.location && (
@@ -631,7 +644,7 @@ export default function ScheduleBuilder({
                 </div>
               )}
             </div>
-            <button style={S.btnDanger} onClick={() => handleRemoveGame(game.id)}>
+            <button style={{ ...S.btnDanger, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }} onClick={() => handleRemoveGame(game.id)}>
               <Trash2 size={14} /> Remove
             </button>
           </div>
@@ -642,11 +655,11 @@ export default function ScheduleBuilder({
           <div
             style={{
               ...T.glass,
-              padding: '16px 20px',
+              padding: isMobile ? '14px' : '16px 20px',
               marginTop: 12,
             }}
           >
-            <div style={{ ...S.row, marginBottom: 12 }}>
+            <div style={{ ...S.row, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', marginBottom: 12, gap: isMobile ? 10 : 16 }}>
               <div style={{ ...S.fieldGroup, flex: 1 }}>
                 <span style={S.label}>Game Name *</span>
                 <input
@@ -681,12 +694,12 @@ export default function ScheduleBuilder({
                 }
               />
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={S.btnPrimary} onClick={handleAddGame}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 8 }}>
+              <button style={{ ...S.btnPrimary, justifyContent: 'center' }} onClick={handleAddGame}>
                 <Check size={14} /> Save Game
               </button>
               <button
-                style={S.btnSecondary}
+                style={{ ...S.btnSecondary, justifyContent: 'center' }}
                 onClick={() => {
                   setShowAddGame(false);
                   setNewGame({ name: '', location: '', howToPlay: '' });
@@ -712,34 +725,79 @@ export default function ScheduleBuilder({
         {schedule.rounds.map((round, ri) => (
           <div
             key={round.id}
-            style={S.roundRow(dragOverIdx === ri)}
-            draggable
+            style={S.roundRow(dragOverIdx === ri, isMobile)}
+            draggable={!isMobile}
             onDragStart={(e) => handleDragStart(e, ri)}
             onDragOver={(e) => handleDragOver(e, ri)}
             onDrop={(e) => handleDrop(e, ri)}
             onDragEnd={handleDragEnd}
           >
-            {/* Drag handle */}
-            <div style={{ cursor: 'grab', color: T.textMuted, flexShrink: 0 }}>
-              <GripVertical size={18} />
-            </div>
+            {/* Drag handle (Desktop only) */}
+            {!isMobile && (
+              <div style={{ cursor: 'grab', color: T.textMuted, flexShrink: 0 }}>
+                <GripVertical size={18} />
+              </div>
+            )}
 
-            {/* Round label + time */}
-            <div style={{ minWidth: 110, flexShrink: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, fontFamily: T.fontTitle }}>
-                Round {ri + 1}
+            {/* Round label + time & Mobile Arrows */}
+            {isMobile ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, fontFamily: T.fontTitle, display: 'inline-block' }}>
+                    Round {ri + 1}
+                  </div>
+                  <span style={{ fontSize: 12, color: T.vbtSky, marginLeft: 8 }}>
+                    {formatTimeSlot(round.startTime, roundDuration, ri)}
+                  </span>
+                </div>
+                {/* Mobile arrows */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    style={{
+                      ...S.btnIcon,
+                      width: 36,
+                      height: 36,
+                      opacity: ri === 0 ? 0.25 : 1,
+                      pointerEvents: ri === 0 ? 'none' : 'auto',
+                    }}
+                    onClick={() => moveRound(ri, -1)}
+                    aria-label="Move round up"
+                  >
+                    <ArrowUp size={15} />
+                  </button>
+                  <button
+                    style={{
+                      ...S.btnIcon,
+                      width: 36,
+                      height: 36,
+                      opacity: ri === schedule.rounds.length - 1 ? 0.25 : 1,
+                      pointerEvents:
+                        ri === schedule.rounds.length - 1 ? 'none' : 'auto',
+                    }}
+                    onClick={() => moveRound(ri, 1)}
+                    aria-label="Move round down"
+                  >
+                    <ArrowDown size={15} />
+                  </button>
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: T.vbtSky, marginTop: 2 }}>
-                {formatTimeSlot(round.startTime, roundDuration, ri)}
+            ) : (
+              <div style={{ minWidth: 110, flexShrink: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, fontFamily: T.fontTitle }}>
+                  Round {ri + 1}
+                </div>
+                <div style={{ fontSize: 12, color: T.vbtSky, marginTop: 2 }}>
+                  {formatTimeSlot(round.startTime, roundDuration, ri)}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Matchups */}
-            <div style={{ display: 'flex', gap: 8, flex: 1, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flex: 1, flexWrap: 'wrap', width: '100%' }}>
               {round.matchups.map((mu, gi) => {
                 const game = schedule.games.find((g) => g.id === mu.gameId);
                 return (
-                  <div key={mu.gameId} style={S.matchupChip}>
+                  <div key={mu.gameId} style={{ ...S.matchupChip, flex: isMobile ? '1 1 calc(50% - 4px)' : '1 1 130px' }}>
                     <div
                       style={{
                         fontSize: 11,
@@ -779,39 +837,41 @@ export default function ScheduleBuilder({
               })}
             </div>
 
-            {/* Arrow buttons */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-                flexShrink: 0,
-              }}
-            >
-              <button
+            {/* Desktop Arrow buttons */}
+            {!isMobile && (
+              <div
                 style={{
-                  ...S.btnIcon,
-                  opacity: ri === 0 ? 0.25 : 1,
-                  pointerEvents: ri === 0 ? 'none' : 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  flexShrink: 0,
                 }}
-                onClick={() => moveRound(ri, -1)}
-                aria-label="Move round up"
               >
-                <ArrowUp size={14} />
-              </button>
-              <button
-                style={{
-                  ...S.btnIcon,
-                  opacity: ri === schedule.rounds.length - 1 ? 0.25 : 1,
-                  pointerEvents:
-                    ri === schedule.rounds.length - 1 ? 'none' : 'auto',
-                }}
-                onClick={() => moveRound(ri, 1)}
-                aria-label="Move round down"
-              >
-                <ArrowDown size={14} />
-              </button>
-            </div>
+                <button
+                  style={{
+                    ...S.btnIcon,
+                    opacity: ri === 0 ? 0.25 : 1,
+                    pointerEvents: ri === 0 ? 'none' : 'auto',
+                  }}
+                  onClick={() => moveRound(ri, -1)}
+                  aria-label="Move round up"
+                >
+                  <ArrowUp size={14} />
+                </button>
+                <button
+                  style={{
+                    ...S.btnIcon,
+                    opacity: ri === schedule.rounds.length - 1 ? 0.25 : 1,
+                    pointerEvents:
+                      ri === schedule.rounds.length - 1 ? 'none' : 'auto',
+                  }}
+                  onClick={() => moveRound(ri, 1)}
+                  aria-label="Move round down"
+                >
+                  <ArrowDown size={14} />
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -841,16 +901,18 @@ export default function ScheduleBuilder({
       </div>
 
       {/* ═══════════ 5. Action Buttons ═══════════ */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
-        <button style={S.btnSecondary} onClick={handleAutoAssign}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, marginBottom: 24, width: '100%' }}>
+        <button style={{ ...S.btnSecondary, justifyContent: 'center', width: isMobile ? '100%' : 'auto' }} onClick={handleAutoAssign}>
           <RefreshCw size={15} /> 🔄 Auto-Assign Teams
         </button>
-        <button style={S.btnSecondary} onClick={() => setShowPreview(true)}>
+        <button style={{ ...S.btnSecondary, justifyContent: 'center', width: isMobile ? '100%' : 'auto' }} onClick={() => setShowPreview(true)}>
           <Eye size={15} /> 📋 Preview Schedule
         </button>
         <button
           style={{
             ...S.btnPrimary,
+            justifyContent: 'center',
+            width: isMobile ? '100%' : 'auto',
             opacity: !validation.valid ? 0.5 : 1,
             pointerEvents: !validation.valid ? 'none' : 'auto',
           }}

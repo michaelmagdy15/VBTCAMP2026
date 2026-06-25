@@ -1,0 +1,26 @@
+# Ignore all images, audio, spreadsheets, and data files to run graphify on a code-only corpus
+node_modules/
+dist/
+build/
+.git/
+.gemini/
+data/
+public/
+src/assets/
+ios/
+sync-function/
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.xlsx
+*.csv
+*.mp3
+*.p8
+*.plist
+credentials.json
+graphify-out/
+*.md
+*.pdf
+*.txt
+index.html

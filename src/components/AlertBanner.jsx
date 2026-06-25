@@ -304,20 +304,21 @@ export default function AlertBanner({ alert, onDismiss, isAdmin, onCreateAlert }
         <button
           style={{
             position: 'fixed',
-            top: 12,
-            right: 12,
+            bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
+            right: 16,
             zIndex: 199,
             ...createBtnStyle,
-            background: 'rgba(20, 65, 161, 0.85)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(41, 182, 246, 0.3)',
-            padding: '7px 14px',
-            fontSize: '0.78rem',
-            borderRadius: 8,
+            background: 'rgba(220, 38, 38, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            boxShadow: '0 4px 16px rgba(220, 38, 38, 0.4)',
+            padding: '10px 16px',
+            fontSize: '0.85rem',
+            borderRadius: '20px',
           }}
           onClick={() => setShowCreateForm(true)}
         >
-          <AlertTriangle size={13} /> Create Alert
+          <AlertTriangle size={15} /> Create Alert
         </button>
       )}
 

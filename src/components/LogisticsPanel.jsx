@@ -22,8 +22,8 @@ const T = {
   vbtBlue:      '#0070f3',
   vbtSky:       '#29b6f6',
   textPrimary:  '#ffffff',
-  textSecondary:'rgba(255,255,255,0.6)',
-  textMuted:    'rgba(255,255,255,0.35)',
+  textSecondary:'rgba(255,255,255,0.85)',
+  textMuted:    'rgba(255,255,255,0.6)',
   gradientVbt:  'linear-gradient(135deg, #0070f3 0%, #29b6f6 100%)',
   fontTitle:    "'Outfit', sans-serif",
   fontBody:     "'Plus Jakarta Sans', sans-serif",
@@ -46,12 +46,12 @@ const glassPanel = {
 
 const inputStyle = {
   background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid rgba(255,255,255,0.15)',
   borderRadius: '8px',
   color: T.textPrimary,
-  padding: '8px 12px',
+  padding: '10px 14px',
   fontFamily: T.fontBody,
-  fontSize: '13px',
+  fontSize: '15px',
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
@@ -62,10 +62,10 @@ const btnPrimary = {
   color: '#fff',
   border: 'none',
   borderRadius: '10px',
-  padding: '10px 20px',
+  padding: '12px 24px',
   fontFamily: T.fontBody,
-  fontWeight: 600,
-  fontSize: '13px',
+  fontWeight: 650,
+  fontSize: '15px',
   cursor: 'pointer',
   display: 'inline-flex',
   alignItems: 'center',
@@ -78,27 +78,29 @@ const btnDanger = {
   color: '#ef4444',
   border: '1px solid rgba(239,68,68,0.25)',
   borderRadius: '8px',
-  padding: '6px 8px',
+  padding: '10px 12px',
   cursor: 'pointer',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+  minWidth: '42px',
+  minHeight: '42px',
 };
 
 const thStyle = {
-  padding: '10px 12px',
+  padding: '12px 14px',
   textAlign: 'left',
-  fontSize: '11px',
+  fontSize: '13px',
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.05em',
-  color: T.textMuted,
+  color: T.textSecondary,
   fontFamily: T.fontBody,
   borderBottom: `1px solid ${T.borderLight}`,
 };
 
 const tdStyle = {
-  padding: '8px 12px',
+  padding: '12px 14px',
   borderBottom: `1px solid ${T.borderLight}`,
   verticalAlign: 'middle',
 };
@@ -115,10 +117,10 @@ function TabButton({ active, icon: Icon, label, onClick }) {
         color: active ? T.vbtSky : T.textSecondary,
         border: active ? `1px solid ${T.vbtBlue}` : '1px solid transparent',
         borderRadius: '10px',
-        padding: '10px 18px',
+        padding: '12px 20px',
         fontFamily: T.fontBody,
         fontWeight: 600,
-        fontSize: '13px',
+        fontSize: '15px',
         cursor: 'pointer',
         display: 'inline-flex',
         alignItems: 'center',
@@ -126,7 +128,7 @@ function TabButton({ active, icon: Icon, label, onClick }) {
         transition: 'all .2s',
       }}
     >
-      <Icon size={16} />
+      <Icon size={18} />
       {label}
     </button>
   );
@@ -187,7 +189,11 @@ function MaterialsTab({ eventCode, campData }) {
           <Package size={18} style={{ color: T.vbtSky }} /> Materials Inventory
         </h3>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ fontSize: '12px', fontStyle: 'italic', color: T.vbtSky, marginBottom: '8px' }}>
+          ← Swipe horizontally to view full table →
+        </div>
+
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
             <thead>
               <tr>
@@ -242,10 +248,10 @@ function MaterialsTab({ eventCode, campData }) {
                     <button
                       onClick={() => handleFieldChange(m.id, 'verified', !m.verified)}
                       style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '6px',
-                        border: m.verified ? 'none' : '1px solid rgba(255,255,255,0.15)',
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '8px',
+                        border: m.verified ? 'none' : '1px solid rgba(255,255,255,0.25)',
                         background: m.verified ? T.gradientVbt : 'rgba(255,255,255,0.06)',
                         color: '#fff',
                         cursor: 'pointer',
@@ -255,7 +261,7 @@ function MaterialsTab({ eventCode, campData }) {
                         transition: 'all .2s',
                       }}
                     >
-                      {m.verified && <Check size={14} />}
+                      {m.verified && <Check size={18} />}
                     </button>
                   </td>
                   <td style={tdStyle}>
@@ -310,10 +316,10 @@ function MaterialsTab({ eventCode, campData }) {
                   padding: '14px',
                 }}
               >
-                <div style={{ fontFamily: T.fontTitle, fontSize: '13px', fontWeight: 700, color: T.textPrimary, marginBottom: '6px' }}>
+                <div style={{ fontFamily: T.fontTitle, fontSize: '15px', fontWeight: 700, color: T.textPrimary, marginBottom: '6px' }}>
                   {g.name || g.title || `Station ${i + 1}`}
                 </div>
-                <div style={{ fontFamily: T.fontBody, fontSize: '12px', color: T.textSecondary }}>
+                <div style={{ fontFamily: T.fontBody, fontSize: '14px', color: T.textSecondary }}>
                   {g.materials
                     ? g.materials.map((mat, j) => <div key={j}>• {mat}</div>)
                     : <span style={{ color: T.textMuted }}>No materials listed</span>}
@@ -491,40 +497,47 @@ function BalanceSheetTab({ eventCode }) {
             </div>
 
             {cat.items.length > 0 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Item</th>
-                    <th style={{ ...thStyle, width: '90px' }}>Qty</th>
-                    <th style={{ ...thStyle, width: '110px' }}>Unit Price</th>
-                    <th style={{ ...thStyle, width: '110px' }}>Total</th>
-                    <th style={{ ...thStyle, width: '50px' }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {cat.items.map((e) => (
-                    <tr key={e._idx}>
-                      <td style={tdStyle}>
-                        <input style={inputStyle} value={e.item || ''} onChange={(ev) => updateExpense(e._idx, 'item', ev.target.value)} />
-                      </td>
-                      <td style={tdStyle}>
-                        <input style={{ ...inputStyle, textAlign: 'center' }} type="number" min="0" value={e.quantity ?? 1} onChange={(ev) => updateExpense(e._idx, 'quantity', Number(ev.target.value))} />
-                      </td>
-                      <td style={tdStyle}>
-                        <input style={{ ...inputStyle, textAlign: 'center' }} type="number" min="0" step="0.01" value={e.unitPrice ?? 0} onChange={(ev) => updateExpense(e._idx, 'unitPrice', Number(ev.target.value))} />
-                      </td>
-                      <td style={{ ...tdStyle, fontFamily: T.fontBody, fontWeight: 600, fontSize: '13px', color: T.textPrimary }}>
-                        EGP {((e.quantity || 0) * (e.unitPrice || 0)).toLocaleString('en', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={tdStyle}>
-                        <button style={btnDanger} onClick={() => removeExpense(e._idx)}>
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <>
+                <div style={{ fontSize: '12px', fontStyle: 'italic', color: T.vbtSky, marginBottom: '8px' }}>
+                  ← Swipe horizontally to view full table →
+                </div>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px' }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Item</th>
+                        <th style={{ ...thStyle, width: '90px' }}>Qty</th>
+                        <th style={{ ...thStyle, width: '110px' }}>Unit Price</th>
+                        <th style={{ ...thStyle, width: '110px' }}>Total</th>
+                        <th style={{ ...thStyle, width: '50px' }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cat.items.map((e) => (
+                        <tr key={e._idx}>
+                          <td style={tdStyle}>
+                            <input style={inputStyle} value={e.item || ''} onChange={(ev) => updateExpense(e._idx, 'item', ev.target.value)} />
+                          </td>
+                          <td style={tdStyle}>
+                            <input style={{ ...inputStyle, textAlign: 'center' }} type="number" min="0" value={e.quantity ?? 1} onChange={(ev) => updateExpense(e._idx, 'quantity', Number(ev.target.value))} />
+                          </td>
+                          <td style={tdStyle}>
+                            <input style={{ ...inputStyle, textAlign: 'center' }} type="number" min="0" step="0.01" value={e.unitPrice ?? 0} onChange={(ev) => updateExpense(e._idx, 'unitPrice', Number(ev.target.value))} />
+                          </td>
+                          <td style={{ ...tdStyle, fontFamily: T.fontBody, fontWeight: 600, fontSize: '13px', color: T.textPrimary }}>
+                            EGP {((e.quantity || 0) * (e.unitPrice || 0)).toLocaleString('en', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td style={tdStyle}>
+                            <button style={btnDanger} onClick={() => removeExpense(e._idx)}>
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         ))}
@@ -540,39 +553,45 @@ function BalanceSheetTab({ eventCode }) {
           <DollarSign size={18} style={{ color: '#22c55e' }} /> Income
         </h3>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Source</th>
-              <th style={{ ...thStyle, width: '140px' }}>Amount</th>
-              <th style={{ ...thStyle, width: '50px' }} />
-            </tr>
-          </thead>
-          <tbody>
-            {financials.income.map((inc, idx) => (
-              <tr key={idx}>
-                <td style={tdStyle}>
-                  <input style={inputStyle} value={inc.source || ''} onChange={(e) => updateIncome(idx, 'source', e.target.value)} />
-                </td>
-                <td style={tdStyle}>
-                  <input style={{ ...inputStyle, textAlign: 'center' }} type="number" min="0" step="0.01" value={inc.amount ?? 0} onChange={(e) => updateIncome(idx, 'amount', Number(e.target.value))} />
-                </td>
-                <td style={tdStyle}>
-                  <button style={btnDanger} onClick={() => removeIncome(idx)}>
-                    <Trash2 size={13} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {financials.income.length === 0 && (
+        <div style={{ fontSize: '12px', fontStyle: 'italic', color: T.vbtSky, marginBottom: '8px' }}>
+          ← Swipe horizontally to view full table →
+        </div>
+
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '400px' }}>
+            <thead>
               <tr>
-                <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: T.textMuted, padding: '24px' }}>
-                  No income entries yet.
-                </td>
+                <th style={thStyle}>Source</th>
+                <th style={{ ...thStyle, width: '140px' }}>Amount</th>
+                <th style={{ ...thStyle, width: '50px' }} />
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {financials.income.map((inc, idx) => (
+                <tr key={idx}>
+                  <td style={tdStyle}>
+                    <input style={inputStyle} value={inc.source || ''} onChange={(e) => updateIncome(idx, 'source', e.target.value)} />
+                  </td>
+                  <td style={tdStyle}>
+                    <input style={{ ...inputStyle, textAlign: 'center' }} type="number" min="0" step="0.01" value={inc.amount ?? 0} onChange={(e) => updateIncome(idx, 'amount', Number(e.target.value))} />
+                  </td>
+                  <td style={tdStyle}>
+                    <button style={btnDanger} onClick={() => removeIncome(idx)}>
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {financials.income.length === 0 && (
+                <tr>
+                  <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: T.textMuted, padding: '24px' }}>
+                    No income entries yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
           <button style={btnPrimary} onClick={addIncome}>

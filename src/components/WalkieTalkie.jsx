@@ -32,7 +32,7 @@ const T = {
   vbtBlue: '#0070f3',
   vbtSky: '#29b6f6',
   textPrimary: '#ffffff',
-  textSecondary: 'rgba(255,255,255,0.6)',
+  textSecondary: 'rgba(255,255,255,0.85)',
   gradientVbt: 'linear-gradient(135deg, #0070f3 0%, #29b6f6 100%)',
   fontTitle: "'Outfit', sans-serif",
   fontBody: "'Plus Jakarta Sans', sans-serif",
@@ -115,6 +115,14 @@ function ensureKeyframes() {
     @keyframes wt-spin {
       to { transform: rotate(360deg); }
     }
+    .wt-channel-scroller::-webkit-scrollbar {
+      display: none !important;
+    }
+    @media screen and (max-width: 768px) {
+      .wt-outer-container {
+        margin-bottom: 80px !important;
+      }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -183,8 +191,8 @@ function MessageBubble({ msg, channelColor }) {
       {/* Avatar */}
       <div
         style={{
-          width: 38,
-          height: 38,
+          width: 44,
+          height: 44,
           borderRadius: '50%',
           background: channelColor || T.vbtBlue,
           display: 'flex',
@@ -192,7 +200,7 @@ function MessageBubble({ msg, channelColor }) {
           justifyContent: 'center',
           fontFamily: T.fontTitle,
           fontWeight: 700,
-          fontSize: 14,
+          fontSize: 16,
           color: '#fff',
           flexShrink: 0,
         }}
@@ -206,8 +214,8 @@ function MessageBubble({ msg, channelColor }) {
           <span
             style={{
               fontFamily: T.fontTitle,
-              fontWeight: 600,
-              fontSize: 14,
+              fontWeight: 650,
+              fontSize: 16,
               color: T.textPrimary,
             }}
           >
@@ -215,13 +223,13 @@ function MessageBubble({ msg, channelColor }) {
           </span>
           <span
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontFamily: T.fontBody,
-              fontWeight: 600,
+              fontWeight: 700,
               color: '#fff',
               background: roleBadgeColor,
               borderRadius: 6,
-              padding: '2px 7px',
+              padding: '3px 8px',
               textTransform: 'capitalize',
             }}
           >
@@ -229,7 +237,7 @@ function MessageBubble({ msg, channelColor }) {
           </span>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 13,
               fontFamily: T.fontBody,
               color: T.textSecondary,
               marginLeft: 'auto',
@@ -243,8 +251,8 @@ function MessageBubble({ msg, channelColor }) {
         <div
           style={{
             marginTop: 8,
-            height: 4,
-            borderRadius: 2,
+            height: 6,
+            borderRadius: 3,
             background: 'rgba(255,255,255,0.08)',
             overflow: 'hidden',
           }}
@@ -253,7 +261,7 @@ function MessageBubble({ msg, channelColor }) {
             style={{
               width: `${progress}%`,
               height: '100%',
-              borderRadius: 2,
+              borderRadius: 3,
               background: channelColor || T.vbtSky,
               transition: 'width 0.15s linear',
             }}
@@ -262,7 +270,7 @@ function MessageBubble({ msg, channelColor }) {
 
         <span
           style={{
-            fontSize: 11,
+            fontSize: 13,
             fontFamily: T.fontBody,
             color: T.textSecondary,
             marginTop: 2,
@@ -277,8 +285,8 @@ function MessageBubble({ msg, channelColor }) {
       <button
         onClick={toggle}
         style={{
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           borderRadius: '50%',
           border: 'none',
           background: channelColor || T.vbtBlue,
@@ -294,7 +302,7 @@ function MessageBubble({ msg, channelColor }) {
         onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         aria-label={playing ? 'Pause' : 'Play'}
       >
-        {playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
+        {playing ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
       </button>
 
       {/* Hidden audio element */}
@@ -468,6 +476,7 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <div
+      className="wt-outer-container"
       style={{
         ...T.glass,
         padding: '0',
@@ -540,11 +549,15 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
 
       {/* ── Channel Selector ──────────────────────────────────────── */}
       <div
+        className="wt-channel-scroller"
         style={{
           display: 'flex',
           gap: 8,
           padding: '14px 20px',
           overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           borderBottom: `1px solid ${T.borderLight}`,
         }}
       >
@@ -557,23 +570,37 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
+                gap: 8,
+                padding: '10px 16px',
                 borderRadius: 12,
                 border: isActive ? `2px solid ${color}` : `1px solid ${T.borderLight}`,
                 background: isActive ? `${color}22` : 'transparent',
                 color: isActive ? color : T.textSecondary,
                 fontFamily: T.fontBody,
-                fontWeight: 600,
-                fontSize: 12,
+                fontWeight: 700,
+                fontSize: 14,
                 cursor: 'pointer',
+                flexShrink: 0,
                 whiteSpace: 'nowrap',
                 transition: 'all 0.2s',
                 boxShadow: isActive ? `0 0 14px ${color}33` : 'none',
               }}
             >
-              <Icon size={14} />
+              <Icon size={16} />
               {getChannelLabel(key)}
+              {isActive && (
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: color,
+                    display: 'inline-block',
+                    boxShadow: `0 0 8px ${color}`,
+                    marginLeft: 2,
+                  }}
+                />
+              )}
             </button>
           );
         })}
@@ -708,8 +735,9 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
 
         <span
           style={{
-            fontSize: 11,
+            fontSize: 14,
             fontFamily: T.fontBody,
+            fontWeight: 600,
             color: T.textSecondary,
           }}
         >

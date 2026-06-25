@@ -27,3 +27,6 @@ dist-ssr
 *.p8
 *.plist
 credentials.json
+
+# Graphify
+graphify-out/

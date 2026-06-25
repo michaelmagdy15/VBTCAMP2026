@@ -33,7 +33,8 @@ function getRelativeTime(timestamp) {
 }
 
 /* ── Helper: role colour ───────────────────────────────────── */
-function getRoleColor(role) {
+function getRoleColor(role, sender) {
+  if (sender && sender.toLowerCase() === 'system') return '#38bdf8';
   if (!role) return '#94a3b8';
   const norm = role.toLowerCase();
   const map = {
@@ -47,7 +48,8 @@ function getRoleColor(role) {
 }
 
 /* ── Helper: role label ────────────────────────────────────── */
-function getRoleLabel(role) {
+function getRoleLabel(role, sender) {
+  if (sender && sender.toLowerCase() === 'system') return 'System';
   if (!role) return 'Viewer';
   const norm = role.toLowerCase();
   const labels = {
@@ -78,7 +80,7 @@ function FeedMessage({ message, currentUser, onReact }) {
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  const roleColor = getRoleColor(senderRole);
+  const roleColor = getRoleColor(senderRole, sender);
   const avatarLetter = sender ? sender.charAt(0).toUpperCase() : '?';
 
   /* ── Ping (urgent) wrapper colours ───────────────────────── */
@@ -182,10 +184,10 @@ function FeedMessage({ message, currentUser, onReact }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              padding: '2px 10px',
+              padding: '3px 10px',
               borderRadius: 999,
-              fontSize: 11,
-              fontWeight: 600,
+              fontSize: 12,
+              fontWeight: 700,
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               color: '#fff',
               background: `${roleColor}33`,
@@ -195,7 +197,7 @@ function FeedMessage({ message, currentUser, onReact }) {
               whiteSpace: 'nowrap',
             }}
           >
-            {getRoleLabel(senderRole)}
+            {getRoleLabel(senderRole, sender)}
           </span>
 
           {/* Timestamp */}
@@ -270,7 +272,7 @@ function FeedMessage({ message, currentUser, onReact }) {
             <p
               style={{
                 margin: 0,
-                fontSize: 14,
+                fontSize: 16,
                 lineHeight: 1.55,
                 color: isPing ? '#fca5a5' : 'rgba(255,255,255,0.88)',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -320,27 +322,28 @@ function FeedMessage({ message, currentUser, onReact }) {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 5,
-                  padding: '4px 10px',
+                  gap: 6,
+                  padding: '6px 14px',
                   borderRadius: 999,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: 'pointer',
                   border: active
-                    ? '1px solid rgba(41,182,246,0.5)'
-                    : '1px solid rgba(255,255,255,0.1)',
+                    ? '1px solid rgba(41,182,246,0.6)'
+                    : '1px solid rgba(255,255,255,0.12)',
                   background: active
-                    ? 'rgba(41,182,246,0.15)'
-                    : 'rgba(255,255,255,0.04)',
-                  color: active ? '#29b6f6' : 'rgba(255,255,255,0.5)',
-                  transition: 'all 0.2s ease',
+                    ? 'rgba(41,182,246,0.22)'
+                    : 'rgba(255,255,255,0.06)',
+                  color: active ? '#29b6f6' : 'rgba(255,255,255,0.7)',
+                  transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  transform: active ? 'scale(1.08)' : 'scale(1)',
                   outline: 'none',
                 }}
               >
-                <span style={{ fontSize: 15, lineHeight: 1 }}>{emoji}</span>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
                 {count > 0 && (
-                  <span style={{ fontSize: 12 }}>{count}</span>
+                  <span style={{ fontSize: 13, marginLeft: 2 }}>{count}</span>
                 )}
               </button>
             );
