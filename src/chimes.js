@@ -123,10 +123,85 @@ function playSmartChime(eventType, isUrgent = false) {
   }
 }
 
+// ── Synthesized Emergency Siren (Earthquake/War Alarm Style) ──────────
+// Synthesizes a loud wailing emergency alert tone using Web Audio API
+export function playEmergencySiren() {
+  try {
+    const ctx = Howler.ctx;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const duration = 4.5; // 4.5 seconds of intense wailing alarm
+
+    // Two oscillators for a massive alarm sound
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    osc1.type = 'sawtooth'; // Aggressive alert edge
+    osc2.type = 'triangle';  // Deep body/volume
+
+    // Sweep frequency repeatedly between 450Hz and 850Hz (wailing siren sound)
+    osc1.frequency.setValueAtTime(450, now);
+    osc2.frequency.setValueAtTime(452, now);
+
+    const wailSpeed = 0.9; // Time for one full up-down sweep
+    for (let t = 0; t < duration; t += wailSpeed) {
+      if (now + t + (wailSpeed / 2) < now + duration) {
+        osc1.frequency.linearRampToValueAtTime(850, now + t + (wailSpeed / 2));
+        osc2.frequency.linearRampToValueAtTime(852, now + t + (wailSpeed / 2));
+      }
+      if (now + t + wailSpeed < now + duration) {
+        osc1.frequency.linearRampToValueAtTime(450, now + t + wailSpeed);
+        osc2.frequency.linearRampToValueAtTime(452, now + t + wailSpeed);
+      }
+    }
+
+    // Aggressive volume pulsing matching the sweeps
+    gainNode.gain.setValueAtTime(0.001, now);
+    gainNode.gain.linearRampToValueAtTime(0.85, now + 0.15); // Loud volume rapidly
+
+    for (let t = 0; t < duration; t += wailSpeed) {
+      if (now + t + (wailSpeed / 2) < now + duration) {
+        gainNode.gain.linearRampToValueAtTime(0.9, now + t + (wailSpeed / 2));
+      }
+      if (now + t + wailSpeed < now + duration) {
+        gainNode.gain.linearRampToValueAtTime(0.55, now + t + wailSpeed);
+      }
+    }
+
+    // Fade out at the end
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + duration);
+    osc2.stop(now + duration);
+  } catch (err) {
+    console.warn('[Chimes] Failed to play emergency siren:', err);
+  }
+}
+
 // ── Public API (same interface as before — no changes needed in App.jsx) ─
 export function chimeAnnouncement()     { playSmartChime('announcement'); }
 export function chimeScoreUpdate()      { playSmartChime('score'); }
-export function chimeUrgent()           { playSmartChime('urgent', true); }
+export function chimeUrgent() {
+  if (!chimesEnabled) return;
+  // Play the custom synthesized emergency siren
+  playEmergencySiren();
+  // Also trigger the Howler file as a backup
+  const howl = sounds['urgent'];
+  if (howl && howl.state() !== 'unloaded') {
+    howl.play();
+  }
+}
 export function chimeScheduleChange()   { playSmartChime('schedule'); }
 export function chimeRoundStart()       { playSmartChime('round_start'); }
 export function chimeWalkieTalkieBeep() { playSmartChime('walkie'); }
