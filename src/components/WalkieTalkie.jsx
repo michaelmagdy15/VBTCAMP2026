@@ -627,6 +627,25 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
           }}
         >
           
+          {/* iOS Playback helper tip */}
+          <div style={{
+            background: 'rgba(251, 191, 36, 0.06)',
+            border: '1px solid rgba(251, 191, 36, 0.15)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'center',
+            fontSize: '0.8rem',
+            color: '#fbbf24',
+            marginBottom: '4px'
+          }}>
+            <span style={{ fontSize: '1.25rem' }}>💡</span>
+            <span style={{ lineHeight: 1.4, fontFamily: T.fontBody }}>
+              <strong>iPhone Users:</strong> If you can't hear audio, turn your side <strong>Silent switch off</strong>. Also, while connected to a channel, iOS routes sound to your quiet phone call earpiece—hold to your ear or disconnect to play out loud.
+            </span>
+          </div>
+
           {/* Remote Active Speaker */}
         {channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId && (
           <div
