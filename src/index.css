@@ -342,3 +342,153 @@ h1, h2, h3, h4, h5, h6 {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Concentric Counters-rotating Orbits for Preloader */
+.spinner-outer {
+  position: absolute;
+  width: 155px;
+  height: 155px;
+  border: 2px solid transparent;
+  border-top-color: var(--vbt-sky);
+  border-bottom-color: var(--vbt-sky);
+  border-radius: 50%;
+  animation: spin 2.2s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(41, 182, 246, 0.3));
+}
+
+.spinner-inner {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  border: 2px solid transparent;
+  border-left-color: #a78bfa;
+  border-right-color: #a78bfa;
+  border-radius: 50%;
+  animation: spin-reverse 1.6s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.25));
+}
+
+@keyframes spin-reverse {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Ambient glow orbs in background */
+.glow-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.16;
+  z-index: 0;
+  pointer-events: none;
+  animation: drift-orb 22s infinite alternate ease-in-out;
+}
+
+.glow-orb-1 {
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, var(--vbt-sky) 0%, transparent 80%);
+  top: -15%;
+  left: -10%;
+}
+
+.glow-orb-2 {
+  width: 55vw;
+  height: 55vw;
+  background: radial-gradient(circle, #7c3aed 0%, transparent 80%);
+  bottom: -20%;
+  right: -10%;
+  animation-delay: -5s;
+}
+
+@keyframes drift-orb {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(8%, 10%) scale(1.15); }
+  100% { transform: translate(-5%, -8%) scale(0.9); }
+}
+
+/* Shimmer Highlight Effect */
+.loading-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 30%,
+    rgba(255, 255, 255, 0.3) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 2.2s infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Micro-animations and hover transitions for widgets */
+.hover-lift {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  border-color: rgba(41, 182, 246, 0.28) !important;
+  box-shadow: 0 20px 40px -15px rgba(20, 65, 161, 0.3), var(--shadow-card) !important;
+}
+
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(41, 182, 246, 0.45);
+  filter: brightness(1.1);
+}
+
+.btn-glow:active {
+  transform: translateY(0);
+}
+
+/* Glass ticket style for events list */
+.glass-ticket {
+  background: rgba(13, 20, 38, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.glass-ticket:hover {
+  background: rgba(20, 30, 58, 0.65);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Pulsing text cursor */
+.text-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  background-color: var(--vbt-sky);
+  margin-left: 4px;
+  animation: cursor-blink 0.8s steps(2, start) infinite;
+  vertical-align: middle;
+}
+
+@keyframes cursor-blink {
+  to { visibility: hidden; }
+}

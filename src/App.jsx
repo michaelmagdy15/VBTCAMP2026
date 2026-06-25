@@ -42,7 +42,12 @@ import {
   subscribeToEventRegistry,
   subscribeToServiceData,
   updateServiceData,
-  registerDevicePushToken
+  registerDevicePushToken,
+  subscribeToServants,
+  updateServant,
+  addServant,
+  deleteServant,
+  generateAndSaveServiceSchedule
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -267,6 +272,9 @@ export default function App() {
     return localStorage.getItem('vbt_current_event') || '';
   });
   const [eventConfig, setEventConfig] = useState(defaultEventConfig);
+  const [globalServants, setGlobalServants] = useState([]);
+  const [isPreloading, setIsPreloading] = useState(true);
+  const [preloadProgress, setPreloadProgress] = useState(0);
   const [eventJoinInput, setEventJoinInput] = useState('');
   const [eventJoinError, setEventJoinError] = useState('');
   const [eventJoinLoading, setEventJoinLoading] = useState(false);
@@ -285,6 +293,53 @@ export default function App() {
   const [createEventError, setCreateEventError] = useState('');
   const [createEventLoading, setCreateEventLoading] = useState(false);
 
+  // Custom team names for new event
+  const [newTeamRed, setNewTeamRed] = useState('Red');
+  const [newTeamWhite, setNewTeamWhite] = useState('White');
+  const [newTeamBlack, setNewTeamBlack] = useState('Black');
+  const [newTeamBlue, setNewTeamBlue] = useState('Blue');
+
+  // New event creation wizard states
+  const [creationStep, setCreationStep] = useState(1);
+  const [newEventType, setNewEventType] = useState('service');
+  const [newKidCount, setNewKidCount] = useState(100);
+  const [newServiceBrief, setNewServiceBrief] = useState('Friend Request — Jesus is knocking... Will you open the door? (Revelation 3:20)\n\nAn outreach service featuring water games, rotational teamwork challenges, and reflection.');
+  const [newStations, setNewStations] = useState({
+    station_1: { name: 'Commitment', location: 'Football Field', howToPlay: 'Objective: One team must move from Point A to Point B while staying connected by holding hands.\n\nRules:\n1. The moving team must hold hands at all times.\n2. The opposing team throws water balloons.\n3. If the chain breaks, they restart.', lesson: 'A game of bond, unity, and perseverance. Stay strong and don\'t let anything break your bond.' },
+    station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: 'Objective: Fill the other team\'s bucket with water to earn puzzle pieces and unlock the key!\n\nRules:\n1. Teams carry water to the opposing team\'s bucket.\n2. More water poured = more puzzle pieces.\n3. Complete the puzzle to identify the key.', lesson: 'Revelation 3:20 - Jesus stands at the door and knocks. Key is opening our hearts. Serving others brings us closer to Christ.' },
+    station_3: { name: 'Trust', location: 'Court', howToPlay: 'Objective: One describer describes a drawing using only geometric shapes. The team draws it without asking questions.', lesson: 'Faith and trust. Trust God even when you cannot see the full picture. He sees the complete picture.' },
+    station_4: { name: 'Communication', location: 'Pool', howToPlay: 'Objective: Safely transfer water through a course.\n\nRound 1: Verbal (blindfolded, teammate guides verbally).\nRound 2: Touch (blindfolded, teammate guides by touch).', lesson: 'Listening and understanding. Friendships require clear communication and listening, just like prayer with God.' },
+    big_game: { name: 'Loyalty (Big Game)', location: 'Football Field', howToPlay: 'Objective: Protect your team\'s flag (friendship with God) while marking other flags with water color.\n\nRules:\n1. Attack or defend.\n2. Cleanest flag at the end wins.', lesson: 'Commitment and loyalty. Protecting what is valuable requires sacrifice and teamwork.' },
+    reflection: { name: 'Reflection', location: 'Main Hall', howToPlay: 'Review Bible targets, discuss lessons from the games, and share reflection insights.', lesson: 'Open your heart to Jesus and live in unity, love, and loyalty.' }
+  });
+  const [wizardAttending, setWizardAttending] = useState([]);
+  const [wizardRoles, setWizardRoles] = useState({});
+  const [quickServantName, setQuickServantName] = useState('');
+  const [quickServantPasscode, setQuickServantPasscode] = useState('');
+  const [quickServantLoading, setQuickServantLoading] = useState(false);
+
+  // Live edit config states for existing active Service Mode event
+  const [editKidCount, setEditKidCount] = useState(100);
+  const [editAttending, setEditAttending] = useState([]);
+  const [editRoles, setEditRoles] = useState({});
+  
+  // Custom team names for active event
+  const [editTeamRed, setEditTeamRed] = useState('Red');
+  const [editTeamWhite, setEditTeamWhite] = useState('White');
+  const [editTeamBlack, setEditTeamBlack] = useState('Black');
+  const [editTeamBlue, setEditTeamBlue] = useState('Blue');
+
+  const [editStations, setEditStations] = useState({
+    station_1: { name: '', location: '', howToPlay: '', lesson: '' },
+    station_2: { name: '', location: '', howToPlay: '', lesson: '' },
+    station_3: { name: '', location: '', howToPlay: '', lesson: '' },
+    station_4: { name: '', location: '', howToPlay: '', lesson: '' }
+  });
+  const [editBigGameName, setEditBigGameName] = useState('');
+  const [editBigGameLocation, setEditBigGameLocation] = useState('');
+  const [editBigGameHowToPlay, setEditBigGameHowToPlay] = useState('');
+  const [editBigGameLesson, setEditBigGameLesson] = useState('');
+
   // Event setup edit state (for existing event)
   const [editEventConfig, setEditEventConfig] = useState(null);
   const [savingEventConfig, setSavingEventConfig] = useState(false);
@@ -292,6 +347,17 @@ export default function App() {
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
   const side1Name = eventConfig.side1Name || 'Shakes';
   const side2Name = eventConfig.side2Name || 'Fries';
+
+  const getTeamColorHex = (teamCode) => {
+    if (!teamCode) return '#ffffff';
+    const team = campData?.teams?.[teamCode];
+    const side = team ? team.side : teamCode;
+    if (side.startsWith('Red') || side === 'Red') return '#ef4444';
+    if (side.startsWith('White') || side === 'White') return '#ffffff';
+    if (side.startsWith('Black') || side === 'Black') return '#94a3b8';
+    if (side.startsWith('Blue') || side === 'Blue') return '#29b6f6';
+    return '#ffffff';
+  };
 
   // ─── CAMP DATA (SCHEDULE) ─────────────────────────────────────────────────
   // Dynamic Camp Schedule/Matchup data from Firestore or local fallback
@@ -605,6 +671,29 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // Subscribe to global servants directory
+  useEffect(() => {
+    const unsub = subscribeToServants((list) => setGlobalServants(list));
+    return () => unsub();
+  }, []);
+
+  // Preloader timer
+  useEffect(() => {
+    let timer = setInterval(() => {
+      setPreloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(timer);
+          setTimeout(() => {
+            setIsPreloading(false);
+          }, 450);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 45);
+    return () => clearInterval(timer);
+  }, []);
+
   // Subscribe to event config when an event is selected
   useEffect(() => {
     if (!currentEventCode) return;
@@ -630,6 +719,64 @@ export default function App() {
     });
     return () => unsub();
   }, [currentEventCode]);
+
+  // Initialize wizard servants when modal opens
+  useEffect(() => {
+    if (showCreateEvent && globalServants.length > 0) {
+      const allIds = globalServants.map(s => s.id);
+      setWizardAttending(allIds);
+      
+      const defaultAssignments = {
+        michel_ghobrial: "station_1",
+        phelo: "station_2",
+        emily_boshra: "station_3",
+        john_kamal: "station_4",
+        amberto: "big_game_1",
+        daniel_el_masry: "reflection",
+        kirollos_remon: "big_game_2",
+        julina: "team_white_1",
+        karen_oberio: "team_white_2",
+        sara_zaky: "team_black_1",
+        michel_remon: "team_black_2",
+        kiro_wagdy: "team_red_1",
+        martina_rizk: "team_red_2",
+        martina_sobhy: "team_blue_1",
+        andrew: "team_blue_2",
+        michael_mitry: "media"
+      };
+      
+      const roles = {};
+      globalServants.forEach(s => {
+        roles[s.id] = defaultAssignments[s.id] || "volunteer";
+      });
+      setWizardRoles(roles);
+      setCreationStep(1);
+    }
+  }, [showCreateEvent, globalServants]);
+
+  // Live configurator state sync when active event config changes
+  useEffect(() => {
+    if (eventConfig && eventConfig.eventType === 'service') {
+      setEditKidCount(eventConfig.kidCount || 100);
+      setEditAttending(eventConfig.activeServants || []);
+      setEditRoles(eventConfig.servantAssignments || {});
+      const teamNames = eventConfig.teamNames || { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' };
+      setEditTeamRed(teamNames.red || 'Red');
+      setEditTeamWhite(teamNames.white || 'White');
+      setEditTeamBlack(teamNames.black || 'Black');
+      setEditTeamBlue(teamNames.blue || 'Blue');
+      setEditStations(eventConfig.stations || {
+        station_1: { name: 'Commitment', location: 'Football Field', howToPlay: '', lesson: '' },
+        station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: '', lesson: '' },
+        station_3: { name: 'Trust', location: 'Court', howToPlay: '', lesson: '' },
+        station_4: { name: 'Communication', location: 'Pool', howToPlay: '', lesson: '' }
+      });
+      setEditBigGameName(eventConfig.bigGameName || 'Loyalty (Big Game)');
+      setEditBigGameLocation(eventConfig.bigGameLocation || 'Football Field');
+      setEditBigGameHowToPlay(eventConfig.bigGameHowToPlay || '');
+      setEditBigGameLesson(eventConfig.bigGameLesson || '');
+    }
+  }, [eventConfig]);
 
   // Save service data to Firestore
   const handleSaveServiceData = async () => {
@@ -790,6 +937,85 @@ export default function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     const normalizedPassword = loginPassword.trim().toUpperCase();
+    
+    // Service Mode Individual Login
+    if (eventConfig.eventType === 'service') {
+      if (!loginName) {
+        setLoginError('Please select your name.');
+        return;
+      }
+      
+      const servant = globalServants.find(s => s.id === loginName);
+      if (!servant) {
+        setLoginError('Servant not found.');
+        return;
+      }
+      
+      if (normalizedPassword !== (servant.passcode || '').toUpperCase()) {
+        setLoginError('Incorrect passcode.');
+        return;
+      }
+      
+      // Resolve role
+      const roleCode = eventConfig.servantAssignments?.[servant.id] || 'none';
+      let resolvedRole = 'viewer';
+      let teamCode = '';
+      let side = 'System';
+      let grade = 'All';
+      let name = servant.name;
+      
+      if (servant.defaultRole === 'admin' || roleCode === 'coordinator') {
+        resolvedRole = 'admin';
+        teamCode = 'ADMIN';
+        name = 'Coordinator';
+      } else if (roleCode.startsWith('team_')) {
+        resolvedRole = 'leader';
+        const parts = roleCode.split('_'); // ["team", "white", "1"]
+        const color = parts[1].charAt(0).toUpperCase() + parts[1].slice(1); // "White"
+        const idx = parts[2]; // "1"
+        teamCode = `${color} ${idx}`; // "White 1"
+        side = color;
+        grade = '3/4';
+      } else if (roleCode.startsWith('station_') || roleCode.startsWith('big_game_') || roleCode === 'reflection') {
+        resolvedRole = 'referee';
+        teamCode = 'REF';
+        side = 'System';
+      } else if (roleCode === 'media') {
+        resolvedRole = 'referee';
+        teamCode = 'MEDIA';
+        side = 'System';
+      }
+      
+      const user = {
+        id: servant.id,
+        role: resolvedRole,
+        name: name,
+        teamCode: teamCode,
+        side: side,
+        grade: grade,
+        roleCode: roleCode
+      };
+      
+      setCurrentUser(user);
+      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
+      setLoginError('');
+      setLoginPassword('');
+      
+      if (resolvedRole === 'admin' || resolvedRole === 'referee') {
+        setCurrentTab('scoreboard');
+      } else if (resolvedRole === 'leader') {
+        setCurrentTab('myteam');
+      } else {
+        setCurrentTab('scoreboard');
+      }
+      
+      if (!isOfflineMode) {
+        addAnnouncement(currentEventCode, `${servant.name} signed in as ${roleCode.toUpperCase().replace('_', ' ')}`, 'System', 'system');
+      }
+      return;
+    }
+
+    // Original Camp Mode Login
     const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
     const gamePass = (eventConfig.passcodeGameLeader || 'VBTREF').toUpperCase();
     const teamPass = (eventConfig.passcodeTeamLeader || 'VBT2026').toUpperCase();
@@ -909,32 +1135,197 @@ export default function App() {
     }
   };
 
+  const handleNewStationChange = (key, field, value) => {
+    setNewStations(prev => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value
+      }
+    }));
+  };
+
+  const performMagicAutoAssign = (attendingList, currentRoles, teamNamesObj) => {
+    const updatedRoles = { ...currentRoles };
+    // Set all to volunteer first except coordinator
+    attendingList.forEach(sId => {
+      if (updatedRoles[sId] !== 'coordinator') {
+        updatedRoles[sId] = 'volunteer';
+      }
+    });
+
+    const stationRoles = ['station_1', 'station_2', 'station_3', 'station_4'];
+    let stationIdx = 0;
+
+    const teamRoles = [
+      'team_red_1', 'team_red_2',
+      'team_white_1', 'team_white_2',
+      'team_black_1', 'team_black_2',
+      'team_blue_1', 'team_blue_2'
+    ];
+    let teamIdx = 0;
+
+    let bigGame1Assigned = false;
+    let bigGame2Assigned = false;
+    let reflectionAssigned = false;
+
+    attendingList.forEach(sId => {
+      if (updatedRoles[sId] === 'coordinator') return;
+
+      if (stationIdx < stationRoles.length) {
+        updatedRoles[sId] = stationRoles[stationIdx];
+        stationIdx++;
+      } else if (teamIdx < teamRoles.length) {
+        updatedRoles[sId] = teamRoles[teamIdx];
+        teamIdx++;
+      } else if (!bigGame1Assigned) {
+        updatedRoles[sId] = 'big_game_1';
+        bigGame1Assigned = true;
+      } else if (!bigGame2Assigned) {
+        updatedRoles[sId] = 'big_game_2';
+        bigGame2Assigned = true;
+      } else if (!reflectionAssigned) {
+        updatedRoles[sId] = 'reflection';
+        reflectionAssigned = true;
+      }
+    });
+
+    return updatedRoles;
+  };
+
+  const handleWizardAutoAssign = () => {
+    const teamNamesObj = { red: newTeamRed, white: newTeamWhite, black: newTeamBlack, blue: newTeamBlue };
+    const updated = performMagicAutoAssign(wizardAttending, wizardRoles, teamNamesObj);
+    setWizardRoles(updated);
+  };
+
+  const handleLiveAutoAssign = () => {
+    const teamNamesObj = { red: editTeamRed, white: editTeamWhite, black: editTeamBlack, blue: editTeamBlue };
+    const updated = performMagicAutoAssign(editAttending, editRoles, teamNamesObj);
+    setEditRoles(updated);
+  };
+
+  const handleQuickAddServant = async (e) => {
+    if (e) e.preventDefault();
+    const nameTrimmed = quickServantName.trim();
+    const passcodeTrimmed = quickServantPasscode.trim() || '1234';
+    if (!nameTrimmed) {
+      alert("Please enter a name for the new servant.");
+      return;
+    }
+    setQuickServantLoading(true);
+    try {
+      const id = nameTrimmed.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (!id) {
+        alert("Invalid name. Please use alphanumeric characters.");
+        return;
+      }
+      
+      const newServant = {
+        id,
+        name: nameTrimmed,
+        passcode: passcodeTrimmed.toUpperCase(),
+        defaultRole: 'volunteer',
+        createdAt: new Date().toISOString()
+      };
+      
+      await addServant(newServant);
+      
+      // Auto-mark as attending
+      if (showCreateEvent) {
+        setWizardAttending(prev => [...prev, id]);
+        setWizardRoles(prev => ({ ...prev, [id]: 'volunteer' }));
+      } else {
+        setEditAttending(prev => [...prev, id]);
+        setEditRoles(prev => ({ ...prev, [id]: 'volunteer' }));
+      }
+      
+      setQuickServantName('');
+      setQuickServantPasscode('');
+      alert(`Successfully added ${nameTrimmed} to the servants directory!`);
+    } catch (err) {
+      alert("Failed to add servant: " + err.message);
+    } finally {
+      setQuickServantLoading(false);
+    }
+  };
+
   // Create New Event Handler
   const handleCreateEvent = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const code = newEventCode.trim().toLowerCase().replace(/\s+/g, '_');
     if (!code) { setCreateEventError('Event code is required.'); return; }
     if (!newEventName.trim()) { setCreateEventError('Event name is required.'); return; }
     if (!newEventPassCoord.trim()) { setCreateEventError('Coordinator passcode is required.'); return; }
+    
     setCreateEventLoading(true);
     setCreateEventError('');
+    
     try {
-      await createEvent(code, {
-        eventName: newEventName.trim(),
-        description: '',
-        eventDate: newEventDate,
-        side1Name: newEventSide1 || 'Team A',
-        side2Name: newEventSide2 || 'Team B',
-        primaryColor: '#1441a1',
-        logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
-        passcodeCoordinator: newEventPassCoord.trim().toUpperCase(),
-        passcodeGameLeader: newEventPassGame.trim().toUpperCase() || 'GAMEREF',
-        passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER'
-      });
-      // Auto-join the new event
+      if (newEventType === 'service') {
+        const configData = {
+          eventName: newEventName.trim(),
+          description: newServiceBrief,
+          eventDate: newEventDate || new Date().toISOString().split('T')[0],
+          eventType: 'service',
+          kidCount: parseInt(newKidCount, 10) || 100,
+          primaryColor: '#a78bfa',
+          logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
+          passcodeCoordinator: newEventPassCoord.trim().toUpperCase(),
+          passcodeGameLeader: newEventPassGame.trim().toUpperCase() || 'GAMEREF',
+          passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER',
+          activeServants: wizardAttending,
+          servantAssignments: wizardRoles,
+          teamNames: {
+            red: newTeamRed.trim() || 'Red',
+            white: newTeamWhite.trim() || 'White',
+            black: newTeamBlack.trim() || 'Black',
+            blue: newTeamBlue.trim() || 'Blue'
+          },
+          stations: {
+            station_1: { name: newStations.station_1.name, location: newStations.station_1.location, howToPlay: newStations.station_1.howToPlay, lesson: newStations.station_1.lesson },
+            station_2: { name: newStations.station_2.name, location: newStations.station_2.location, howToPlay: newStations.station_2.howToPlay, lesson: newStations.station_2.lesson },
+            station_3: { name: newStations.station_3.name, location: newStations.station_3.location, howToPlay: newStations.station_3.howToPlay, lesson: newStations.station_3.lesson },
+            station_4: { name: newStations.station_4.name, location: newStations.station_4.location, howToPlay: newStations.station_4.howToPlay, lesson: newStations.station_4.lesson }
+          },
+          bigGameName: newStations.big_game.name,
+          bigGameLocation: newStations.big_game.location,
+          bigGameHowToPlay: newStations.big_game.howToPlay,
+          bigGameLesson: newStations.big_game.lesson,
+          reflectionName: newStations.reflection.name,
+          reflectionLocation: newStations.reflection.location,
+          reflectionHowToPlay: newStations.reflection.howToPlay,
+          reflectionLesson: newStations.reflection.lesson
+        };
+        
+        // Write event configuration and live scores structure
+        await createEvent(code, configData);
+        
+        // Run scheduling engine
+        await generateAndSaveServiceSchedule(code, configData, wizardAttending, globalServants);
+      } else {
+        // Camp Mode (Legacy)
+        await createEvent(code, {
+          eventName: newEventName.trim(),
+          description: 'Camp Outreach',
+          eventDate: newEventDate || new Date().toISOString().split('T')[0],
+          eventType: 'camp',
+          side1Name: newEventSide1 || 'Shakes',
+          side2Name: newEventSide2 || 'Fries',
+          primaryColor: '#1441a1',
+          logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
+          passcodeCoordinator: newEventPassCoord.trim().toUpperCase(),
+          passcodeGameLeader: newEventPassGame.trim().toUpperCase() || 'GAMEREF',
+          passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER'
+        });
+      }
+      
+      // Auto-join the newly created event
       setCurrentEventCode(code);
       localStorage.setItem('vbt_current_event', code);
       setShowCreateEvent(false);
+      
+      // Reset form states
       setNewEventCode(''); setNewEventName(''); setNewEventDate('');
       setNewEventSide1('Team A'); setNewEventSide2('Team B');
       setNewEventPassCoord(''); setNewEventPassGame(''); setNewEventPassTeam('');
@@ -959,26 +1350,179 @@ export default function App() {
     }
   };
 
+  const handleSaveAndRegenerateSchedule = async () => {
+    if (!currentEventCode || !editEventConfig) return;
+    setSavingEventConfig(true);
+    try {
+      const updatedConfig = {
+        ...editEventConfig,
+        kidCount: parseInt(editKidCount, 10) || 100,
+        activeServants: editAttending,
+        servantAssignments: editRoles,
+        teamNames: {
+          red: editTeamRed.trim() || 'Red',
+          white: editTeamWhite.trim() || 'White',
+          black: editTeamBlack.trim() || 'Black',
+          blue: editTeamBlue.trim() || 'Blue'
+        },
+        stations: editStations,
+        bigGameName: editBigGameName,
+        bigGameLocation: editBigGameLocation,
+        bigGameHowToPlay: editBigGameHowToPlay,
+        bigGameLesson: editBigGameLesson
+      };
+      
+      await generateAndSaveServiceSchedule(currentEventCode, updatedConfig, editAttending, globalServants);
+      
+      if (!isOfflineMode) {
+        await addAnnouncement(currentEventCode, "updated the servant roster and regenerated the schedule", currentUser.name, 'system');
+      }
+      
+      alert("✨ Roster and schedule recalculated & updated successfully!");
+    } catch (err) {
+      alert("Failed to regenerate schedule: " + err.message);
+    } finally {
+      setSavingEventConfig(false);
+    }
+  };
+
+  // Score Calculator Logic (Excel formula compliance)
   // Score Calculator Logic (Excel formula compliance)
   const scoreCalculations = useMemo(() => {
-    const { blockScores = {}, teamDeductions = {}, tokens = { shakes: 0, fries: 0 } } = campState;
+    const { blockScores = {}, teamDeductions = {}, tokens = {} } = campState;
 
+    if (eventConfig.eventType === 'service') {
+      const colors = ['Red', 'White', 'Black', 'Blue'];
+      const wins = { Red: 0, White: 0, Black: 0, Blue: 0 };
+      const deductions = { Red: 0, White: 0, Black: 0, Blue: 0 };
+      const tokensCount = { Red: tokens.red || 0, White: tokens.white || 0, Black: tokens.black || 0, Blue: tokens.blue || 0 };
+      
+      if (campData && campData.matchups) {
+        campData.matchups.forEach(m => {
+          const key = `${m.block}_${m.round}_${m.game}`;
+          const winner = blockScores[key] || 'NA';
+          const points = campData.gamePoints?.[m.game] || 0;
+          
+          if (m.shakes === "All Teams") {
+            if (winner === 'Shakes') {
+              colors.forEach(c => { wins[c] += points; });
+            }
+          } else {
+            if (winner === 'Shakes') {
+              const team = campData.teams?.[m.shakes];
+              if (team && colors.includes(team.side)) {
+                wins[team.side] += points;
+              }
+            } else if (winner === 'Fries') {
+              const team = campData.teams?.[m.fries];
+              if (team && colors.includes(team.side)) {
+                wins[team.side] += points;
+              }
+            }
+          }
+        });
+      }
+
+      Object.entries(teamDeductions).forEach(([teamCode, val]) => {
+        const team = campData?.teams?.[teamCode];
+        if (team && colors.includes(team.side)) {
+          deductions[team.side] += val;
+        }
+      });
+
+      const finalScores = {};
+      colors.forEach(c => {
+        finalScores[c] = wins[c] + (tokensCount[c] * 2) - deductions[c];
+      });
+
+      let leadColor = 'TIE';
+      let maxVal = -999;
+      colors.forEach(c => {
+        if (finalScores[c] > maxVal) {
+          maxVal = finalScores[c];
+          leadColor = c;
+        } else if (finalScores[c] === maxVal) {
+          leadColor = 'TIE';
+        }
+      });
+
+      const getBlockPointsService = (blockIdx) => {
+        const blockWins = { Red: 0, White: 0, Black: 0, Blue: 0 };
+        if (campData && campData.matchups) {
+          campData.matchups.forEach(m => {
+            if (m.block !== blockIdx) return;
+            const key = `${m.block}_${m.round}_${m.game}`;
+            const winner = blockScores[key] || 'NA';
+            const points = campData.gamePoints?.[m.game] || 0;
+            
+            if (m.shakes === "All Teams") {
+              if (winner === 'Shakes') {
+                colors.forEach(c => { blockWins[c] += points; });
+              }
+            } else {
+              if (winner === 'Shakes') {
+                const team = campData.teams?.[m.shakes];
+                if (team && colors.includes(team.side)) {
+                  blockWins[team.side] += points;
+                }
+              } else if (winner === 'Fries') {
+                const team = campData.teams?.[m.fries];
+                if (team && colors.includes(team.side)) {
+                  blockWins[team.side] += points;
+                }
+              }
+            }
+          });
+        }
+        return blockWins;
+      };
+
+      const b1 = getBlockPointsService(1);
+      const b2 = getBlockPointsService(2);
+      const b3 = getBlockPointsService(3);
+      const b4 = getBlockPointsService(4);
+
+      return {
+        isService: true,
+        colors,
+        wins,
+        deductions,
+        tokensCount,
+        finalScores,
+        leadColor,
+        b1, b2, b3, b4,
+        // Legacy fallbacks to avoid crashes
+        shakesFinal: finalScores['Red'] || 0,
+        friesFinal: finalScores['White'] || 0,
+        shakesDeductions: deductions['Red'] || 0,
+        friesDeductions: deductions['White'] || 0,
+        shakesBlocksTotal: wins['Red'] || 0,
+        friesBlocksTotal: wins['White'] || 0,
+        shakesTokenPoints: (tokensCount['Red'] || 0) * 2,
+        friesTokenPoints: (tokensCount['White'] || 0) * 2,
+        winner: leadColor
+      };
+    }
+
+    // Legacy mode calculations
     const getBlockPoints = (blockIdx) => {
       let shakes = 0;
       let fries = 0;
 
-      campData.matchups.forEach(m => {
-        if (m.block !== blockIdx) return;
-        const key = `${m.block}_${m.round}_${m.game}`;
-        const winner = blockScores[key] || 'NA';
-        const points = campData.gamePoints[m.game] || 0;
+      if (campData && campData.matchups) {
+        campData.matchups.forEach(m => {
+          if (m.block !== blockIdx) return;
+          const key = `${m.block}_${m.round}_${m.game}`;
+          const winner = blockScores[key] || 'NA';
+          const points = campData.gamePoints?.[m.game] || 0;
 
-        if (winner === 'Shakes') {
-          shakes += points;
-        } else if (winner === 'Fries') {
-          fries += points;
-        }
-      });
+          if (winner === 'Shakes') {
+            shakes += points;
+          } else if (winner === 'Fries') {
+            fries += points;
+          }
+        });
+      }
 
       return { shakes, fries };
     };
@@ -991,7 +1535,7 @@ export default function App() {
     let shakesDeductions = 0;
     let friesDeductions = 0;
     Object.entries(teamDeductions).forEach(([teamCode, val]) => {
-      const team = campData.teams[teamCode];
+      const team = campData?.teams?.[teamCode];
       if (team) {
         if (team.side === 'Shakes') {
           shakesDeductions += val;
@@ -1017,6 +1561,7 @@ export default function App() {
     else if (friesFinal > shakesFinal) winner = 'FRIES';
 
     return {
+      isService: false,
       b1, b2, b3, b4,
       shakesBlocksTotal, friesBlocksTotal,
       shakesDeductions, friesDeductions,
@@ -1024,7 +1569,7 @@ export default function App() {
       shakesFinal, friesFinal,
       winner
     };
-  }, [campState]);
+  }, [campState, campData, eventConfig]);
 
   // Schedule Timer Actions (Play/Pause, Adjust shift, Reset)
   const handleToggleTimer = async () => {
@@ -1175,7 +1720,12 @@ export default function App() {
     await syncToGoogleSheet({ tokens: newTokensState });
 
     if (currentUser) {
-      const sideText = side === 'shakes' ? side1Name : side2Name;
+      let sideText = side;
+      if (eventConfig.eventType === 'service') {
+        sideText = eventConfig.teamNames?.[side.toLowerCase()] || (side.charAt(0).toUpperCase() + side.slice(1));
+      } else {
+        sideText = side === 'shakes' ? side1Name : side2Name;
+      }
       const action = amount > 0 ? 'added' : 'removed';
       const tokenStr = Math.abs(amount) === 1 ? 'token' : 'tokens';
       const msg = `${action} ${Math.abs(amount)} ${tokenStr} to ${sideText} (Total: ${newTokens})`;
@@ -1315,15 +1865,33 @@ export default function App() {
 
   const myTeamInfo = useMemo(() => {
     if (!currentUser) return null;
-    const rawSchedule = campData.teamSchedules[currentUser.teamCode] || [];
+    const isService = eventConfig.eventType === 'service';
+    let rawSchedule = [];
+    if (isService) {
+      rawSchedule = (campData.matchups || [])
+        .filter(m => m.shakes === currentUser.teamCode || m.fries === currentUser.teamCode)
+        .map(m => ({
+          block: `Block ${m.block}`,
+          round: m.round,
+          game: m.game,
+          time: m.time,
+          location: m.location,
+          opponent: m.shakes === currentUser.teamCode ? m.fries : m.shakes,
+          shakes: m.shakes,
+          fries: m.fries
+        }));
+    } else {
+      rawSchedule = campData.teamSchedules?.[currentUser.teamCode] || [];
+    }
+    const teamDetails = campData.teams?.[currentUser.teamCode] || {};
     return {
-      ...campData.teams[currentUser.teamCode],
+      ...teamDetails,
       schedule: rawSchedule,
-      day1Schedule: rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 1')),
-      day2Schedule: rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 2')),
+      day1Schedule: isService ? rawSchedule : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 1')),
+      day2Schedule: isService ? [] : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 2')),
       deductions: (campState.teamDeductions || {})[currentUser.teamCode] || 0
     };
-  }, [currentUser, campState, campData]);
+  }, [currentUser, campState, campData, eventConfig]);
 
   const currentActiveSlot = useMemo(() => {
     if (!myTeamInfo || !myTeamInfo.schedule) return null;
@@ -1341,161 +1909,944 @@ export default function App() {
   };
 
   // ─── EVENT SELECTION SCREEN ──────────────────────────────────────────────
-  if (!currentEventCode) {
+  const getPreloadMessage = (progress) => {
+    if (progress < 25) return "Connecting to db-vbt...";
+    if (progress < 50) return "Fetching active sports events...";
+    if (progress < 75) return "Synchronizing servant credentials...";
+    if (progress < 90) return "Caching dynamic schedules & matches...";
+    return "VBT Service day loaded. Launching...";
+  };
+
+  // ─── EVENT SELECTION SCREEN ──────────────────────────────────────────────
+  // Preloader View
+  if (isPreloading) {
     return (
       <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        background: 'radial-gradient(circle at center, #0d1633 0%, #070a13 100%)'
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'radial-gradient(circle at center, #0d1633 0%, #050814 100%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999,
+        transition: 'opacity 0.4s ease-out',
+        opacity: preloadProgress === 100 ? 0 : 1,
+        pointerEvents: 'none'
       }}>
-        <div className="glass-panel animate-fade" style={{ width: '100%', maxWidth: '420px', padding: '32px' }}>
-          {/* Logo & Title */}
-          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        {/* Glow Orbs */}
+        <div className="glow-orb glow-orb-1" style={{ opacity: 0.18 }} />
+        <div className="glow-orb glow-orb-2" style={{ opacity: 0.18 }} />
+        
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center', zIndex: 10 }}>
+          <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+            <div className="spinner-outer" />
+            <div className="spinner-inner" />
             <img
               src="/Final VBT Re-Branding 2026-02 (3).png"
               alt="VBT Logo"
-              style={{ width: '130px', height: 'auto', marginBottom: '14px' }}
+              style={{
+                width: '100px',
+                height: 'auto',
+                animation: 'pulse-glow 1.8s infinite',
+                filter: 'drop-shadow(0 0 25px rgba(41,182,246,0.4))',
+                zIndex: 5
+              }}
             />
-            <h1 style={{ fontSize: '1.6rem', color: '#ffffff', marginBottom: '4px', fontFamily: 'var(--font-title)' }}>VBT Sports Platform</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Enter your event code to get started</p>
           </div>
-
-          {/* Join Event Form */}
-          {!showCreateEvent ? (
-            <form onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {eventJoinError && (
-                <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 12px', borderRadius: '8px', color: '#ef4444', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle size={14} /><span>{eventJoinError}</span>
-                </div>
-              )}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Event Code</label>
-                <input
-                  type="text"
-                  value={eventJoinInput}
-                  onChange={(e) => setEventJoinInput(e.target.value)}
-                  placeholder="e.g. vbt_2026_camp"
-                  autoCapitalize="none"
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '10px',
-                    background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                    color: '#ffffff', fontSize: '0.95rem', outline: 'none', fontFamily: 'monospace'
-                  }}
-                />
-              </div>
-
-              {/* Quick-join from registry */}
-              {eventRegistry.filter(ev => ev.active).length > 0 && (
-                <div>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Or tap to join:</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {eventRegistry.filter(ev => ev.active).map(ev => (
-                      <button
-                        key={ev.code}
-                        type="button"
-                        onClick={() => { setEventJoinInput(ev.code); }}
-                        style={{
-                          padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)',
-                          background: 'rgba(255,255,255,0.04)', color: '#ffffff', cursor: 'pointer',
-                          textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '2px'
-                        }}
-                      >
-                        <span style={{ fontWeight: '700' }}>{ev.name}</span>
-                        {ev.date && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{ev.date}</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={eventJoinLoading}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: '10px',
-                  background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
-                  fontFamily: 'var(--font-title)', fontWeight: '600', fontSize: '1rem',
-                  cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 15px rgba(20,65,161,0.4)', marginTop: '4px',
-                  opacity: eventJoinLoading ? 0.7 : 1
-                }}
-              >
-                {eventJoinLoading ? 'Joining...' : 'Join Event →'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowCreateEvent(true)}
-                style={{
-                  width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-light)',
-                  background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.85rem', cursor: 'pointer'
-                }}
-              >
-                + Create a New Event
-              </button>
-            </form>
-          ) : (
-            /* Create New Event Form */
-            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                <button type="button" onClick={() => setShowCreateEvent(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>← Back</button>
-                <h3 style={{ color: '#ffffff', fontSize: '1rem', margin: 0 }}>Create New Event</h3>
-              </div>
-              {createEventError && (
-                <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 12px', borderRadius: '8px', color: '#ef4444', fontSize: '0.8rem' }}>
-                  {createEventError}
-                </div>
-              )}
-              {[['Event Code', newEventCode, setNewEventCode, 'e.g. summer_2026', 'monospace'],
-                ['Event Name', newEventName, setNewEventName, 'e.g. VBT Summer Camp', ''],
-                ['Event Date', newEventDate, setNewEventDate, 'e.g. July 12, 2026', ''],
-                ['Side 1 Name', newEventSide1, setNewEventSide1, 'e.g. Shakes, Red, Lions...', ''],
-                ['Side 2 Name', newEventSide2, setNewEventSide2, 'e.g. Fries, Blue, Tigers...', ''],
-                ['Coordinator Passcode', newEventPassCoord, setNewEventPassCoord, 'e.g. CAMP2026ADMIN', ''],
-                ['Game Leader Passcode', newEventPassGame, setNewEventPassGame, 'e.g. GAMEREF2026', ''],
-                ['Team Leader Passcode', newEventPassTeam, setNewEventPassTeam, 'e.g. LEADER2026', '']
-              ].map(([label, val, setter, ph, ff]) => (
-                <div key={label}>
-                  <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px' }}>{label}</label>
-                  <input
-                    type="text"
-                    value={val}
-                    onChange={(e) => setter(e.target.value)}
-                    placeholder={ph}
-                    style={{
-                      width: '100%', padding: '10px', borderRadius: '8px',
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                      color: '#ffffff', fontSize: '0.875rem', outline: 'none',
-                      fontFamily: ff || 'inherit'
-                    }}
-                  />
-                </div>
-              ))}
-              <button
-                type="submit"
-                disabled={createEventLoading}
-                style={{
-                  width: '100%', padding: '13px', borderRadius: '10px',
-                  background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
-                  fontFamily: 'var(--font-title)', fontWeight: '700', fontSize: '0.9rem',
-                  cursor: createEventLoading ? 'not-allowed' : 'pointer', opacity: createEventLoading ? 0.7 : 1,
-                  marginTop: '4px'
-                }}
-              >
-                {createEventLoading ? 'Creating...' : '🚀 Create & Join Event'}
-              </button>
-            </form>
-          )}
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <h1 style={{ 
+              fontSize: '2rem', 
+              color: '#ffffff', 
+              fontWeight: '900', 
+              fontFamily: 'var(--font-title)', 
+              letterSpacing: '0.12em', 
+              margin: 0, 
+              textShadow: '0 0 15px rgba(255,255,255,0.15)',
+              background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              VBT SERVICE
+            </h1>
+            <p style={{ color: 'var(--vbt-sky)', fontSize: '0.8rem', fontWeight: '700', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              Church Sports Outreach
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
+            <div style={{ 
+              width: '240px', 
+              height: '6px', 
+              background: 'rgba(255,255,255,0.03)', 
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '20px', 
+              overflow: 'hidden',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)'
+            }} className="loading-shimmer">
+              <div style={{ width: `${preloadProgress}%`, height: '100%', background: 'linear-gradient(90deg, #1441a1 0%, var(--vbt-sky) 50%, #a78bfa 100%)', boxShadow: '0 0 8px var(--vbt-sky)', transition: 'width 0.05s ease-out' }} />
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '240px', fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '500', color: 'var(--text-muted)' }}>
+                {getPreloadMessage(preloadProgress)}
+                <span className="text-cursor" />
+              </span>
+              <span style={{ color: 'var(--vbt-sky)', fontWeight: '700' }}>
+                {preloadProgress}%
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────
+  // ─── EVENT SELECTION / HOMEPAGE SCREEN ───────────────────────────────────
+  if (!currentEventCode) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'radial-gradient(circle at center, #0c1530 0%, #05070f 100%)',
+        padding: '24px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Glow Orbs */}
+        <div className="glow-orb glow-orb-1" />
+        <div className="glow-orb glow-orb-2" />
+
+        {/* Top Header */}
+        <header style={{
+          position: 'sticky',
+          top: '12px',
+          width: '100%',
+          maxWidth: '850px',
+          background: 'rgba(13, 20, 38, 0.45)',
+          backdropFilter: 'blur(16px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '24px',
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '40px',
+          zIndex: 50,
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img
+              src="/Final VBT Re-Branding 2026-02 (3).png"
+              alt="VBT Logo"
+              style={{ width: '40px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }}
+            />
+            <span style={{ fontSize: '1.2rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em' }}>
+              VBT SERVICE
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              const el = document.getElementById('events-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="btn-glow"
+            style={{
+              padding: '8px 18px',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Launch Portal
+          </button>
+        </header>
+
+        {/* Hero Section */}
+        <section style={{ width: '100%', maxWidth: '850px', textAlign: 'center', marginBottom: '48px', marginTop: '20px', zIndex: 10 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(41,182,246,0.1)', border: '1px solid rgba(41,182,246,0.2)', padding: '5px 12px', borderRadius: '20px', marginBottom: '16px' }}>
+            <span className="live-dot" style={{ width: '6px', height: '6px' }} />
+            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Service Platform Active</span>
+          </div>
+          
+          <h1 style={{ fontSize: '2.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1.15', marginBottom: '16px', letterSpacing: '-0.03em' }}>
+            Church Sports Outreach <br />
+            <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 2px 10px rgba(41,182,246,0.15))' }}>
+              Reimagined for Kids
+            </span>
+          </h1>
+          
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', lineHeight: '1.6', maxWidth: '620px', margin: '0 auto 28px auto', fontFamily: 'var(--font-body)' }}>
+            VBT Service provides dynamic sports games and Bible reflections for children of all ages. 
+            Coordinate match schedules, manage sub-teams, and submit real-time scores effortlessly.
+          </p>
+          
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={() => {
+                const el = document.getElementById('events-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="btn-glow"
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: 'none',
+                background: 'var(--gradient-vbt)', color: '#ffffff', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(20,65,161,0.4)'
+              }}
+            >
+              🎯 Explore Services
+            </button>
+            <button
+              onClick={() => setShowCreateEvent(true)}
+              className="btn-glow"
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: '1px solid var(--border-light)',
+                background: 'rgba(255,255,255,0.04)', color: '#ffffff', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer'
+              }}
+            >
+              + Create Service Day
+            </button>
+          </div>
+        </section>
+
+        {/* Stats Bento Grid */}
+        <section style={{ width: '100%', maxWidth: '850px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '56px', zIndex: 10 }}>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(0, 176, 255, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>👥</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--vbt-sky)', margin: 0 }}>100+ Kids</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Grade 3/4 Players</p>
+          </div>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>🏆</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#c4b5fd', margin: 0 }}>16 Servants</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Assigned Roles & Leaders</p>
+          </div>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(0, 176, 255, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>🎮</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--vbt-sky)', margin: 0 }}>5 Stations</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Water & Rotational Games</p>
+          </div>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>📖</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#c4b5fd', margin: 0 }}>1 Target</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Bible Insight Reflection</p>
+          </div>
+        </section>
+
+        {/* Portal Section */}
+        <section id="events-section" style={{ width: '100%', maxWidth: '850px', display: 'flex', flexDirection: 'column', gap: '24px', scrollMarginTop: '40px', zIndex: 10 }}>
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Active Services & Camps</h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Launch an event below to manage scheduling, rosters, and scoring.</p>
+          </div>
+
+          {!showCreateEvent ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+              {/* Seeded Events cards list */}
+              {eventRegistry.map(ev => {
+                const isCamp = ev.eventType === 'camp';
+                return (
+                  <div 
+                    key={ev.code} 
+                    className="glass-ticket hover-lift" 
+                    style={{ 
+                      padding: '28px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between',
+                      minHeight: '210px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Accent glow behind active ticket */}
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: '-20px', 
+                      left: '-20px', 
+                      width: '120px', 
+                      height: '120px', 
+                      background: isCamp 
+                        ? 'radial-gradient(circle, rgba(0, 176, 255, 0.12) 0%, transparent 70%)'
+                        : 'radial-gradient(circle, rgba(167, 139, 250, 0.12) 0%, transparent 70%)',
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <span style={{ 
+                          fontSize: '0.68rem', 
+                          fontWeight: '800', 
+                          textTransform: 'uppercase', 
+                          padding: '4px 10px', 
+                          borderRadius: '20px',
+                          background: isCamp ? 'rgba(0,176,255,0.12)' : 'rgba(167,139,250,0.12)',
+                          color: isCamp ? 'var(--vbt-sky)' : '#c4b5fd',
+                          border: isCamp ? '1px solid rgba(0,176,255,0.2)' : '1px solid rgba(167,139,250,0.2)',
+                          display: 'inline-block',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {isCamp ? 'Camp Mode (Legacy)' : 'Service Mode (Dynamic)'}
+                        </span>
+                        
+                        {!isCamp && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span className="live-dot" style={{ width: '6px', height: '6px' }} />
+                            <span style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>LIVE</span>
+                          </div>
+                        )}
+                      </div>
+                      <h3 style={{ fontSize: '1.3rem', color: '#ffffff', margin: 0, fontWeight: '800', letterSpacing: '-0.01em' }}>{ev.name}</h3>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        📅 {ev.date || 'Pending'}
+                      </p>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        {isCamp 
+                          ? 'Traditional two-team scoring and stationary camp scheduling.'
+                          : 'Real-time multi-color scoreboard, automated servant grouping & rotations.'
+                        }
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setCurrentEventCode(ev.code);
+                        localStorage.setItem('vbt_current_event', ev.code);
+                      }}
+                      className="btn-glow"
+                      style={{
+                        marginTop: '20px',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: isCamp ? 'var(--gradient-vbt)' : 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
+                        color: '#ffffff',
+                        fontWeight: '800',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'transform 0.2s ease',
+                        boxShadow: isCamp 
+                          ? '0 4px 15px rgba(20,65,161,0.3)' 
+                          : '0 4px 15px rgba(124,58,237,0.3)'
+                      }}
+                    >
+                      Launch Event ➔
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Join Code Panel */}
+              <div className="glass-ticket hover-lift" style={{ padding: '28px', display: 'flex', flexDirection: 'column', justify: 'space-between', minHeight: '210px' }}>
+                <form onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>🔑</span>
+                      <h3 style={{ fontSize: '1.1rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Join Code Manually</h3>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.4' }}>Access a custom service day code provided by coordinator.</p>
+                    <input
+                      type="text"
+                      value={eventJoinInput}
+                      onChange={(e) => setEventJoinInput(e.target.value)}
+                      placeholder="e.g. june26"
+                      autoCapitalize="none"
+                      style={{
+                        width: '100%', padding: '11px 14px', borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                        color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'monospace',
+                        transition: 'border-color 0.2s, box-shadow 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = 'var(--vbt-sky)';
+                        e.target.style.boxShadow = '0 0 10px rgba(41,182,246,0.2)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'var(--border-light)';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                    {eventJoinError && (
+                      <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '6px 0 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        ⚠️ {eventJoinError}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={eventJoinLoading}
+                    className="btn-glow"
+                    style={{
+                      width: '100%',
+                      padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontWeight: '800', fontSize: '0.85rem',
+                      cursor: 'pointer', marginTop: '12px'
+                    }}
+                  >
+                    {eventJoinLoading ? 'Joining...' : 'Submit Code'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            /* Create New Event Form */
+            <div className="glass-ticket animate-fade" style={{ padding: '28px', width: '100%', maxWidth: '750px' }}>
+              <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (creationStep > 1) {
+                        setCreationStep(creationStep - 1);
+                      } else {
+                        setShowCreateEvent(false);
+                      }
+                    }} 
+                    style={{ 
+                      background: 'rgba(255,255,255,0.04)', 
+                      border: '1px solid rgba(255,255,255,0.08)', 
+                      borderRadius: '8px',
+                      color: 'var(--text-secondary)', 
+                      cursor: 'pointer', 
+                      padding: '6px 12px', 
+                      fontSize: '0.78rem',
+                      fontWeight: '700'
+                    }}
+                  >
+                    ← Back
+                  </button>
+                  <h3 style={{ color: '#ffffff', fontSize: '1.25rem', margin: 0, fontWeight: '800' }}>
+                    Create New Event {newEventType === 'service' && `(Step ${creationStep} of 3)`}
+                  </h3>
+                </div>
+                
+                {createEventError && (
+                  <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '12px 14px', borderRadius: '10px', color: '#ef4444', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ⚠️ {createEventError}
+                  </div>
+                )}
+
+                {/* Step Headers */}
+                {newEventType === 'service' && (
+                  <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px', marginBottom: '6px' }}>
+                    {['1. Details', '2. Setup Games', '3. Roster & Roles'].map((stepTitle, idx) => {
+                      const stepNum = idx + 1;
+                      const isActive = creationStep === stepNum;
+                      return (
+                        <div 
+                          key={stepTitle} 
+                          style={{ 
+                            fontSize: '0.78rem', 
+                            fontWeight: '700', 
+                            color: isActive ? '#c4b5fd' : 'var(--text-muted)',
+                            borderBottom: isActive ? '2px solid #a78bfa' : 'none',
+                            paddingBottom: '4px',
+                            flex: 1,
+                            textAlign: 'center'
+                          }}
+                        >
+                          {stepTitle}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Step 1: Details & Team Names */}
+                {creationStep === 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Event Code</label>
+                        <input
+                          type="text"
+                          value={newEventCode}
+                          onChange={(e) => setNewEventCode(e.target.value)}
+                          placeholder="e.g. summer_2026"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'monospace' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Event Name</label>
+                        <input
+                          type="text"
+                          value={newEventName}
+                          onChange={(e) => setNewEventName(e.target.value)}
+                          placeholder="e.g. VBT Summer Camp"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Event Date</label>
+                        <input
+                          type="text"
+                          value={newEventDate}
+                          onChange={(e) => setNewEventDate(e.target.value)}
+                          placeholder="e.g. July 12, 2026"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Event Type</label>
+                        <select
+                          value={newEventType}
+                          onChange={(e) => setNewEventType(e.target.value)}
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+                        >
+                          <option value="service">Service Mode (Dynamic 4 Teams)</option>
+                          <option value="camp">Camp Mode (Legacy 2 Teams)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Coordinator Passcode</label>
+                        <input
+                          type="text"
+                          value={newEventPassCoord}
+                          onChange={(e) => setNewEventPassCoord(e.target.value)}
+                          placeholder="e.g. VBTADMIN"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Game Leader Passcode</label>
+                        <input
+                          type="text"
+                          value={newEventPassGame}
+                          onChange={(e) => setNewEventPassGame(e.target.value)}
+                          placeholder="e.g. GAMEREF"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Team Leader Passcode</label>
+                        <input
+                          type="text"
+                          value={newEventPassTeam}
+                          onChange={(e) => setNewEventPassTeam(e.target.value)}
+                          placeholder="e.g. LEADER"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                    </div>
+
+                    {newEventType === 'service' ? (
+                      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                        <h4 style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Custom Team Labels</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#ef4444', marginBottom: '4px', fontWeight: '700' }}>Red Team Label</label>
+                            <input
+                              type="text"
+                              value={newTeamRed}
+                              onChange={(e) => setNewTeamRed(e.target.value)}
+                              placeholder="Red"
+                              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#ffffff', marginBottom: '4px', fontWeight: '700' }}>White Team Label</label>
+                            <input
+                              type="text"
+                              value={newTeamWhite}
+                              onChange={(e) => setNewTeamWhite(e.target.value)}
+                              placeholder="White"
+                              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>Black Team Label</label>
+                            <input
+                              type="text"
+                              value={newTeamBlack}
+                              onChange={(e) => setNewTeamBlack(e.target.value)}
+                              placeholder="Black"
+                              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#29b6f6', marginBottom: '4px', fontWeight: '700' }}>Blue Team Label</label>
+                            <input
+                              type="text"
+                              value={newTeamBlue}
+                              onChange={(e) => setNewTeamBlue(e.target.value)}
+                              placeholder="Blue"
+                              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--color-shakes)', marginBottom: '4px', fontWeight: '700' }}>Side 1 Name</label>
+                          <input
+                            type="text"
+                            value={newEventSide1}
+                            onChange={(e) => setNewEventSide1(e.target.value)}
+                            placeholder="Shakes"
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--color-fries)', marginBottom: '4px', fontWeight: '700' }}>Side 2 Name</label>
+                          <input
+                            type="text"
+                            value={newEventSide2}
+                            onChange={(e) => setNewEventSide2(e.target.value)}
+                            placeholder="Fries"
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {newEventType === 'service' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newEventCode.trim()) { setCreateEventError('Event code is required.'); return; }
+                          if (!newEventName.trim()) { setCreateEventError('Event name is required.'); return; }
+                          if (!newEventPassCoord.trim()) { setCreateEventError('Coordinator passcode is required.'); return; }
+                          setCreateEventError('');
+                          setCreationStep(2);
+                        }}
+                        className="btn-glow"
+                        style={{
+                          width: '100%', padding: '14px', borderRadius: '12px',
+                          background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
+                          fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.95rem',
+                          cursor: 'pointer', marginTop: '10px'
+                        }}
+                      >
+                        Next: Setup Games ➔
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={createEventLoading}
+                        className="btn-glow"
+                        style={{
+                          width: '100%', padding: '14px', borderRadius: '12px',
+                          background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
+                          fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.95rem',
+                          cursor: createEventLoading ? 'not-allowed' : 'pointer', opacity: createEventLoading ? 0.7 : 1,
+                          marginTop: '10px', boxShadow: '0 4px 15px rgba(20,65,161,0.3)'
+                        }}
+                      >
+                        {createEventLoading ? 'Creating...' : '🚀 Create & Join Event'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 2: Games & Outreach Brief Setup */}
+                {creationStep === 2 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
+                        <input
+                          type="number"
+                          value={newKidCount}
+                          onChange={(e) => setNewKidCount(parseInt(e.target.value, 10) || '')}
+                          placeholder="e.g. 100"
+                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Outreach Theme Brief</label>
+                      <textarea
+                        value={newServiceBrief}
+                        onChange={(e) => setNewServiceBrief(e.target.value)}
+                        placeholder="Brief description of the service target and theme..."
+                        rows={3}
+                        style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'inherit', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    {/* Rotational Stations Setup */}
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+                      <h4 style={{ color: '#c4b5fd', fontSize: '0.9rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏁 Rotational Stations (4 Stations)</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {['station_1', 'station_2', 'station_3', 'station_4'].map((stKey, idx) => {
+                          const st = newStations[stKey];
+                          return (
+                            <div key={stKey} style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                              <h5 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}>Station {idx + 1}</h5>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '10px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Game Name</label>
+                                  <input
+                                    type="text"
+                                    value={st.name}
+                                    onChange={(e) => handleNewStationChange(stKey, 'name', e.target.value)}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Location</label>
+                                  <input
+                                    type="text"
+                                    value={st.location}
+                                    onChange={(e) => handleNewStationChange(stKey, 'location', e.target.value)}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }}
+                                  />
+                                </div>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>How to Play</label>
+                                  <textarea
+                                    value={st.howToPlay}
+                                    onChange={(e) => handleNewStationChange(stKey, 'howToPlay', e.target.value)}
+                                    rows={2}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.78rem', resize: 'vertical' }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Lesson Learned</label>
+                                  <textarea
+                                    value={st.lesson}
+                                    onChange={(e) => handleNewStationChange(stKey, 'lesson', e.target.value)}
+                                    rows={2}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.78rem', resize: 'vertical' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Big Game & Reflection Setup */}
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+                      <h4 style={{ color: '#c4b5fd', fontSize: '0.9rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏆 Big Game & Reflection</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {['big_game', 'reflection'].map((stKey) => {
+                          const st = newStations[stKey];
+                          return (
+                            <div key={stKey} style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                              <h5 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px', textTransform: 'capitalize' }}>{stKey.replace('_', ' ')}</h5>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '10px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Name</label>
+                                  <input
+                                    type="text"
+                                    value={st.name}
+                                    onChange={(e) => handleNewStationChange(stKey, 'name', e.target.value)}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Location</label>
+                                  <input
+                                    type="text"
+                                    value={st.location}
+                                    onChange={(e) => handleNewStationChange(stKey, 'location', e.target.value)}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }}
+                                  />
+                                </div>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>How to Play</label>
+                                  <textarea
+                                    value={st.howToPlay}
+                                    onChange={(e) => handleNewStationChange(stKey, 'howToPlay', e.target.value)}
+                                    rows={2}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.78rem', resize: 'vertical' }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Lesson Learned</label>
+                                  <textarea
+                                    value={st.lesson}
+                                    onChange={(e) => handleNewStationChange(stKey, 'lesson', e.target.value)}
+                                    rows={2}
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.78rem', resize: 'vertical' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCreationStep(1)}
+                        style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#ffffff', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer' }}
+                      >
+                        ← Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreationStep(3)}
+                        className="btn-glow"
+                        style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer' }}
+                      >
+                        Next: Roster & Roles ➔
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Roster & Roles */}
+                {creationStep === 3 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <div>
+                        <h4 style={{ color: '#ffffff', fontSize: '0.9rem', fontWeight: '800', margin: 0 }}>👥 Servant Roster & Attendance</h4>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Check who is attending and assign their roles.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleWizardAutoAssign}
+                        className="btn-glow"
+                        style={{
+                          padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.3)',
+                          background: 'rgba(167,139,250,0.15)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✨ Magic Auto-Assign
+                      </button>
+                    </div>
+
+                    <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                      {globalServants.sort((a,b) => a.name.localeCompare(b.name)).map(s => {
+                        const isAttending = wizardAttending.includes(s.id);
+                        return (
+                          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '8px', background: isAttending ? 'rgba(167,139,250,0.06)' : 'rgba(255,255,255,0.01)', border: '1px solid ' + (isAttending ? 'rgba(167,139,250,0.25)' : 'rgba(255,255,255,0.03)') }}>
+                            <input
+                              type="checkbox"
+                              checked={isAttending}
+                              onChange={() => {
+                                const updated = wizardAttending.includes(s.id)
+                                  ? wizardAttending.filter(id => id !== s.id)
+                                  : [...wizardAttending, s.id];
+                                setWizardAttending(updated);
+                              }}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.85rem', color: '#ffffff', flex: 1, fontWeight: isAttending ? '700' : 'normal' }}>{s.name}</span>
+                            
+                            {isAttending && (
+                              <select
+                                value={wizardRoles[s.id] || 'volunteer'}
+                                onChange={(e) => setWizardRoles(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                style={{ padding: '6px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.78rem', cursor: 'pointer', outline: 'none', maxWidth: '160px' }}
+                              >
+                                <option value="volunteer">Volunteer/Ref</option>
+                                <option value="coordinator">Coordinator</option>
+                                <option value="station_1">{(newStations.station_1.name || 'Station 1') + ' Lead'}</option>
+                                <option value="station_2">{(newStations.station_2.name || 'Station 2') + ' Lead'}</option>
+                                <option value="station_3">{(newStations.station_3.name || 'Station 3') + ' Lead'}</option>
+                                <option value="station_4">{(newStations.station_4.name || 'Station 4') + ' Lead'}</option>
+                                <option value="big_game_1">Big Game Lead 1</option>
+                                <option value="big_game_2">Big Game Lead 2</option>
+                                <option value="reflection">Reflection Lead</option>
+                                <option value="team_red_1">{(newTeamRed || 'Red') + ' 1 Leader'}</option>
+                                <option value="team_red_2">{(newTeamRed || 'Red') + ' 2 Leader'}</option>
+                                <option value="team_white_1">{(newTeamWhite || 'White') + ' 1 Leader'}</option>
+                                <option value="team_white_2">{(newTeamWhite || 'White') + ' 2 Leader'}</option>
+                                <option value="team_black_1">{(newTeamBlack || 'Black') + ' 1 Leader'}</option>
+                                <option value="team_black_2">{(newTeamBlack || 'Black') + ' 2 Leader'}</option>
+                                <option value="team_blue_1">{(newTeamBlue || 'Blue') + ' 1 Leader'}</option>
+                                <option value="team_blue_2">{(newTeamBlue || 'Blue') + ' 2 Leader'}</option>
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Quick Add Servant form */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a78bfa' }}>➕ Add New Servant to Directory</span>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={quickServantName}
+                          onChange={(e) => setQuickServantName(e.target.value)}
+                          placeholder="Full Name (e.g. Mary Mitry)"
+                          style={{ flex: 2, padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }}
+                        />
+                        <input
+                          type="text"
+                          value={quickServantPasscode}
+                          onChange={(e) => setQuickServantPasscode(e.target.value)}
+                          placeholder="Passcode (default: 1234)"
+                          style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleQuickAddServant}
+                          disabled={quickServantLoading}
+                          className="btn-glow"
+                          style={{ padding: '8px 14px', borderRadius: '6px', border: 'none', background: 'var(--gradient-vbt)', color: '#ffffff', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          {quickServantLoading ? 'Adding...' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCreationStep(2)}
+                        style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#ffffff', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer' }}
+                      >
+                        ← Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={createEventLoading}
+                        className="btn-glow"
+                        style={{
+                          flex: 1, padding: '12px', borderRadius: '10px',
+                          background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
+                          fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.9rem',
+                          cursor: createEventLoading ? 'not-allowed' : 'pointer', opacity: createEventLoading ? 0.7 : 1,
+                          boxShadow: '0 4px 15px rgba(124,58,237,0.3)'
+                        }}
+                      >
+                        {createEventLoading ? 'Creating...' : '🚀 Create & Join Event'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
+
   if (!currentUser) {
+    const isService = eventConfig.eventType === 'service';
     return (
       <div style={{
         minHeight: '100vh',
@@ -1512,18 +2863,43 @@ export default function App() {
               alt="Event Logo" 
               style={{ width: '120px', height: 'auto', marginBottom: '16px' }} 
             />
-            <h1 style={{ fontSize: '1.6rem', color: '#ffffff', marginBottom: '4px', fontFamily: 'var(--font-title)' }}>{eventConfig.eventName || 'VBT SPORTS CAMP'}</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{eventConfig.description || 'Leader Portal & Live Scoring'}</p>
+            <h1 style={{ fontSize: '1.6rem', color: '#ffffff', marginBottom: '4px', fontFamily: 'var(--font-title)' }}>
+              {isService ? "VBT Service Portal" : (eventConfig.eventName || 'VBT SPORTS CAMP')}
+            </h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+              {isService ? (eventConfig.eventName || "Friend Request") : (eventConfig.description || 'Leader Portal & Live Scoring')}
+            </p>
             <button
               type="button"
               onClick={handleLeaveEvent}
               style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
-              ← Change event
+              ← Back to Homepage
             </button>
           </div>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {isService && (
+              <div style={{
+                background: 'rgba(41, 182, 246, 0.1)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                borderRadius: '12px',
+                padding: '14px',
+                color: '#e2e8f0',
+                fontSize: '0.85rem',
+                lineHeight: '1.5'
+              }}>
+                <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  👴 Sign-In Helper Card
+                </h3>
+                <ol style={{ margin: 0, paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <li>Click <strong>Choose Name</strong> and choose your name.</li>
+                  <li>Click <strong>Passcode</strong> and enter your password.</li>
+                  <li>Click the big blue <strong>Sign In</strong> button below.</li>
+                </ol>
+              </div>
+            )}
+            
             {loginError && (
               <div style={{
                 background: 'rgba(239, 68, 68, 0.15)',
@@ -1541,34 +2917,58 @@ export default function App() {
               </div>
             )}
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Role</label>
-              <div className="toggle-group" style={{ marginBottom: '4px' }}>
-                <button 
-                  type="button"
-                  className={`toggle-btn ${loginRole === 'leader' ? 'active' : ''}`}
-                  onClick={() => { setLoginRole('leader'); setLoginError(''); }}
+            {isService ? (
+              // Service mode: Individual servant account login dropdown
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Your Name</label>
+                <select
+                  value={loginName}
+                  onChange={(e) => { setLoginName(e.target.value); setLoginError(''); }}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: '10px',
+                    background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                    color: '#ffffff', fontSize: '0.95rem', outline: 'none', cursor: 'pointer'
+                  }}
                 >
-                  Team Leader
-                </button>
-                <button 
-                  type="button"
-                  className={`toggle-btn ${loginRole === 'referee' ? 'active' : ''}`}
-                  onClick={() => { setLoginRole('referee'); setLoginError(''); }}
-                >
-                  Game Leader
-                </button>
-                <button 
-                  type="button"
-                  className={`toggle-btn ${loginRole === 'admin' ? 'active' : ''}`}
-                  onClick={() => { setLoginRole('admin'); setLoginError(''); }}
-                >
-                  Coordinator
-                </button>
+                  <option value="">-- Choose Name --</option>
+                  {globalServants.sort((a,b) => a.name.localeCompare(b.name)).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
+            ) : (
+              // Original Camp mode: Role selector toggle
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Role</label>
+                <div className="toggle-group" style={{ marginBottom: '4px' }}>
+                  <button 
+                    type="button"
+                    className={`toggle-btn ${loginRole === 'leader' ? 'active' : ''}`}
+                    onClick={() => { setLoginRole('leader'); setLoginError(''); }}
+                  >
+                    Team Leader
+                  </button>
+                  <button 
+                    type="button"
+                    className={`toggle-btn ${loginRole === 'referee' ? 'active' : ''}`}
+                    onClick={() => { setLoginRole('referee'); setLoginError(''); }}
+                  >
+                    Game Leader
+                  </button>
+                  <button 
+                    type="button"
+                    className={`toggle-btn ${loginRole === 'admin' ? 'active' : ''}`}
+                    onClick={() => { setLoginRole('admin'); setLoginError(''); }}
+                  >
+                    Coordinator
+                  </button>
+                </div>
+              </div>
+            )}
 
-            {loginRole === 'leader' && (
+            {!isService && loginRole === 'leader' && (
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Team Leader Name</label>
                 {leadersList.length === 0 ? (
@@ -1597,7 +2997,9 @@ export default function App() {
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Camp Passcode</label>
+              <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                {isService ? "Private Passcode" : "Camp Passcode"}
+              </label>
               <div style={{ position: 'relative' }}>
                 <input 
                   type="password"
@@ -1619,30 +3021,118 @@ export default function App() {
               </div>
             </div>
 
-            <button 
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '10px',
-                background: 'var(--gradient-vbt)',
-                border: 'none',
-                color: '#ffffff',
-                fontFamily: 'var(--font-title)',
-                fontWeight: '600',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(20, 65, 161, 0.4)',
-                marginTop: '10px'
-              }}
-            >
-              Sign In
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+              <button 
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: 'var(--gradient-vbt)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-title)',
+                  fontWeight: '700',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(20, 65, 161, 0.4)'
+                }}
+              >
+                Sign In
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => {
+                  const user = {
+                    id: 'visitor',
+                    role: 'viewer',
+                    name: 'Visitor',
+                    teamCode: 'VISITOR',
+                    side: 'System',
+                    grade: 'All',
+                    roleCode: 'none'
+                  };
+                  setCurrentUser(user);
+                  localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
+                  setCurrentTab('scoreboard');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#ffffff',
+                  fontWeight: '700',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
+              >
+                👀 View as Visitor (No Passcode Needed)
+              </button>
+            </div>
           </form>
         </div>
       </div>
     );
   }
+
+    const getActiveTabs = () => {
+    if (!currentUser) return [];
+    
+    // For Service Mode:
+    if (eventConfig.eventType === 'service') {
+      if (currentUser.role === 'admin') {
+        return [
+          { id: 'schedule', label: 'Schedule', icon: Calendar },
+          { id: 'scoreboard', label: 'Scores', icon: Trophy },
+          { id: 'service', label: 'Games', icon: BookOpen },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+          { id: 'settings', label: 'Controls', icon: Settings }
+        ];
+      } else if (currentUser.role === 'leader') {
+        return [
+          { id: 'schedule', label: 'Schedule', icon: Calendar },
+          { id: 'myteam', label: 'My Team', icon: Users },
+          { id: 'service', label: 'Games', icon: BookOpen },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 }
+        ];
+      } else if (currentUser.role === 'referee') {
+        return [
+          { id: 'schedule', label: 'Schedule', icon: Calendar },
+          { id: 'scoreboard', label: 'Scores', icon: Trophy },
+          { id: 'service', label: 'Games', icon: BookOpen },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 }
+        ];
+      } else {
+        // viewer or visitor
+        return [
+          { id: 'schedule', label: 'Schedule', icon: Calendar },
+          { id: 'scoreboard', label: 'Scores', icon: Trophy },
+          { id: 'service', label: 'Games', icon: BookOpen },
+          { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 }
+        ];
+      }
+    }
+    
+    // For Camp Mode (legacy):
+    const tabs = [
+      { id: 'schedule', label: 'Schedule', icon: Calendar },
+      { id: 'myteam', label: 'My Team', icon: Users },
+      { id: 'scoreboard', label: 'Scores', icon: Trophy },
+      { id: 'info', label: 'Map', icon: MapIcon },
+      { id: 'stats', label: 'Stats', icon: BarChart3 }
+    ];
+    if (currentUser.role === 'admin') {
+      tabs.push({ id: 'settings', label: 'Controls', icon: Settings });
+    }
+    tabs.push({ id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 });
+    return tabs;
+  };
 
   const totalBothSides = scoreCalculations.shakesFinal + scoreCalculations.friesFinal;
   const shakesPercentage = totalBothSides > 0 ? (scoreCalculations.shakesFinal / totalBothSides) * 100 : 50;
@@ -1767,43 +3257,107 @@ export default function App() {
 
       {/* Main standings */}
       <section style={{ maxWidth: '600px', width: '100%', margin: '16px auto 0 auto', padding: '0 16px' }}>
-        <div className="glass-panel animate-fade" style={{ padding: '16px', background: 'linear-gradient(180deg, rgba(20, 30, 58, 0.5) 0%, rgba(13, 20, 38, 0.7) 100%)' }}>
-          <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        {eventConfig.eventType === 'service' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Trophy size={18} style={{ color: '#fbbf24' }} />
               <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
             </div>
-            {scoreCalculations.winner !== 'TIE' && (
-              <span className={`badge ${scoreCalculations.winner === 'SHAKES' ? 'badge-shakes' : 'badge-fries'}`}>
-                {scoreCalculations.winner} leading
-              </span>
-            )}
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              {scoreCalculations.colors.map(colorName => {
+                const colorHex = getTeamColorHex(colorName);
+                const score = scoreCalculations.finalScores[colorName] || 0;
+                const winsPts = scoreCalculations.wins[colorName] || 0;
+                const tokCount = scoreCalculations.tokensCount[colorName] || 0;
+                const ded = scoreCalculations.deductions[colorName] || 0;
+                const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
+                
+                return (
+                  <div key={colorName} className="glass-panel hover-lift" style={{ 
+                    padding: '14px', 
+                    borderLeft: `4px solid ${colorHex}`,
+                    background: 'rgba(13, 20, 38, 0.45)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '-15px',
+                      right: '-15px',
+                      width: '50px',
+                      height: '50px',
+                      background: `radial-gradient(circle, ${colorHex}15 0%, transparent 70%)`,
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    <h4 style={{ 
+                      fontSize: '0.85rem', 
+                      fontWeight: '800', 
+                      color: '#ffffff', 
+                      margin: '0 0 4px 0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span>{customName}</span>
+                      {scoreCalculations.leadColor === colorName && (
+                        <span style={{ fontSize: '0.7rem', color: '#fbbf24', animation: 'pulse-glow 1.5s infinite' }}>👑 Lead</span>
+                      )}
+                    </h4>
+                    <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1', marginBottom: '6px' }}>
+                      {score}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      <div>🎮 Games: <strong style={{ color: '#ffffff' }}>{winsPts}</strong> pts</div>
+                      <div>🪙 Tokens: <strong style={{ color: '#ffffff' }}>{tokCount}</strong> ({(tokCount * 2)} pts)</div>
+                      {ded > 0 && <div style={{ color: '#ef4444' }}>⚠️ Deductions: <strong>-{ded}</strong> pts</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        ) : (
+          <div className="glass-panel animate-fade" style={{ padding: '16px', background: 'linear-gradient(180deg, rgba(20, 30, 58, 0.5) 0%, rgba(13, 20, 38, 0.7) 100%)' }}>
+            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Trophy size={18} style={{ color: '#fbbf24' }} />
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
+              </div>
+              {scoreCalculations.winner !== 'TIE' && (
+                <span className={`badge ${scoreCalculations.winner === 'SHAKES' ? 'badge-shakes' : 'badge-fries'}`}>
+                  {scoreCalculations.winner} leading
+                </span>
+              )}
+            </div>
 
-          <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
-            <div>
-              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>{side1Name}</p>
-              <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
-                {scoreCalculations.shakesFinal}
-              </p>
+            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+              <div>
+                <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>{side1Name}</p>
+                <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
+                  {scoreCalculations.shakesFinal}
+                </p>
+              </div>
+              <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>VS</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>{side2Name}</p>
+                <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
+                  {scoreCalculations.friesFinal}
+                </p>
+              </div>
             </div>
-            <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>VS</span>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>{side2Name}</p>
-              <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
-                {scoreCalculations.friesFinal}
-              </p>
-            </div>
-          </div>
 
-          <div className="tug-of-war-container">
-            <div className="tug-of-war-bar-shakes" style={{ width: `${shakesPercentage}%` }} />
-            <div className="tug-of-war-bar-fries" style={{ width: `${friesPercentage}%` }} />
-            <div className="tug-of-war-center" />
+            <div className="tug-of-war-container">
+              <div className="tug-of-war-bar-shakes" style={{ width: `${shakesPercentage}%` }} />
+              <div className="tug-of-war-bar-fries" style={{ width: `${friesPercentage}%` }} />
+              <div className="tug-of-war-center" />
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {/* Content tabs */}
@@ -1814,20 +3368,58 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff', marginBottom: '4px' }}>Game Score Entry</h2>
             
-            {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
-              <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(41, 182, 246, 0.06)', border: '1px solid rgba(41, 182, 246, 0.2)', borderRadius: '12px' }}>
-                <p style={{ fontSize: '0.78rem', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                  <span style={{ fontSize: '1rem' }}>📝</span>
-                  <span><strong>{currentUser.role === 'admin' ? 'Coordinator' : 'Game Leader'} View:</strong> Tap the winner options (Shakes, Tie, Fries) below to submit scores in real-time. Any changes immediately update all devices.</span>
-                </p>
-              </div>
+            {eventConfig.eventType === 'service' ? (
+              currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
+                <div style={{
+                  background: 'rgba(41, 182, 246, 0.1)',
+                  border: '1px solid rgba(41, 182, 246, 0.3)',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  color: '#e2e8f0',
+                  fontSize: '0.85rem',
+                  lineHeight: '1.5'
+                }}>
+                  <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    👴 Scoring Helper Card
+                  </h3>
+                  <p style={{ margin: 0 }}>
+                    Click <strong>By Block</strong> or <strong>By Game</strong> below. Find the matchup, and click the winning sub-team's button (e.g., <strong>Falcons 1</strong> or <strong>Eagles 1</strong>) to award points. Click <strong>Reset</strong> to undo.
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  color: '#e2e8f0',
+                  fontSize: '0.85rem',
+                  lineHeight: '1.5'
+                }}>
+                  <h3 style={{ color: '#94a3b8', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    👴 View-Only Helper Card
+                  </h3>
+                  <p style={{ margin: 0 }}>
+                    This scoreboard shows the points for all teams. Point values update automatically as game rounds finish and Station Leaders submit wins.
+                  </p>
+                </div>
+              )
             ) : (
-              <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                  <span style={{ fontSize: '1rem' }}>👀</span>
-                  <span><strong>Team Leader View:</strong> Live scoreboard. Winner selection buttons are locked for security. If you see a discrepancy, contact a Coordinator.</span>
-                </p>
-              </div>
+              currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
+                <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(41, 182, 246, 0.06)', border: '1px solid rgba(41, 182, 246, 0.2)', borderRadius: '12px' }}>
+                  <p style={{ fontSize: '0.78rem', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
+                    <span style={{ fontSize: '1rem' }}>📝</span>
+                    <span><strong>{currentUser.role === 'admin' ? 'Coordinator' : 'Game Leader'} View:</strong> Tap the winner options (Shakes, Tie, Fries) below to submit scores in real-time. Any changes immediately update all devices.</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
+                    <span style={{ fontSize: '1rem' }}>👀</span>
+                    <span><strong>Team Leader View:</strong> Live scoreboard. Winner selection buttons are locked for security. If you see a discrepancy, contact a Coordinator.</span>
+                  </p>
+                </div>
+              )
             )}
             
             {/* View Mode Switcher */}
@@ -1867,7 +3459,24 @@ export default function App() {
                     <div>
                       <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{blockTitle}</h3>
                       <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        Score: Shakes <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{bScores.shakes}</span> - Fries <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{bScores.fries}</span>
+                        {eventConfig.eventType === 'service' ? (
+                          <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            {['Red', 'White', 'Black', 'Blue'].map((c, i) => {
+                              const customColorName = eventConfig.teamNames?.[c.toLowerCase()] || c;
+                              const colorHex = getTeamColorHex(c);
+                              return (
+                                <span key={c}>
+                                  {i > 0 && ' | '}
+                                  {customColorName}: <span style={{ color: colorHex, fontWeight: '700' }}>{bScores?.[c] || 0}</span>
+                                </span>
+                              );
+                            })}
+                          </span>
+                        ) : (
+                          <>
+                            Score: {side1Name} <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{bScores?.shakes || 0}</span> - {side2Name} <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{bScores?.fries || 0}</span>
+                          </>
+                        )}
                       </p>
                     </div>
                     <span style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>▼</span>
@@ -1922,9 +3531,13 @@ export default function App() {
                                         {winner === 'NA' ? (
                                           <span style={{ color: 'var(--text-muted)' }}>Pending</span>
                                         ) : winner === 'Shakes' ? (
-                                          <span style={{ color: 'var(--color-shakes)' }}>Shakes Win</span>
+                                          <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.shakes) : 'var(--color-shakes)' }}>
+                                            {eventConfig.eventType === 'service' ? `${m.shakes} Win` : 'Shakes Win'}
+                                          </span>
                                         ) : winner === 'Fries' ? (
-                                          <span style={{ color: 'var(--color-fries)' }}>Fries Win</span>
+                                          <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.fries) : 'var(--color-fries)' }}>
+                                            {eventConfig.eventType === 'service' ? `${m.fries} Win` : 'Fries Win'}
+                                          </span>
                                         ) : (
                                           <span style={{ color: 'var(--color-tie)' }}>Tie</span>
                                         )}
@@ -1932,9 +3545,19 @@ export default function App() {
                                     </div>
                                     
                                     <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '8px' }}>
-                                      <span style={{ color: 'var(--color-shakes)', fontWeight: '600' }}>{m.shakes} (Shakes)</span>
-                                      <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                      <span style={{ color: 'var(--color-fries)', fontWeight: '600' }}>{m.fries} (Fries)</span>
+                                      {eventConfig.eventType === 'service' ? (
+                                        <>
+                                          <span style={{ color: getTeamColorHex(m.shakes), fontWeight: '600' }}>{m.shakes}</span>
+                                          <span style={{ color: 'var(--text-muted)' }}>vs</span>
+                                          <span style={{ color: getTeamColorHex(m.fries), fontWeight: '600' }}>{m.fries}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span style={{ color: 'var(--color-shakes)', fontWeight: '600' }}>{m.shakes} (Shakes)</span>
+                                          <span style={{ color: 'var(--text-muted)' }}>vs</span>
+                                          <span style={{ color: 'var(--color-fries)', fontWeight: '600' }}>{m.fries} (Fries)</span>
+                                        </>
+                                      )}
                                     </div>
                                     
                                     {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') && (
@@ -1943,7 +3566,7 @@ export default function App() {
                                           className={`winner-option ${winner === 'Shakes' ? 'active-shakes' : ''}`}
                                           onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Shakes')}
                                         >
-                                          Shakes
+                                          {eventConfig.eventType === 'service' ? m.shakes : 'Shakes'}
                                         </button>
                                         <button 
                                           className={`winner-option ${winner === 'TIE' ? 'active-tie' : ''}`}
@@ -1955,7 +3578,7 @@ export default function App() {
                                           className={`winner-option ${winner === 'Fries' ? 'active-fries' : ''}`}
                                           onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Fries')}
                                         >
-                                          Fries
+                                          {eventConfig.eventType === 'service' ? m.fries : 'Fries'}
                                         </button>
                                         <button 
                                           className={`winner-option`}
@@ -2032,9 +3655,13 @@ export default function App() {
                                 {winner === 'NA' ? (
                                   <span style={{ color: 'var(--text-muted)' }}>Pending</span>
                                 ) : winner === 'Shakes' ? (
-                                  <span style={{ color: 'var(--color-shakes)' }}>Shakes Win</span>
+                                  <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.shakes) : 'var(--color-shakes)' }}>
+                                    {eventConfig.eventType === 'service' ? `${m.shakes} Win` : 'Shakes Win'}
+                                  </span>
                                 ) : winner === 'Fries' ? (
-                                  <span style={{ color: 'var(--color-fries)' }}>Fries Win</span>
+                                  <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.fries) : 'var(--color-fries)' }}>
+                                    {eventConfig.eventType === 'service' ? `${m.fries} Win` : 'Fries Win'}
+                                  </span>
                                 ) : (
                                   <span style={{ color: 'var(--color-tie)' }}>Tie</span>
                                 )}
@@ -2042,9 +3669,19 @@ export default function App() {
                             </div>
                             
                             <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '8px' }}>
-                              <span style={{ color: 'var(--color-shakes)', fontWeight: '600' }}>{m.shakes} (Shakes)</span>
-                              <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                              <span style={{ color: 'var(--color-fries)', fontWeight: '600' }}>{m.fries} (Fries)</span>
+                              {eventConfig.eventType === 'service' ? (
+                                <>
+                                  <span style={{ color: getTeamColorHex(m.shakes), fontWeight: '600' }}>{m.shakes}</span>
+                                  <span style={{ color: 'var(--text-muted)' }}>vs</span>
+                                  <span style={{ color: getTeamColorHex(m.fries), fontWeight: '600' }}>{m.fries}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span style={{ color: 'var(--color-shakes)', fontWeight: '600' }}>{m.shakes} (Shakes)</span>
+                                  <span style={{ color: 'var(--text-muted)' }}>vs</span>
+                                  <span style={{ color: 'var(--color-fries)', fontWeight: '600' }}>{m.fries} (Fries)</span>
+                                </>
+                              )}
                             </div>
                             
                             {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') && (
@@ -2053,7 +3690,7 @@ export default function App() {
                                   className={`winner-option ${winner === 'Shakes' ? 'active-shakes' : ''}`}
                                   onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Shakes')}
                                 >
-                                  Shakes
+                                  {eventConfig.eventType === 'service' ? m.shakes : 'Shakes'}
                                 </button>
                                 <button 
                                   className={`winner-option ${winner === 'TIE' ? 'active-tie' : ''}`}
@@ -2065,7 +3702,7 @@ export default function App() {
                                   className={`winner-option ${winner === 'Fries' ? 'active-fries' : ''}`}
                                   onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Fries')}
                                 >
-                                  Fries
+                                  {eventConfig.eventType === 'service' ? m.fries : 'Fries'}
                                 </button>
                                 <button 
                                   className={`winner-option`}
@@ -2284,68 +3921,70 @@ export default function App() {
                 </div>
 
                 {/* Day 2 Section */}
-                <div>
-                  <h4 style={{ 
-                    fontSize: '0.75rem', 
-                    color: '#f43f5e', 
-                    fontWeight: '700', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em',
-                    marginBottom: '8px',
-                    borderBottom: '1px solid rgba(244, 63, 94, 0.2)',
-                    paddingBottom: '4px'
-                  }}>
-                    Day 2 (Block 4)
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {myTeamInfo.day2Schedule.length === 0 ? (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>No Day 2 activities scheduled.</p>
-                    ) : (
-                      myTeamInfo.day2Schedule.map((slot, idx) => {
-                        const isActive = isTimeSlotActive(slot.time, slot.block);
-                        return (
-                          <div 
-                            key={`day2-${idx}`} 
-                            className="glass-panel"
-                            style={{ 
-                              padding: '12px', 
-                              background: isActive ? 'rgba(41, 182, 246, 0.08)' : 'rgba(0,0,0,0.15)',
-                              borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)',
-                              boxShadow: isActive ? 'var(--shadow-glow-shakes)' : 'none'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)' }}>
-                                  {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
-                                </span>
-                                {isActive && (
-                                  <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
-                                    LIVE NOW
+                {eventConfig.eventType !== 'service' && (
+                  <div>
+                    <h4 style={{ 
+                      fontSize: '0.75rem', 
+                      color: '#f43f5e', 
+                      fontWeight: '700', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.05em',
+                      marginBottom: '8px',
+                      borderBottom: '1px solid rgba(244, 63, 94, 0.2)',
+                      paddingBottom: '4px'
+                    }}>
+                      Day 2 (Block 4)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {myTeamInfo.day2Schedule.length === 0 ? (
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>No Day 2 activities scheduled.</p>
+                      ) : (
+                        myTeamInfo.day2Schedule.map((slot, idx) => {
+                          const isActive = isTimeSlotActive(slot.time, slot.block);
+                          return (
+                            <div 
+                              key={`day2-${idx}`} 
+                              className="glass-panel"
+                              style={{ 
+                                padding: '12px', 
+                                background: isActive ? 'rgba(41, 182, 246, 0.08)' : 'rgba(0,0,0,0.15)',
+                                borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)',
+                                boxShadow: isActive ? 'var(--shadow-glow-shakes)' : 'none'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)' }}>
+                                    {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
                                   </span>
-                                )}
+                                  {isActive && (
+                                    <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
+                                      LIVE NOW
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{slot.block.split(' - ')[0]}</span>
                               </div>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{slot.block.split(' - ')[0]}</span>
+                              
+                              <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{slot.game}</p>
+                                  {slot.gameExtra && (
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Split: {slot.gameExtra}</p>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px' }}>
+                                  <MapPin size={12} style={{ color: 'var(--vbt-sky)' }} />
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ffffff' }}>{slot.location}</span>
+                                </div>
+                              </div>
                             </div>
-                            
-                            <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{slot.game}</p>
-                                {slot.gameExtra && (
-                                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Split: {slot.gameExtra}</p>
-                                )}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px' }}>
-                                <MapPin size={12} style={{ color: 'var(--vbt-sky)' }} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ffffff' }}>{slot.location}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -2396,12 +4035,31 @@ export default function App() {
         {/* Tab 3: Full Schedule filterable */}
         {currentTab === 'schedule' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                <span style={{ fontSize: '1rem' }}>📅</span>
-                <span><strong>Live Schedule:</strong> View today's blocks, locations, and matchups. Any updates to the schedule Google Sheet will automatically sync and show up here. Active matches are marked <strong>LIVE</strong>.</span>
-              </p>
-            </div>
+            {eventConfig.eventType === 'service' ? (
+              <div style={{
+                background: 'rgba(41, 182, 246, 0.1)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                borderRadius: '12px',
+                padding: '14px',
+                color: '#e2e8f0',
+                fontSize: '0.85rem',
+                lineHeight: '1.5'
+              }}>
+                <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  👴 Schedule Helper Card
+                </h3>
+                <p style={{ margin: 0 }}>
+                  Find your team name (e.g., <strong>Falcons 1</strong> or <strong>Eagles 2</strong>) in the matchups below. For each Round, it shows which station game you play, where it is located, and what time it starts.
+                </p>
+              </div>
+            ) : (
+              <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
+                  <span style={{ fontSize: '1rem' }}>📅</span>
+                  <span><strong>Live Schedule:</strong> View today's blocks, locations, and matchups. Active matches are marked <strong>LIVE</strong>.</span>
+                </p>
+              </div>
+            )}
 
             {/* Day Selector Segmented Control */}
             <div className="toggle-group" style={{ 
@@ -3075,12 +4733,18 @@ export default function App() {
               const b2 = scoreCalculations.b2;
               const b3 = scoreCalculations.b3;
               const b4 = scoreCalculations.b4;
-              const trendData = [
+              const trendData = eventConfig.eventType === 'service' ? [
+                { name: 'Start', Red: 0, White: 0, Black: 0, Blue: 0 },
+                { name: 'Block 1', Red: b1?.Red || 0, White: b1?.White || 0, Black: b1?.Black || 0, Blue: b1?.Blue || 0 },
+                { name: 'Block 2', Red: (b1?.Red || 0) + (b2?.Red || 0), White: (b1?.White || 0) + (b2?.White || 0), Black: (b1?.Black || 0) + (b2?.Black || 0), Blue: (b1?.Blue || 0) + (b2?.Blue || 0) },
+                { name: 'Block 3', Red: (b1?.Red || 0) + (b2?.Red || 0) + (b3?.Red || 0), White: (b1?.White || 0) + (b2?.White || 0) + (b3?.White || 0), Black: (b1?.Black || 0) + (b2?.Black || 0) + (b3?.Black || 0), Blue: (b1?.Blue || 0) + (b2?.Blue || 0) + (b3?.Blue || 0) },
+                { name: 'Block 4', Red: scoreCalculations.wins?.Red || 0, White: scoreCalculations.wins?.White || 0, Black: scoreCalculations.wins?.Black || 0, Blue: scoreCalculations.wins?.Blue || 0 }
+              ] : [
                 { name: 'Start', shakes: 0, fries: 0 },
-                { name: 'Block 1', shakes: b1.shakes, fries: b1.fries },
-                { name: 'Block 2', shakes: b1.shakes + b2.shakes, fries: b1.fries + b2.fries },
-                { name: 'Block 3', shakes: b1.shakes + b2.shakes + b3.shakes, fries: b1.fries + b2.fries + b3.fries },
-                { name: 'Block 4', shakes: scoreCalculations.shakesBlocksTotal, fries: scoreCalculations.friesBlocksTotal }
+                { name: 'Block 1', shakes: b1?.shakes || 0, fries: b1?.fries || 0 },
+                { name: 'Block 2', shakes: (b1?.shakes || 0) + (b2?.shakes || 0), fries: (b1?.fries || 0) + (b2?.fries || 0) },
+                { name: 'Block 3', shakes: (b1?.shakes || 0) + (b2?.shakes || 0) + (b3?.shakes || 0), fries: (b1?.fries || 0) + (b2?.fries || 0) + (b3?.fries || 0) },
+                { name: 'Block 4', shakes: scoreCalculations.shakesBlocksTotal || 0, fries: scoreCalculations.friesBlocksTotal || 0 }
               ];
 
               const width = 320;
@@ -3093,12 +4757,14 @@ export default function App() {
               const chartWidth = width - paddingLeft - paddingRight;
               const chartHeight = height - paddingTop - paddingBottom;
               
-              const maxScore = Math.max(100, scoreCalculations.shakesBlocksTotal, scoreCalculations.friesBlocksTotal);
+              const maxScore = eventConfig.eventType === 'service'
+                ? Math.max(100, ...Object.values(scoreCalculations.wins || {}))
+                : Math.max(100, scoreCalculations.shakesBlocksTotal || 0, scoreCalculations.friesBlocksTotal || 0);
               const scaleY = (val) => height - paddingBottom - (val * chartHeight / maxScore);
               const scaleX = (idx) => paddingLeft + (idx * chartWidth / 4);
               
-              const shakesPoints = trendData.map((d, i) => `${scaleX(i)},${scaleY(d.shakes)}`).join(' ');
-              const friesPoints = trendData.map((d, i) => `${scaleX(i)},${scaleY(d.fries)}`).join(' ');
+              const shakesPoints = eventConfig.eventType === 'service' ? '' : trendData.map((d, i) => `${scaleX(i)},${scaleY(d.shakes)}`).join(' ');
+              const friesPoints = eventConfig.eventType === 'service' ? '' : trendData.map((d, i) => `${scaleX(i)},${scaleY(d.fries)}`).join(' ');
 
               const teamsWithDeductions = Object.entries(campState.teamDeductions || {})
                 .map(([code, val]) => ({
@@ -3129,44 +4795,83 @@ export default function App() {
                           <text key={i} x={scaleX(i)} y={height - 6} fill="var(--text-muted)" fontSize="9" textAnchor="middle">{d.name}</text>
                         ))}
                         {trendData.map((d, i) => {
-                          const shakesHeight = Math.max(0, height - paddingBottom - scaleY(d.shakes));
-                          const friesHeight = Math.max(0, height - paddingBottom - scaleY(d.fries));
-                          return (
-                            <g key={i}>
-                              {/* Shakes Bar */}
-                              {d.shakes > 0 && (
-                                <rect 
-                                  x={scaleX(i) - 13} 
-                                  y={scaleY(d.shakes)} 
-                                  width="10" 
-                                  height={shakesHeight} 
-                                  fill="var(--color-shakes)" 
-                                  rx="2" 
-                                />
-                              )}
-                              {/* Fries Bar */}
-                              {d.fries > 0 && (
-                                <rect 
-                                  x={scaleX(i) + 3} 
-                                  y={scaleY(d.fries)} 
-                                  width="10" 
-                                  height={friesHeight} 
-                                  fill="var(--color-fries)" 
-                                  rx="2" 
-                                />
-                              )}
-                            </g>
-                          );
+                          if (eventConfig.eventType === 'service') {
+                            const colors = ['Red', 'White', 'Black', 'Blue'];
+                            return (
+                              <g key={i}>
+                                {colors.map((colorName, cIdx) => {
+                                  const val = d[colorName] || 0;
+                                  const colorHex = getTeamColorHex(colorName);
+                                  const barHeight = Math.max(0, height - paddingBottom - scaleY(val));
+                                  const barX = scaleX(i) - 13 + cIdx * 7;
+                                  return val > 0 ? (
+                                    <rect
+                                      key={colorName}
+                                      x={barX}
+                                      y={scaleY(val)}
+                                      width="5"
+                                      height={barHeight}
+                                      fill={colorHex}
+                                      rx="1"
+                                    />
+                                  ) : null;
+                                })}
+                              </g>
+                            );
+                          } else {
+                            const shakesHeight = Math.max(0, height - paddingBottom - scaleY(d.shakes));
+                            const friesHeight = Math.max(0, height - paddingBottom - scaleY(d.fries));
+                            return (
+                              <g key={i}>
+                                {/* Shakes Bar */}
+                                {d.shakes > 0 && (
+                                  <rect 
+                                    x={scaleX(i) - 13} 
+                                    y={scaleY(d.shakes)} 
+                                    width="10" 
+                                    height={shakesHeight} 
+                                    fill="var(--color-shakes)" 
+                                    rx="2" 
+                                  />
+                                )}
+                                {/* Fries Bar */}
+                                {d.fries > 0 && (
+                                  <rect 
+                                    x={scaleX(i) + 3} 
+                                    y={scaleY(d.fries)} 
+                                    width="10" 
+                                    height={friesHeight} 
+                                    fill="var(--color-fries)" 
+                                    rx="2" 
+                                  />
+                                )}
+                              </g>
+                            );
+                          }
                         })}
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--color-shakes)' }}>
-                        <span style={{ width: '12px', height: '3px', background: 'var(--color-shakes)', display: 'inline-block' }} /> Shakes Side
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--color-fries)' }}>
-                        <span style={{ width: '12px', height: '3px', background: 'var(--color-fries)', display: 'inline-block' }} /> Fries Side
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      {eventConfig.eventType === 'service' ? (
+                        ['Red', 'White', 'Black', 'Blue'].map(colorName => {
+                          const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
+                          const colorHex = getTeamColorHex(colorName);
+                          return (
+                            <div key={colorName} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: colorHex }}>
+                              <span style={{ width: '12px', height: '3px', background: colorHex, display: 'inline-block' }} /> {customName}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--color-shakes)' }}>
+                            <span style={{ width: '12px', height: '3px', background: 'var(--color-shakes)', display: 'inline-block' }} /> {side1Name} Side
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--color-fries)' }}>
+                            <span style={{ width: '12px', height: '3px', background: 'var(--color-fries)', display: 'inline-block' }} /> {side2Name} Side
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -3188,7 +4893,7 @@ export default function App() {
                                 <div style={{
                                   width: `${barWidthPercent}%`,
                                   height: '100%',
-                                  background: team.side === 'Shakes' ? 'var(--gradient-shakes)' : 'var(--gradient-fries)',
+                                  background: eventConfig.eventType === 'service' ? getTeamColorHex(team.side) : (team.side === 'Shakes' ? 'var(--gradient-shakes)' : 'var(--gradient-fries)'),
                                   borderRadius: '4px',
                                   transition: 'width 0.5s ease'
                                 }} />
@@ -3222,125 +4927,200 @@ export default function App() {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  {/* Shakes side */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <h3 style={{ fontSize: '0.85rem', color: 'var(--color-shakes)', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid rgba(0, 176, 255, 0.2)', paddingBottom: '6px' }}>
-                      Shakes (-{scoreCalculations.shakesDeductions})
-                    </h3>
-                    {Object.keys(campData.teams).filter(code => campData.teams[code].side === 'Shakes').map(code => {
-                      const team = campData.teams[code];
-                      const dVal = (campState.teamDeductions || {})[code] || 0;
-                      const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
+                {eventConfig.eventType === 'service' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {['Red', 'White', 'Black', 'Blue'].map(colorName => {
+                      const colorHex = getTeamColorHex(colorName);
+                      const customColorName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
+                      const colorDeductions = scoreCalculations.deductions[colorName] || 0;
+                      const colorTeams = Object.keys(campData.teams || {}).filter(code => campData.teams[code].side === colorName);
+                      
                       return (
-                        <div key={code} className="glass-panel glass-card-shakes" style={{ padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
-                          <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>{code}</p>
-                              <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders.split('/')[0]}</p>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                                -{dVal}
-                              </span>
-                              {canEdit && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                  <button 
-                                    onClick={() => handleAdjustDeduction(code, 1)} 
-                                    disabled={dVal >= 10}
-                                    style={{ 
-                                      padding: '2px', 
-                                      border: 'none', 
-                                      background: dVal >= 10 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
-                                      color: dVal >= 10 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
-                                      borderRadius: '3px', 
-                                      cursor: dVal >= 10 ? 'not-allowed' : 'pointer' 
-                                    }}
-                                  >
-                                    <Plus size={10} />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleAdjustDeduction(code, -1)} 
-                                    disabled={dVal <= 0}
-                                    style={{ 
-                                      padding: '2px', 
-                                      border: 'none', 
-                                      background: dVal <= 0 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
-                                      color: dVal <= 0 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
-                                      borderRadius: '3px', 
-                                      cursor: dVal <= 0 ? 'not-allowed' : 'pointer' 
-                                    }}
-                                  >
-                                    <Minus size={10} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                        <div key={colorName} className="glass-panel" style={{ padding: '12px', background: 'rgba(0,0,0,0.25)', borderLeft: `4px solid ${colorHex}`, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <h3 style={{ fontSize: '0.85rem', color: colorHex, textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: `1px solid ${colorHex}33`, paddingBottom: '6px' }}>
+                            {customColorName} (-{colorDeductions})
+                          </h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {colorTeams.length === 0 ? (
+                              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', margin: '8px 0' }}>No active teams</p>
+                            ) : (
+                              colorTeams.map(code => {
+                                const team = campData.teams[code];
+                                const dVal = (campState.teamDeductions || {})[code] || 0;
+                                const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
+                                return (
+                                  <div key={code} style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '6px' }}>
+                                    <div style={{ minWidth: 0, flex: 1, marginRight: '4px' }}>
+                                      <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{code}</p>
+                                      <p style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{team.leaders?.split('/')[0] || ''}</p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                        -{dVal}
+                                      </span>
+                                      {canEdit && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                          <button 
+                                            onClick={() => handleAdjustDeduction(code, 1)} 
+                                            disabled={dVal >= 10}
+                                            style={{ 
+                                              padding: '2px', 
+                                              border: 'none', 
+                                              background: dVal >= 10 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
+                                              color: dVal >= 10 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
+                                              borderRadius: '3px', 
+                                              cursor: dVal >= 10 ? 'not-allowed' : 'pointer' 
+                                            }}
+                                          >
+                                            <Plus size={10} />
+                                          </button>
+                                          <button 
+                                            onClick={() => handleAdjustDeduction(code, -1)} 
+                                            disabled={dVal <= 0}
+                                            style={{ 
+                                              padding: '2px', 
+                                              border: 'none', 
+                                              background: dVal <= 0 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
+                                              color: dVal <= 0 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
+                                              borderRadius: '3px', 
+                                              cursor: dVal <= 0 ? 'not-allowed' : 'pointer' 
+                                            }}
+                                          >
+                                            <Minus size={10} />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
- 
-                  {/* Fries side */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <h3 style={{ fontSize: '0.85rem', color: 'var(--color-fries)', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '6px' }}>
-                      Fries (-{scoreCalculations.friesDeductions})
-                    </h3>
-                    {Object.keys(campData.teams).filter(code => campData.teams[code].side === 'Fries').map(code => {
-                      const team = campData.teams[code];
-                      const dVal = (campState.teamDeductions || {})[code] || 0;
-                      const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
-                      return (
-                        <div key={code} className="glass-panel glass-card-fries" style={{ padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
-                          <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>{code}</p>
-                              <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders.split('/')[0]}</p>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                                -{dVal}
-                              </span>
-                              {canEdit && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                  <button 
-                                    onClick={() => handleAdjustDeduction(code, 1)} 
-                                    disabled={dVal >= 10}
-                                    style={{ 
-                                      padding: '2px', 
-                                      border: 'none', 
-                                      background: dVal >= 10 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
-                                      color: dVal >= 10 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
-                                      borderRadius: '3px', 
-                                      cursor: dVal >= 10 ? 'not-allowed' : 'pointer' 
-                                    }}
-                                  >
-                                    <Plus size={10} />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleAdjustDeduction(code, -1)} 
-                                    disabled={dVal <= 0}
-                                    style={{ 
-                                      padding: '2px', 
-                                      border: 'none', 
-                                      background: dVal <= 0 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
-                                      color: dVal <= 0 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
-                                      borderRadius: '3px', 
-                                      cursor: dVal <= 0 ? 'not-allowed' : 'pointer' 
-                                    }}
-                                  >
-                                    <Minus size={10} />
-                                  </button>
-                                </div>
-                              )}
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {/* Shakes side */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <h3 style={{ fontSize: '0.85rem', color: 'var(--color-shakes)', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid rgba(0, 176, 255, 0.2)', paddingBottom: '6px' }}>
+                        {side1Name} (-{scoreCalculations.shakesDeductions})
+                      </h3>
+                      {Object.keys(campData.teams).filter(code => campData.teams[code].side === 'Shakes').map(code => {
+                        const team = campData.teams[code];
+                        const dVal = (campState.teamDeductions || {})[code] || 0;
+                        const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
+                        return (
+                          <div key={code} className="glass-panel glass-card-shakes" style={{ padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
+                            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>{code}</p>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders.split('/')[0]}</p>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                  -{dVal}
+                                </span>
+                                {canEdit && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <button 
+                                      onClick={() => handleAdjustDeduction(code, 1)} 
+                                      disabled={dVal >= 10}
+                                      style={{ 
+                                        padding: '2px', 
+                                        border: 'none', 
+                                        background: dVal >= 10 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
+                                        color: dVal >= 10 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
+                                        borderRadius: '3px', 
+                                        cursor: dVal >= 10 ? 'not-allowed' : 'pointer' 
+                                      }}
+                                    >
+                                      <Plus size={10} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleAdjustDeduction(code, -1)} 
+                                      disabled={dVal <= 0}
+                                      style={{ 
+                                        padding: '2px', 
+                                        border: 'none', 
+                                        background: dVal <= 0 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
+                                        color: dVal <= 0 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
+                                        borderRadius: '3px', 
+                                        cursor: dVal <= 0 ? 'not-allowed' : 'pointer' 
+                                      }}
+                                    >
+                                      <Minus size={10} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+   
+                    {/* Fries side */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <h3 style={{ fontSize: '0.85rem', color: 'var(--color-fries)', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '6px' }}>
+                        {side2Name} (-{scoreCalculations.friesDeductions})
+                      </h3>
+                      {Object.keys(campData.teams).filter(code => campData.teams[code].side === 'Fries').map(code => {
+                        const team = campData.teams[code];
+                        const dVal = (campState.teamDeductions || {})[code] || 0;
+                        const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
+                        return (
+                          <div key={code} className="glass-panel glass-card-fries" style={{ padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
+                            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>{code}</p>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders.split('/')[0]}</p>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                  -{dVal}
+                                </span>
+                                {canEdit && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <button 
+                                      onClick={() => handleAdjustDeduction(code, 1)} 
+                                      disabled={dVal >= 10}
+                                      style={{ 
+                                        padding: '2px', 
+                                        border: 'none', 
+                                        background: dVal >= 10 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
+                                        color: dVal >= 10 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
+                                        borderRadius: '3px', 
+                                        cursor: dVal >= 10 ? 'not-allowed' : 'pointer' 
+                                      }}
+                                    >
+                                      <Plus size={10} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleAdjustDeduction(code, -1)} 
+                                      disabled={dVal <= 0}
+                                      style={{ 
+                                        padding: '2px', 
+                                        border: 'none', 
+                                        background: dVal <= 0 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', 
+                                        color: dVal <= 0 ? 'rgba(255,255,255,0.15)' : '#ffffff', 
+                                        borderRadius: '3px', 
+                                        cursor: dVal <= 0 ? 'not-allowed' : 'pointer' 
+                                      }}
+                                    >
+                                      <Minus size={10} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -3529,259 +5309,413 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff' }}>Control Panel</h2>
 
-            {/* Google Sheets Sync panel */}
-            <div className="glass-panel" style={{ padding: '16px' }}>
-              <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Google Sheets Live Sync</h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                Manage schedule synchronization from your camp spreadsheet. The app polls in the background, or you can force an instant sync below.
-              </p>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Direct Google Sheet link button */}
-                <a 
-                  href="https://docs.google.com/spreadsheets/d/106n37V38hEdy9Mto0kXS4aipAQDNi5uNh7kR9IWrbME/edit?gid=32520354#gid=32520354"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid var(--border-light)',
-                    color: '#ffffff',
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: '600',
-                    fontSize: '0.85rem',
-                    textDecoration: 'none',
-                    textAlign: 'center',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-                >
-                  <Calendar size={16} />
-                  Open Google Sheet
-                </a>
+            {eventConfig.eventType === 'service' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.02)' }}>
+                  <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', marginBottom: '4px', fontWeight: '800' }}>⚙️ Live Service Configurator</h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    Recalculate expected kids, custom team labels, and servant attendance checklist in real-time.
+                  </p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
+                      <input
+                        type="number"
+                        value={editKidCount}
+                        onChange={(e) => setEditKidCount(parseInt(e.target.value, 10) || '')}
+                        placeholder="e.g. 100"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                      />
+                    </div>
 
-                {/* Sync Trigger button */}
-                <button 
-                  onClick={handleSyncGoogleSheet}
-                  disabled={isSyncing}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: 'var(--gradient-vbt)',
-                    border: 'none',
-                    color: '#ffffff',
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: '700',
-                    fontSize: '0.85rem',
-                    cursor: isSyncing ? 'not-allowed' : 'pointer',
-                    opacity: isSyncing ? 0.7 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(41, 182, 246, 0.2)'
-                  }}
-                >
-                  {isSyncing ? (
-                    <>
-                      <div className="spinner" style={{
-                        width: '14px',
-                        height: '14px',
-                        border: '2px solid rgba(255,255,255,0.3)',
-                        borderTop: '2px solid #ffffff',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite'
-                      }} />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <Clock3 size={16} />
-                      Sync Google Sheet Now
-                    </>
-                  )}
-                </button>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                      <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Rename Teams</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#ef4444', marginBottom: '4px', fontWeight: '700' }}>Red Team</label>
+                          <input type="text" value={editTeamRed} onChange={(e) => setEditTeamRed(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#ffffff', marginBottom: '4px', fontWeight: '700' }}>White Team</label>
+                          <input type="text" value={editTeamWhite} onChange={(e) => setEditTeamWhite(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>Black Team</label>
+                          <input type="text" value={editTeamBlack} onChange={(e) => setEditTeamBlack(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#29b6f6', marginBottom: '4px', fontWeight: '700' }}>Blue Team</label>
+                          <input type="text" value={editTeamBlue} onChange={(e) => setEditTeamBlue(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Sync status messages */}
-                {syncStatus && (
-                  <div style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: syncError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                    border: syncError ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(34, 197, 94, 0.2)',
-                    color: syncError ? '#f87171' : '#4ade80',
-                    fontSize: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    <AlertCircle size={14} />
-                    <span>{syncStatus}</span>
-                  </div>
-                )}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>👥 Leader Roster & Attendance</h4>
+                        <button
+                          type="button"
+                          onClick={handleLiveAutoAssign}
+                          className="btn-glow"
+                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.15)', color: '#c4b5fd', fontSize: '0.7rem', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          ✨ Live Auto-Assign
+                        </button>
+                      </div>
+                      
+                      <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                        {globalServants.sort((a,b) => a.name.localeCompare(b.name)).map(s => {
+                          const isAttending = editAttending.includes(s.id);
+                          return (
+                            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', borderRadius: '6px', background: isAttending ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.01)', border: '1px solid ' + (isAttending ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.02)') }}>
+                              <input
+                                type="checkbox"
+                                checked={isAttending}
+                                onChange={() => {
+                                  const updated = editAttending.includes(s.id)
+                                    ? editAttending.filter(id => id !== s.id)
+                                    : [...editAttending, s.id];
+                                  setEditAttending(updated);
+                                }}
+                                style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                              />
+                              <span style={{ fontSize: '0.8rem', color: '#ffffff', flex: 1, fontWeight: isAttending ? '700' : 'normal' }}>{s.name}</span>
+                              
+                              {isAttending && (
+                                <select
+                                  value={editRoles[s.id] || 'volunteer'}
+                                  onChange={(e) => setEditRoles(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                  style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.72rem', cursor: 'pointer', outline: 'none', maxWidth: '140px' }}
+                                >
+                                  <option value="volunteer">Volunteer/Ref</option>
+                                  <option value="coordinator">Coordinator</option>
+                                  <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
+                                  <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
+                                  <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
+                                  <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
+                                  <option value="big_game_1">Big Game Lead 1</option>
+                                  <option value="big_game_2">Big Game Lead 2</option>
+                                  <option value="reflection">Reflection Lead</option>
+                                  <option value="team_red_1">{(editTeamRed || 'Red') + ' 1 Leader'}</option>
+                                  <option value="team_red_2">{(editTeamRed || 'Red') + ' 2 Leader'}</option>
+                                  <option value="team_white_1">{(editTeamWhite || 'White') + ' 1 Leader'}</option>
+                                  <option value="team_white_2">{(editTeamWhite || 'White') + ' 2 Leader'}</option>
+                                  <option value="team_black_1">{(editTeamBlack || 'Black') + ' 1 Leader'}</option>
+                                  <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
+                                  <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
+                                  <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
+                                </select>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                {/* Step-by-step Apps Script guide */}
-                <div style={{
-                  background: 'rgba(0, 0, 0, 0.2)',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-light)',
-                  padding: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}>
-                  <div>
-                    <h4 style={{ fontSize: '0.78rem', color: '#ffffff', marginBottom: '6px', fontWeight: '700' }}>⚡ Setup Two-Way Auto-Sync</h4>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
-                      To make updates sync bidirectionally (Spreadsheet ➔ App and App ➔ Spreadsheet), copy this unified code and paste it inside the sheet's <strong>Extensions → Apps Script</strong> editor:
-                    </p>
-                    <pre style={{
-                      background: 'rgba(0,0,0,0.4)',
-                      padding: '8px',
-                      borderRadius: '6px',
-                      fontSize: '0.65rem',
-                      color: 'var(--vbt-sky)',
-                      overflowX: 'auto',
-                      maxHeight: '180px',
-                      fontFamily: 'monospace',
-                      border: '1px solid rgba(255,255,255,0.03)'
-                    }}>
-{`function onEdit(e) {
-  UrlFetchApp.fetch('https://sync-vbt-sheet-75ez7bhuzq-ew.a.run.app', {
-    method: 'post'
-  });
-}
+                      {/* Quick Add Servant form inside Controls tab */}
+                      <div style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#a78bfa' }}>➕ Add New Servant to Directory</span>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            value={quickServantName}
+                            onChange={(e) => setQuickServantName(e.target.value)}
+                            placeholder="Name"
+                            style={{ flex: 2, padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', outline: 'none' }}
+                          />
+                          <input
+                            type="text"
+                            value={quickServantPasscode}
+                            onChange={(e) => setQuickServantPasscode(e.target.value)}
+                            placeholder="Pass (1234)"
+                            style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', outline: 'none' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleQuickAddServant}
+                            disabled={quickServantLoading}
+                            className="btn-glow"
+                            style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: 'var(--gradient-vbt)', color: '#ffffff', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}
+                          >
+                            {quickServantLoading ? '...' : 'Add'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-function doPost(e) {
-  try {
-    var postData = JSON.parse(e.postData.contents);
-    var action = postData.action;
-    
-    if (action === "update_scores") {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var calcSheet = ss.getSheetByName("Score Calculator");
-      
-      // Update Block Scores
-      if (postData.blockScores) {
-        for (var key in postData.blockScores) {
-          var parts = key.split("_");
-          if (parts.length >= 3) {
-            var block = parts[0];
-            var round = parts[1];
-            var gameName = parts.slice(2).join("_");
-            var winner = postData.blockScores[key];
-            if (winner) {
-              var wLower = winner.toLowerCase();
-              if (wLower === "shakes") winner = "Shakes";
-              else if (wLower === "fries") winner = "Fries";
-              else if (wLower === "tie") winner = "Tie";
-              else winner = "NA";
-            }
-            
-            var cell = getScoreCell(block, round, gameName);
-            if (cell) {
-              calcSheet.getRange(cell.row, cell.col).setValue(winner);
-            }
-          }
-        }
-      }
-      
-      // Update Tokens
-      if (postData.tokens) {
-        calcSheet.getRange(48, 8).setValue(postData.tokens.shakes || 0);
-        calcSheet.getRange(48, 9).setValue(postData.tokens.fries || 0);
-      }
-      
-      // Update Point Deductions
-      if (postData.teamDeductions) {
-        var clearCells = ["F4", "F5", "F6", "F7", "F8", "F12", "F13", "F14", "F15", "F16", "F20", "F21", "F25", "F26", "F27", "F28"];
-        for (var team in postData.teamDeductions) {
-          var tSheet = ss.getSheetByName(team);
-          if (tSheet) {
-            for (var i = 0; i < clearCells.length; i++) {
-              tSheet.getRange(clearCells[i]).setValue(0);
-            }
-            tSheet.getRange("F4").setValue(postData.teamDeductions[team] || 0);
-          }
-        }
-      }
-      
-      SpreadsheetApp.flush();
-      return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function getScoreCell(block, round, gameName) {
-  var b = parseInt(block);
-  var r = parseInt(round);
-  
-  if (b === 1) {
-    var row = 4 + r;
-    var colMap = { "Big Mac": 3, "Cone Memory": 4, "Scale": 5, "Chubby Bunny": 6 };
-    return { row: row, col: colMap[gameName] };
-  } else if (b === 2) {
-    var row = 15 + r;
-    var colMap = { "Cheesy Strings": 3, "Lift": 4, "Bible Whispers": 5, "Puzzle": 6 };
-    return { row: row, col: colMap[gameName] };
-  } else if (b === 3) {
-    var row = 26 + r;
-    var colMap = { "Big Bucket 1": 4, "Big Bucket 2": 5 };
-    return { row: row, col: colMap[gameName] };
-  } else if (b === 4) {
-    var row = 33 + r;
-    var colMap = { 
-      "Nadala+ 1": 2, "Balloon Darts 1": 3, "Golden Snitch 1": 4,
-      "Nadala+ 2": 5, "Balloon Darts 2": 6, "Golden Snitch 2": 7 
-    };
-    return { row: row, col: colMap[gameName] };
-  }
-  return null;
-}`}
-                    </pre>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                    <label style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
-                      🔗 Apps Script Web App URL
-                    </label>
-                    <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
-                      Deploy the Apps Script project as a **Web App** (Execute as: "Me", Who has access: "Anyone"), then paste the generated URL here to enable app-to-sheets write-back:
-                    </p>
-                    <input 
-                      type="text"
-                      value={appsScriptWebappUrl}
-                      onChange={(e) => setAppsScriptWebappUrl(e.target.value)}
-                      onBlur={(e) => handleUpdateCampState({ appsScriptWebappUrl: e.target.value })}
-                      placeholder="https://script.google.com/macros/s/.../exec"
+                    <button
+                      type="button"
+                      onClick={handleSaveAndRegenerateSchedule}
+                      disabled={savingEventConfig}
+                      className="btn-glow"
                       style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid var(--border-light)',
-                        borderRadius: '6px',
-                        color: '#ffffff',
-                        fontSize: '0.75rem',
-                        outline: 'none',
-                        fontFamily: 'monospace'
+                        width: '100%', padding: '14px', borderRadius: '10px',
+                        background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
+                        fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.95rem',
+                        cursor: savingEventConfig ? 'not-allowed' : 'pointer', opacity: savingEventConfig ? 0.7 : 1,
+                        boxShadow: '0 4px 15px rgba(124,58,237,0.3)', marginTop: '8px'
                       }}
-                    />
+                    >
+                      {savingEventConfig ? 'Saving & Recalculating...' : '🔄 Save Setup & Regenerate Schedule'}
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="glass-panel" style={{ padding: '16px' }}>
+                {/* Google Sheets Sync panel */}
+                <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Google Sheets Live Sync</h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  Manage schedule synchronization from your camp spreadsheet. The app polls in the background, or you can force an instant sync below.
+                </p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Direct Google Sheet link button */}
+                  <a 
+                    href="https://docs.google.com/spreadsheets/d/106n37V38hEdy9Mto0kXS4aipAQDNi5uNh7kR9IWrbME/edit?gid=32520354#gid=32520354"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-light)',
+                      color: '#ffffff',
+                      fontFamily: 'var(--font-title)',
+                      fontWeight: '600',
+                      fontSize: '0.85rem',
+                      textDecoration: 'none',
+                      textAlign: 'center',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                  >
+                    <Calendar size={16} />
+                    Open Google Sheet
+                  </a>
+
+                  {/* Sync Trigger button */}
+                  <button 
+                    onClick={handleSyncGoogleSheet}
+                    disabled={isSyncing}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'var(--gradient-vbt)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontFamily: 'var(--font-title)',
+                      fontWeight: '700',
+                      fontSize: '0.85rem',
+                      cursor: isSyncing ? 'not-allowed' : 'pointer',
+                      opacity: isSyncing ? 0.7 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(41, 182, 246, 0.2)'
+                    }}
+                  >
+                    {isSyncing ? (
+                      <>
+                        <div className="spinner" style={{
+                          width: '14px',
+                          height: '14px',
+                          border: '2px solid rgba(255,255,255,0.3)',
+                          borderTop: '2px solid #ffffff',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite'
+                        }} />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <Clock3 size={16} />
+                        Sync Google Sheet Now
+                      </>
+                    )}
+                  </button>
+
+                  {/* Sync status messages */}
+                  {syncStatus && (
+                    <div style={{
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: syncError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                      border: syncError ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(34, 197, 94, 0.2)',
+                      color: syncError ? '#f87171' : '#4ade80',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <AlertCircle size={14} />
+                      <span>{syncStatus}</span>
+                    </div>
+                  )}
+
+                  {/* Step-by-step Apps Script guide */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-light)',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.78rem', color: '#ffffff', marginBottom: '6px', fontWeight: '700' }}>⚡ Setup Two-Way Auto-Sync</h4>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
+                        To make updates sync bidirectionally (Spreadsheet ➔ App and App ➔ Spreadsheet), copy this unified code and paste it inside the sheet's <strong>Extensions → Apps Script</strong> editor:
+                      </p>
+                      <pre style={{
+                        background: 'rgba(0,0,0,0.4)',
+                        padding: '8px',
+                        borderRadius: '6px',
+                        fontSize: '0.65rem',
+                        color: 'var(--vbt-sky)',
+                        overflowX: 'auto',
+                        maxHeight: '180px',
+                        fontFamily: 'monospace',
+                        border: '1px solid rgba(255,255,255,0.03)'
+                      }}>
+  {`function onEdit(e) {
+    UrlFetchApp.fetch('https://sync-vbt-sheet-75ez7bhuzq-ew.a.run.app', {
+      method: 'post'
+    });
+  }
+
+  function doPost(e) {
+    try {
+      var postData = JSON.parse(e.postData.contents);
+      var action = postData.action;
+      
+      if (action === "update_scores") {
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var calcSheet = ss.getSheetByName("Score Calculator");
+        
+        // Update Block Scores
+        if (postData.blockScores) {
+          for (var key in postData.blockScores) {
+            var parts = key.split("_");
+            if (parts.length >= 3) {
+              var block = parts[0];
+              var round = parts[1];
+              var gameName = parts.slice(2).join("_");
+              var winner = postData.blockScores[key];
+              if (winner) {
+                var wLower = winner.toLowerCase();
+                if (wLower === "shakes") winner = "Shakes";
+                else if (wLower === "fries") winner = "Fries";
+                else if (wLower === "tie") winner = "Tie";
+                else winner = "NA";
+              }
+              
+              var cell = getScoreCell(block, round, gameName);
+              if (cell) {
+                calcSheet.getRange(cell.row, cell.col).setValue(winner);
+              }
+            }
+          }
+        }
+        
+        // Update Tokens
+        if (postData.tokens) {
+          calcSheet.getRange(48, 8).setValue(postData.tokens.shakes || 0);
+          calcSheet.getRange(48, 9).setValue(postData.tokens.fries || 0);
+        }
+        
+        // Update Point Deductions
+        if (postData.teamDeductions) {
+          var clearCells = ["F4", "F5", "F6", "F7", "F8", "F12", "F13", "F14", "F15", "F16", "F20", "F21", "F25", "F26", "F27", "F28"];
+          for (var team in postData.teamDeductions) {
+            var tSheet = ss.getSheetByName(team);
+            if (tSheet) {
+              for (var i = 0; i < clearCells.length; i++) {
+                tSheet.getRange(clearCells[i]).setValue(0);
+              }
+              tSheet.getRange("F4").setValue(postData.teamDeductions[team] || 0);
+            }
+          }
+        }
+        
+        SpreadsheetApp.flush();
+        return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  function getScoreCell(block, round, gameName) {
+    var b = parseInt(block);
+    var r = parseInt(round);
+    
+    if (b === 1) {
+      var row = 4 + r;
+      var colMap = { "Big Mac": 3, "Cone Memory": 4, "Scale": 5, "Chubby Bunny": 6 };
+      return { row: row, col: colMap[gameName] };
+    } else if (b === 2) {
+      var row = 15 + r;
+      var colMap = { "Cheesy Strings": 3, "Lift": 4, "Bible Whispers": 5, "Puzzle": 6 };
+      return { row: row, col: colMap[gameName] };
+    } else if (b === 3) {
+      var row = 26 + r;
+      var colMap = { "Big Bucket 1": 4, "Big Bucket 2": 5 };
+      return { row: row, col: colMap[gameName] };
+    } else if (b === 4) {
+      var row = 33 + r;
+      var colMap = { 
+        "Nadala+ 1": 2, "Balloon Darts 1": 3, "Golden Snitch 1": 4,
+        "Nadala+ 2": 5, "Balloon Darts 2": 6, "Golden Snitch 2": 7 
+      };
+      return { row: row, col: colMap[gameName] };
+    }
+    return null;
+  }`}
+                      </pre>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                      <label style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                        🔗 Apps Script Web App URL
+                      </label>
+                      <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
+                        Deploy the Apps Script project as a **Web App** (Execute as: "Me", Who has access: "Anyone"), then paste the generated URL here to enable app-to-sheets write-back:
+                      </p>
+                      <input 
+                        type="text"
+                        value={appsScriptWebappUrl}
+                        onChange={(e) => setAppsScriptWebappUrl(e.target.value)}
+                        onBlur={(e) => handleUpdateCampState({ appsScriptWebappUrl: e.target.value })}
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          background: 'rgba(0, 0, 0, 0.3)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '6px',
+                          color: '#ffffff',
+                          fontSize: '0.75rem',
+                          outline: 'none',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="glass-panel" style={{ padding: '16px' }}>
               <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Database Synchronization</h3>
@@ -3813,33 +5747,58 @@ function getScoreCell(block, round, gameName) {
               <div className="glass-panel" style={{ padding: '16px' }}>
                 <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '8px' }}>Camp Tokens (+2 pts each)</h3>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px' }}>
-                    <span style={{ color: 'var(--color-shakes)', fontWeight: '600', fontSize: '0.85rem' }}>Shakes Tokens</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {currentUser.role === 'admin' && (
-                        <button onClick={() => handleAdjustTokens('shakes', -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
-                      )}
-                      <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{campState.tokens?.shakes || 0}</span>
-                      {currentUser.role === 'admin' && (
-                        <button onClick={() => handleAdjustTokens('shakes', 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
-                      )}
-                    </div>
+                {eventConfig.eventType === 'service' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {['red', 'white', 'black', 'blue'].map(colorKey => {
+                      const colorNameCapitalized = colorKey.charAt(0).toUpperCase() + colorKey.slice(1);
+                      const customName = eventConfig.teamNames?.[colorKey] || colorNameCapitalized;
+                      const colorHex = getTeamColorHex(colorNameCapitalized);
+                      const tokenCount = campState.tokens?.[colorKey] || 0;
+                      return (
+                        <div key={colorKey} style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', borderLeft: `3px solid ${colorHex}` }}>
+                          <span style={{ color: colorHex, fontWeight: '600', fontSize: '0.85rem' }}>{customName}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {currentUser.role === 'admin' && (
+                              <button onClick={() => handleAdjustTokens(colorKey, -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
+                            )}
+                            <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{tokenCount}</span>
+                            {currentUser.role === 'admin' && (
+                              <button onClick={() => handleAdjustTokens(colorKey, 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px' }}>
+                      <span style={{ color: 'var(--color-shakes)', fontWeight: '600', fontSize: '0.85rem' }}>{side1Name} Tokens</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {currentUser.role === 'admin' && (
+                          <button onClick={() => handleAdjustTokens('shakes', -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
+                        )}
+                        <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{campState.tokens?.shakes || 0}</span>
+                        {currentUser.role === 'admin' && (
+                          <button onClick={() => handleAdjustTokens('shakes', 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
+                        )}
+                      </div>
+                    </div>
 
-                  <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px' }}>
-                    <span style={{ color: 'var(--color-fries)', fontWeight: '600', fontSize: '0.85rem' }}>Fries Tokens</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {currentUser.role === 'admin' && (
-                        <button onClick={() => handleAdjustTokens('fries', -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
-                      )}
-                      <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{campState.tokens?.fries || 0}</span>
-                      {currentUser.role === 'admin' && (
-                        <button onClick={() => handleAdjustTokens('fries', 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
-                      )}
+                    <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px' }}>
+                      <span style={{ color: 'var(--color-fries)', fontWeight: '600', fontSize: '0.85rem' }}>{side2Name} Tokens</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {currentUser.role === 'admin' && (
+                          <button onClick={() => handleAdjustTokens('fries', -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
+                        )}
+                        <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{campState.tokens?.fries || 0}</span>
+                        {currentUser.role === 'admin' && (
+                          <button onClick={() => handleAdjustTokens('fries', 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -4028,6 +5987,23 @@ function getScoreCell(block, round, gameName) {
         {/* Tab: Service */}
         {currentTab === 'service' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            <div style={{
+              background: 'rgba(41, 182, 246, 0.1)',
+              border: '1px solid rgba(41, 182, 246, 0.3)',
+              borderRadius: '12px',
+              padding: '14px',
+              color: '#e2e8f0',
+              fontSize: '0.85rem',
+              lineHeight: '1.5'
+            }}>
+              <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                👴 Games & Theme Helper Card
+              </h3>
+              <p style={{ margin: 0 }}>
+                Here you can view the outreach service target brief, team sub-group breakdowns (with kid counts), and the active station games with rules and Bible lessons.
+              </p>
+            </div>
 
             {/* ── COORDINATOR EDIT BAR ─────────────────────────────── */}
             {currentUser && currentUser.role === 'admin' && (
@@ -4422,70 +6398,42 @@ function getScoreCell(block, round, gameName) {
       </main>
 
       {/* Navigation bar */}
-      <nav className="mobile-nav-bar">
-        <button 
-          className={`mobile-nav-item ${currentTab === 'schedule' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('schedule')}
-        >
-          <Calendar size={20} />
-          <span>Schedule</span>
-        </button>
-        <button 
-          className={`mobile-nav-item ${currentTab === 'myteam' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('myteam')}
-        >
-          <Users size={20} />
-          <span>My Team</span>
-        </button>
-        <button 
-          className={`mobile-nav-item ${currentTab === 'scoreboard' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('scoreboard')}
-        >
-          <Trophy size={20} />
-          <span>Scores</span>
-        </button>
-        <button 
-          className={`mobile-nav-item ${currentTab === 'info' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('info')}
-        >
-          <MapIcon size={20} />
-          <span>Map</span>
-        </button>
-        <button 
-          className={`mobile-nav-item ${currentTab === 'stats' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('stats')}
-        >
-          <BarChart3 size={20} />
-          <span>Stats</span>
-        </button>
-        {currentUser && currentUser.role === 'admin' && (
-          <button 
-            className={`mobile-nav-item ${currentTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('settings')}
-          >
-            <Settings size={20} />
-            <span>Controls</span>
-          </button>
-        )}
-        <button 
-          className={`mobile-nav-item ${currentTab === 'timeline' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('timeline')}
-        >
-          <div style={{ position: 'relative' }}>
-            <Bell size={20} />
-            {announcements.length > 0 && (
-              <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '6px', height: '6px', background: '#ef4444', borderRadius: '50%' }} />
-            )}
-          </div>
-          <span>Feed</span>
-        </button>
-        <button
-          className={`mobile-nav-item ${currentTab === 'service' ? 'active' : ''}`}
-          onClick={() => setCurrentTab('service')}
-        >
-          <BookOpen size={20} />
-          <span>Service</span>
-        </button>
+      <nav className="mobile-nav-bar" style={{ display: 'flex', width: '100%', justifyContent: 'space-around', alignItems: 'center' }}>
+        {getActiveTabs().map((t) => {
+          const Icon = t.icon;
+          return (
+            <button 
+              key={t.id}
+              className={`mobile-nav-item ${currentTab === t.id ? 'active' : ''}`}
+              onClick={() => setCurrentTab(t.id)}
+              style={{
+                flex: 1,
+                maxWidth: '120px',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.78rem',
+                fontWeight: '700',
+                padding: '6px 4px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                background: 'transparent',
+                border: 'none',
+                gap: '2px'
+              }}
+            >
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={22} style={{ marginBottom: '2px' }} />
+                {t.badge && (
+                  <span style={{ position: 'absolute', top: '-2px', right: '-2px', width: '6px', height: '6px', background: '#ef4444', borderRadius: '50%' }} />
+                )}
+              </div>
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
