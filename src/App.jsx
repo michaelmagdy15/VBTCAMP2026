@@ -156,6 +156,18 @@ function playLoudDoubleChime() {
   playChime('urgent'); // → Alarmed.wav from akx/Notifications (CC0)
 }
 
+// Vibration helper — works on Android Chrome; silently ignored on iOS
+function vibrate(pattern) {
+  try {
+    if ('vibrate' in navigator) navigator.vibrate(pattern);
+  } catch (_) {}
+}
+
+// Vibration patterns
+const VIBRATE_URGENT       = [200, 80, 200, 80, 400]; // urgent / ping
+const VIBRATE_ANNOUNCEMENT = [150, 60, 150];           // regular announcement
+const VIBRATE_NOTIFICATION = [100];                    // subtle feed item
+
 // Request notification permission
 async function requestNotificationPermission() {
   if (!('Notification' in window)) return false;
@@ -621,23 +633,34 @@ export default function App() {
     });
   }, [campData, campState, currentTime, eventConfig]);
 
-  // Watch for new announcements to play chimes and trigger notifications
+  // Watch for new announcements → play chime + vibrate + show notification
   useEffect(() => {
     if (announcements.length > 0) {
       const latest = announcements[0]; // ordered desc
       if (latest && latest.timestamp) {
         const itemTime = new Date(latest.timestamp).getTime();
-        // If the announcement is new (post-load time) and length grew
+        // Only fire for NEW items (posted after app loaded, and list grew)
         if (itemTime > loadTime.current + 2000 && announcements.length > prevAnnouncementsLength.current) {
-          if (latest.type === 'ping') {
+          const type = latest.type || 'announcement';
+
+          if (type === 'ping' || type === 'urgent') {
+            // Urgent / ping — loud chime + strong vibration + banner
             playLoudDoubleChime();
+            vibrate(VIBRATE_URGENT);
             setActivePingAlert({ show: true, text: latest.text });
-            setTimeout(() => {
-              setActivePingAlert({ show: false, text: '' });
-            }, 6000);
+            setTimeout(() => setActivePingAlert({ show: false, text: '' }), 6000);
+
+          } else if (type === 'announcement' || type === 'round_start' || type === 'schedule') {
+            // Important announcement — bell chime + medium vibration
+            playChime(type === 'round_start' ? 'round_start' : type === 'schedule' ? 'schedule' : 'announcement');
+            vibrate(VIBRATE_ANNOUNCEMENT);
+
           } else {
+            // Regular feed item (photo, reaction, etc.) — soft chime + subtle vibration
             playBellChime();
+            vibrate(VIBRATE_NOTIFICATION);
           }
+
           showLocalNotification(`VBT Alert: ${latest.sender}`, latest.text);
         }
       }

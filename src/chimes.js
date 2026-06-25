@@ -1,17 +1,23 @@
 // ─── VBT Announcement Chimes & Sound Effects ─────────────────────────
-// Primary sounds: real WAV files from github.com/akx/Notifications
-//   License: CC Attribution 3.0 / CC0 Public Domain
-// Fallback: Web Audio API oscillators (no files needed)
-// Files live in public/sounds/ and are loaded at startup.
+// Primary sounds: WAV files decoded into AudioBuffers via AudioContext.
+//   Source: github.com/akx/Notifications (CC0 / CC-BY 3.0)
+//   Files: public/sounds/*.mp3
+//
+// Why AudioBuffers instead of new Audio():
+//   iOS PWA mode blocks HTML5 Audio.play() from non-gesture contexts
+//   (e.g. Firestore callbacks). AudioContext.decodeAudioData + BufferSource
+//   plays reliably once the context is unlocked by a single user tap.
+//
+// Fallback: Web Audio oscillators (if files fail to load).
 // ──────────────────────────────────────────────────────────────────────
 
 let audioCtx = null;
 let hasInteracted = false;
 
-// Preload audio files
-const audioFiles = {};
+// AudioBuffer cache — populated on first user interaction
+const audioBuffers = {};
 const SOUNDS_DIR = '/sounds';
-const soundTypes = [
+const SOUND_TYPES = [
   'announcement',
   'score',
   'urgent',
@@ -21,75 +27,95 @@ const soundTypes = [
   'notification',
   'success',
   'error',
-  'countdown'
+  'countdown',
 ];
 
-// Try .wav first (our files are WAV data), fall back to .mp3 name
-if (typeof window !== 'undefined') {
-  soundTypes.forEach(type => {
-    // The files are WAV audio saved as .mp3 — browsers decode by content, not extension
-    const audio = new Audio(`${SOUNDS_DIR}/${type}.mp3`);
-    audio.preload = 'auto';
-    audioFiles[type] = audio;
-  });
-}
+// ── AudioContext management ────────────────────────────────────────────
 
-/**
- * Eagerly unlock the audio context on user gesture.
- */
-export function unlockAudioContext() {
-  hasInteracted = true;
-  if (!audioCtx) {
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) {
-      console.warn('[Chimes] AudioContext creation failed:', e);
-      return;
-    }
-  }
-  if (audioCtx.state === 'suspended') {
-    const p = audioCtx.resume();
-    if (p) p.catch(() => {});
-  }
-}
-
-if (typeof window !== 'undefined') {
-  const unlockAudio = () => {
-    unlockAudioContext();
-    window.removeEventListener('click', unlockAudio);
-    window.removeEventListener('touchstart', unlockAudio, { passive: true });
-    window.removeEventListener('keydown', unlockAudio);
-  };
-  window.addEventListener('click', unlockAudio);
-  window.addEventListener('touchstart', unlockAudio, { passive: true });
-  window.addEventListener('keydown', unlockAudio);
-}
-
-function getCtx() {
-  if (!hasInteracted) return null;
-  if (!audioCtx) {
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) { return null; }
-  }
-  if (audioCtx.state === 'suspended') {
-    const p = audioCtx.resume();
-    if (p) p.catch(() => {});
+function createCtx() {
+  if (audioCtx) return audioCtx;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) {
+    console.warn('[Chimes] AudioContext creation failed:', e);
   }
   return audioCtx;
 }
 
-export function getSharedAudioContext() {
-  return getCtx();
+/**
+ * Eagerly unlock the AudioContext AND pre-decode all sound files.
+ * Call this from any user-gesture handler (click / touchstart / keydown).
+ */
+export async function unlockAudioContext() {
+  hasInteracted = true;
+  const ctx = createCtx();
+  if (!ctx) return;
+
+  if (ctx.state === 'suspended') {
+    try { await ctx.resume(); } catch (_) {}
+  }
+
+  // Pre-decode every sound file into an AudioBuffer so they can be played
+  // from non-gesture contexts (Firestore callbacks, timers, etc.)
+  await Promise.all(
+    SOUND_TYPES.map(async (type) => {
+      if (audioBuffers[type]) return; // already decoded
+      try {
+        const res = await fetch(`${SOUNDS_DIR}/${type}.mp3`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const arrayBuffer = await res.arrayBuffer();
+        audioBuffers[type] = await ctx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        // File missing or decode failed — oscillator fallback will be used
+        console.warn(`[Chimes] Could not load sound "${type}":`, e.message);
+      }
+    })
+  );
 }
 
-// ── Tone primitives (FALLBACK) ─────────────────────────────────────────
+// Attach unlock to first user interaction
+if (typeof window !== 'undefined') {
+  const onFirstInteraction = () => {
+    unlockAudioContext();
+    window.removeEventListener('click',      onFirstInteraction);
+    window.removeEventListener('touchstart', onFirstInteraction, { passive: true });
+    window.removeEventListener('keydown',    onFirstInteraction);
+  };
+  window.addEventListener('click',      onFirstInteraction);
+  window.addEventListener('touchstart', onFirstInteraction, { passive: true });
+  window.addEventListener('keydown',    onFirstInteraction);
+}
+
+export function getSharedAudioContext() {
+  if (!hasInteracted) return null;
+  return createCtx();
+}
+
+// ── AudioBuffer playback ────────────────────────────────────────────────
+
+function playBuffer(buffer, volume = 0.7) {
+  if (!audioCtx || !buffer) return false;
+  try {
+    const source = audioCtx.createBufferSource();
+    const gain   = audioCtx.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start(audioCtx.currentTime);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ── Oscillator fallback ─────────────────────────────────────────────────
 
 function playTone(frequency, duration, type = 'sine', volume = 0.15) {
   try {
-    const ctx = getCtx();
+    const ctx = getSharedAudioContext();
     if (!ctx) return;
-    const osc = ctx.createOscillator();
+    const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(frequency, ctx.currentTime);
@@ -99,157 +125,88 @@ function playTone(frequency, duration, type = 'sine', volume = 0.15) {
     gain.connect(ctx.destination);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + duration);
-  } catch (e) {
-    // Silently fail if audio context isn't available
-  }
+  } catch (_) {}
 }
 
-function playSequence(notes, baseDelay = 0) {
+function playSequence(notes) {
   notes.forEach(([freq, dur, delay, type, vol]) => {
-    setTimeout(() => playTone(freq, dur, type || 'sine', vol || 0.15), (delay + baseDelay) * 1000);
+    setTimeout(() => playTone(freq, dur, type || 'sine', vol || 0.15), delay * 1000);
   });
 }
 
-// ── Fallback Chime Sounds ──────────────────────────────────────────────
+// ── Fallback melodies ───────────────────────────────────────────────────
 
-function fallbackAnnouncement() {
-  playSequence([[523, 0.15, 0], [659, 0.15, 0.1], [784, 0.25, 0.2]]);
-}
+const FALLBACKS = {
+  announcement: () => playSequence([[523,.15,0],[659,.15,.1],[784,.25,.2]]),
+  score:        () => playSequence([[523,.12,0,'triangle',.2],[659,.12,.08,'triangle',.2],[784,.12,.16,'triangle',.2],[1047,.4,.24,'triangle',.25]]),
+  urgent:       () => playSequence([[880,.15,0,'square',.12],[880,.15,.25,'square',.12],[880,.15,.5,'square',.12],[1100,.3,.75,'square',.15]]),
+  schedule:     () => playSequence([[784,.12,0],[659,.12,.1],[523,.15,.2],[659,.12,.4],[784,.3,.5]]),
+  round_start:  () => playSequence([[440,.08,0,'triangle',.18],[550,.08,.1,'triangle',.18],[660,.08,.2,'triangle',.18],[880,.5,.3,'triangle',.22]]),
+  walkie:       () => playSequence([[1200,.06,0,'square',.08],[1400,.08,.08,'square',.1]]),
+  notification: () => playSequence([[660,.12,0,'sine',.1],[880,.2,.12,'sine',.12]]),
+  success:      () => playSequence([[523,.1,0,'sine',.12],[659,.1,.1,'sine',.12],[784,.1,.2,'sine',.15],[1047,.35,.3,'sine',.18]]),
+  error:        () => playSequence([[300,.2,0,'sawtooth',.08],[250,.3,.25,'sawtooth',.1]]),
+  countdown:    () => playTone(800, .08, 'square', .1),
+};
 
-function fallbackScoreUpdate() {
-  playSequence([
-    [523, 0.12, 0, 'triangle', 0.2],
-    [659, 0.12, 0.08, 'triangle', 0.2],
-    [784, 0.12, 0.16, 'triangle', 0.2],
-    [1047, 0.4, 0.24, 'triangle', 0.25],
-  ]);
-}
-
-function fallbackUrgent() {
-  playSequence([
-    [880, 0.15, 0, 'square', 0.12],
-    [880, 0.15, 0.25, 'square', 0.12],
-    [880, 0.15, 0.5, 'square', 0.12],
-    [1100, 0.3, 0.75, 'square', 0.15],
-  ]);
-}
-
-function fallbackScheduleChange() {
-  playSequence([
-    [784, 0.12, 0], [659, 0.12, 0.1], [523, 0.15, 0.2],
-    [659, 0.12, 0.4], [784, 0.3, 0.5],
-  ]);
-}
-
-function fallbackRoundStart() {
-  playSequence([
-    [440, 0.08, 0, 'triangle', 0.18], [550, 0.08, 0.1, 'triangle', 0.18],
-    [660, 0.08, 0.2, 'triangle', 0.18], [880, 0.5, 0.3, 'triangle', 0.22],
-  ]);
-}
-
-function fallbackWalkieTalkieBeep() {
-  playSequence([[1200, 0.06, 0, 'square', 0.08], [1400, 0.08, 0.08, 'square', 0.1]]);
-}
-
-function fallbackNotification() {
-  playSequence([[660, 0.12, 0, 'sine', 0.1], [880, 0.2, 0.12, 'sine', 0.12]]);
-}
-
-function fallbackSuccess() {
-  playSequence([
-    [523, 0.1, 0, 'sine', 0.12], [659, 0.1, 0.1, 'sine', 0.12],
-    [784, 0.1, 0.2, 'sine', 0.15], [1047, 0.35, 0.3, 'sine', 0.18],
-  ]);
-}
-
-function fallbackError() {
-  playSequence([[300, 0.2, 0, 'sawtooth', 0.08], [250, 0.3, 0.25, 'sawtooth', 0.1]]);
-}
-
-function fallbackCountdown() {
-  playTone(800, 0.08, 'square', 0.1);
-}
-
-
-// ── Smart Chime Dispatcher ─────────────────────────────────────────────
+// ── Smart dispatcher ────────────────────────────────────────────────────
 
 let chimesEnabled = true;
 let lastChimeTime = 0;
-const CHIME_COOLDOWN_MS = 800;
+const COOLDOWN_MS = 800;
 
-export function setChimesEnabled(enabled) {
-  chimesEnabled = enabled;
-}
+export function setChimesEnabled(enabled) { chimesEnabled = enabled; }
+export function isChimesEnabled()          { return chimesEnabled; }
 
-export function isChimesEnabled() {
-  return chimesEnabled;
-}
-
-/**
- * Attempts to play the MP3 audio file. If it fails or is not found,
- * it falls back to the Web Audio API oscillator function.
- */
-async function playSmartChime(eventType, fallbackFn) {
+function playSmartChime(eventType) {
   if (!chimesEnabled) return;
-  
-  // Urgent chimes bypass cooldown
+
+  // Urgent bypasses cooldown
   if (eventType !== 'urgent') {
     const now = Date.now();
-    if (now - lastChimeTime < CHIME_COOLDOWN_MS) return;
+    if (now - lastChimeTime < COOLDOWN_MS) return;
     lastChimeTime = now;
   }
 
-  const audio = audioFiles[eventType];
-  let playSuccess = false;
-
-  if (audio) {
-    try {
-      const clone = audio.cloneNode();
-      clone.volume = 0.6; // Base volume for MP3s
-      await clone.play();
-      playSuccess = true;
-    } catch (err) {
-      // Audio playback failed (file not found, or browser auto-play blocked)
-      playSuccess = false;
-    }
+  // Resume context if suspended (handles iOS PWA background/foreground)
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
   }
 
-  // If the MP3 failed to play, trigger the oscillator fallback
-  if (!playSuccess && fallbackFn) {
-    fallbackFn();
-  }
+  // Try AudioBuffer first (works in non-gesture contexts on iOS)
+  const buffer = audioBuffers[eventType];
+  if (playBuffer(buffer)) return;
+
+  // Fallback to oscillator
+  const fallback = FALLBACKS[eventType] || FALLBACKS.notification;
+  fallback();
 }
 
-// ── Exported Event Triggers ─────────────────────────────────────────────
+// ── Public chime API ────────────────────────────────────────────────────
 
-export function chimeAnnouncement() { return playSmartChime('announcement', fallbackAnnouncement); }
-export function chimeScoreUpdate() { return playSmartChime('score', fallbackScoreUpdate); }
-export function chimeUrgent() { return playSmartChime('urgent', fallbackUrgent); }
-export function chimeScheduleChange() { return playSmartChime('schedule', fallbackScheduleChange); }
-export function chimeRoundStart() { return playSmartChime('round_start', fallbackRoundStart); }
-export function chimeWalkieTalkieBeep() { return playSmartChime('walkie', fallbackWalkieTalkieBeep); }
-export function chimeNotification() { return playSmartChime('notification', fallbackNotification); }
-export function chimeSuccess() { return playSmartChime('success', fallbackSuccess); }
-export function chimeError() { return playSmartChime('error', fallbackError); }
-export function chimeCountdown() { return playSmartChime('countdown', fallbackCountdown); }
+export function chimeAnnouncement()    { playSmartChime('announcement'); }
+export function chimeScoreUpdate()     { playSmartChime('score'); }
+export function chimeUrgent()          { playSmartChime('urgent'); }
+export function chimeScheduleChange()  { playSmartChime('schedule'); }
+export function chimeRoundStart()      { playSmartChime('round_start'); }
+export function chimeWalkieTalkieBeep(){ playSmartChime('walkie'); }
+export function chimeNotification()    { playSmartChime('notification'); }
+export function chimeSuccess()         { playSmartChime('success'); }
+export function chimeError()           { playSmartChime('error'); }
+export function chimeCountdown()       { playSmartChime('countdown'); }
 
-/**
- * Legacy central dispatcher support
- */
 export function playChime(eventType) {
   switch (eventType) {
-    case 'announcement': return chimeAnnouncement();
-    case 'score': return chimeScoreUpdate();
-    case 'urgent': return chimeUrgent();
-    case 'schedule': return chimeScheduleChange();
-    case 'round_start': return chimeRoundStart();
-    case 'walkie': return chimeWalkieTalkieBeep();
-    case 'notification': return chimeNotification();
-    case 'success': return chimeSuccess();
-    case 'error': return chimeError();
-    case 'countdown': return chimeCountdown();
-    default: return chimeNotification();
+    case 'announcement':  return chimeAnnouncement();
+    case 'score':         return chimeScoreUpdate();
+    case 'urgent':        return chimeUrgent();
+    case 'schedule':      return chimeScheduleChange();
+    case 'round_start':   return chimeRoundStart();
+    case 'walkie':        return chimeWalkieTalkieBeep();
+    case 'notification':  return chimeNotification();
+    case 'success':       return chimeSuccess();
+    case 'error':         return chimeError();
+    case 'countdown':     return chimeCountdown();
+    default:              return chimeNotification();
   }
 }
-
