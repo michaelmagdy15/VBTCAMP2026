@@ -14,10 +14,10 @@ export async function acquireChannelLock(channelId, userRole, userName, uid) {
       if (lockDoc.exists()) {
         const data = lockDoc.data();
         if (data.isBusy && data.currentSpeakerUid !== uid) {
-          // Check for stale lock (e.g. 15 seconds)
+          // Check for stale lock (35 seconds, since UI auto-stops at 30s)
           const now = Date.now();
           const lockTime = data.timestamp ? data.timestamp.toMillis() : now;
-          if (now - lockTime < 15000) {
+          if (now - lockTime < 35000) {
             return Promise.reject('Channel is busy');
           }
         }

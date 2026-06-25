@@ -114,11 +114,17 @@ function MessageBubble({ msg, channelColor }) {
     a.addEventListener('pause', onPause);
     a.addEventListener('ended', onEnded);
     a.addEventListener('timeupdate', onTime);
+    a.addEventListener('error', (e) => {
+      console.error('Audio error:', e);
+      setPlaying(false);
+      alert('Your browser does not support this audio format. If this was recorded on a PC (WebM), some iPhones cannot play it natively.');
+    });
     return () => {
       a.removeEventListener('play', onPlay);
       a.removeEventListener('pause', onPause);
       a.removeEventListener('ended', onEnded);
       a.removeEventListener('timeupdate', onTime);
+      a.removeEventListener('error', onPause);
     };
   }, []);
 
@@ -324,6 +330,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   const [uploading, setUploading] = useState(false);
   const recorderRef = useRef(new VoiceRecorder());
   const feedRef = useRef(null);
+  const talkTimeoutRef = useRef(null);
 
   const [token, setToken] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -407,6 +414,12 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
       playChime('walkie');
       setAmISpeaking(true);
       
+      // Auto-stop after 30 seconds to prevent getting stuck
+      if (talkTimeoutRef.current) clearTimeout(talkTimeoutRef.current);
+      talkTimeoutRef.current = setTimeout(() => {
+        handleStopTalk();
+      }, 30000);
+      
       // Start recording locally for the replay feed
       try {
         await recorderRef.current.startRecording();
@@ -419,6 +432,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   };
 
   const handleStopTalk = async () => {
+    if (talkTimeoutRef.current) clearTimeout(talkTimeoutRef.current);
     if (amISpeaking) {
       setAmISpeaking(false);
       await releaseChannelLock(`${eventCode}_${activeChannel}`, mySessionId);
@@ -428,14 +442,16 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
         try {
           setUploading(true);
           const { blob, duration } = await recorderRef.current.stopRecording();
-          await uploadVoiceMessage(
-            blob,
-            eventCode,
-            activeChannel,
-            currentUser?.name || 'Unknown',
-            currentUser?.role || 'viewer',
-            duration
-          );
+          if (duration > 0 || blob.size > 0) {
+            await uploadVoiceMessage(
+              blob,
+              eventCode,
+              activeChannel,
+              currentUser?.name || 'Unknown',
+              currentUser?.role || 'viewer',
+              duration
+            );
+          }
         } catch (err) {
           console.error('Upload failed', err);
         } finally {
@@ -457,7 +473,13 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   }, [amISpeaking, activeChannel, eventCode, mySessionId, currentUser]);
 
   const channelColor = getChannelColor(activeChannel);
-  const isSomeoneElseSpeaking = channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId;
+  
+  // Calculate if lock is stale (older than 35s)
+  const isLockStale = channelLock.timestamp 
+    ? (Date.now() - channelLock.timestamp.toMillis() > 35000) 
+    : false;
+    
+  const isSomeoneElseSpeaking = channelLock.isBusy && !isLockStale && channelLock.currentSpeakerUid !== mySessionId;
 
   return (
     <div
@@ -647,7 +669,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
           </div>
 
           {/* Remote Active Speaker */}
-        {channelLock.isBusy && channelLock.currentSpeakerUid !== mySessionId && (
+        {isSomeoneElseSpeaking && (
           <div
             style={{
               ...T.glass,
@@ -719,7 +741,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
         )}
 
         {/* Replay History */}
-        {messages.length === 0 && !channelLock.isBusy && !amISpeaking && (
+        {messages.length === 0 && !isSomeoneElseSpeaking && !amISpeaking && (
           <div
             style={{
               flex: 1,
