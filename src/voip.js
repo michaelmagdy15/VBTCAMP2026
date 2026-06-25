@@ -121,7 +121,8 @@ export class VoiceRecorder {
 
       this._mediaRecorder.onstop = () => {
         const duration = Math.round((Date.now() - this._startTime) / 1000); // seconds
-        const blob = new Blob(this._chunks, { type: 'audio/webm' });
+        const recordedMimeType = this._mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(this._chunks, { type: recordedMimeType });
         this._cleanup();
         resolve({ blob, duration });
       };
@@ -167,7 +168,7 @@ export class VoiceRecorder {
  * Upload a voice Blob to Firebase Storage, then persist a Firestore
  * document with metadata so listeners are notified in real time.
  *
- * @param {Blob}   blob       – audio blob (webm)
+ * @param {Blob}   blob       – audio blob (webm, mp4, etc.)
  * @param {string} eventCode  – e.g. "VBT2026"
  * @param {string} channel    – one of CHANNELS values
  * @param {string} sender     – display name / uid
@@ -176,9 +177,10 @@ export class VoiceRecorder {
  */
 export async function uploadVoiceMessage(blob, eventCode, channel, sender, senderRole) {
   // 1. Upload to Storage
-  const filename = `${Date.now()}_${sender}.webm`;
+  const extension = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('aac') ? 'aac' : 'webm';
+  const filename = `${Date.now()}_${sender}.${extension}`;
   const storageRef = ref(storage, `vbt_events/${eventCode}/voice/${filename}`);
-  await uploadBytes(storageRef, blob);
+  await uploadBytes(storageRef, blob, { contentType: blob.type });
   const audioUrl = await getDownloadURL(storageRef);
 
   // 2. Estimate duration from blob size (rough: webm ≈ 6 kB/s at default quality)

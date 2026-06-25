@@ -689,7 +689,42 @@ export default function App() {
   // Time tracker for Live indicators
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+
+    // Mobile audio context & HTML5 audio autoplay unlocker
+    const unlockAudio = () => {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const context = new AudioContextClass();
+          if (context.state === 'suspended') {
+            context.resume();
+          }
+          // Play a tiny silent buffer to unlock the AudioContext on mobile Safari
+          const buffer = context.createBuffer(1, 1, 22050);
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.connect(context.destination);
+          source.start(0);
+        }
+        
+        // Also play a silent HTML5 Audio element to unlock native audio players
+        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+        silentAudio.play().catch(() => {});
+      } catch (e) {
+        console.warn('[Audio] Failed to unlock AudioContext:', e);
+      } finally {
+        window.removeEventListener('click', unlockAudio);
+        window.removeEventListener('touchstart', unlockAudio);
+      }
+    };
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
   }, []);
 
   // Smart auto-detection of current day on load
@@ -3442,110 +3477,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main standings */}
-      <section style={{ maxWidth: '600px', width: '100%', margin: '16px auto 0 auto', padding: '0 16px' }}>
-        {eventConfig.eventType === 'service' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Trophy size={18} style={{ color: '#fbbf24' }} />
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-              {scoreCalculations.colors.map(colorName => {
-                const colorHex = getTeamColorHex(colorName);
-                const score = scoreCalculations.finalScores[colorName] || 0;
-                const winsPts = scoreCalculations.wins[colorName] || 0;
-                const tokCount = scoreCalculations.tokensCount[colorName] || 0;
-                const ded = scoreCalculations.deductions[colorName] || 0;
-                const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
-                
-                return (
-                  <div key={colorName} className="glass-panel hover-lift" style={{ 
-                    padding: '14px', 
-                    borderLeft: `4px solid ${colorHex}`,
-                    background: 'rgba(13, 20, 38, 0.45)',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-15px',
-                      right: '-15px',
-                      width: '50px',
-                      height: '50px',
-                      background: `radial-gradient(circle, ${colorHex}15 0%, transparent 70%)`,
-                      borderRadius: '50%',
-                      pointerEvents: 'none'
-                    }} />
-                    
-                    <h4 style={{ 
-                      fontSize: '0.85rem', 
-                      fontWeight: '800', 
-                      color: '#ffffff', 
-                      margin: '0 0 4px 0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span>{customName}</span>
-                      {scoreCalculations.leadColor === colorName && (
-                        <span style={{ fontSize: '0.7rem', color: '#fbbf24', animation: 'pulse-glow 1.5s infinite' }}>👑 Lead</span>
-                      )}
-                    </h4>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1', marginBottom: '6px' }}>
-                      {score}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                      <div>🎮 Games: <strong style={{ color: '#ffffff' }}>{winsPts}</strong> pts</div>
-                      <div>🪙 Tokens: <strong style={{ color: '#ffffff' }}>{tokCount}</strong> ({(tokCount * 2)} pts)</div>
-                      {ded > 0 && <div style={{ color: '#ef4444' }}>⚠️ Deductions: <strong>-{ded}</strong> pts</div>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="glass-panel animate-fade" style={{ padding: '16px', background: 'linear-gradient(180deg, rgba(20, 30, 58, 0.5) 0%, rgba(13, 20, 38, 0.7) 100%)' }}>
-            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Trophy size={18} style={{ color: '#fbbf24' }} />
-                <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
-              </div>
-              {scoreCalculations.winner !== 'TIE' && (
-                <span className={`badge ${scoreCalculations.winner === 'SHAKES' ? 'badge-shakes' : 'badge-fries'}`}>
-                  {scoreCalculations.winner} leading
-                </span>
-              )}
-            </div>
 
-            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
-              <div>
-                <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>{side1Name}</p>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
-                  {scoreCalculations.shakesFinal}
-                </p>
-              </div>
-              <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>VS</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>{side2Name}</p>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
-                  {scoreCalculations.friesFinal}
-                </p>
-              </div>
-            </div>
-
-            <div className="tug-of-war-container">
-              <div className="tug-of-war-bar-shakes" style={{ width: `${shakesPercentage}%` }} />
-              <div className="tug-of-war-bar-fries" style={{ width: `${friesPercentage}%` }} />
-              <div className="tug-of-war-center" />
-            </div>
-          </div>
-        )}
-      </section>
 
       {/* Content tabs */}
       <main className="content-area animate-fade">
@@ -3553,6 +3485,112 @@ export default function App() {
         {/* Tab 1: Scoreboard Accordions */}
         {currentTab === 'scoreboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            {/* Standings section rendered inside Scores page only */}
+            <div style={{ width: '100%', marginBottom: '8px' }}>
+              {eventConfig.eventType === 'service' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Trophy size={18} style={{ color: '#fbbf24' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    {scoreCalculations.colors.map(colorName => {
+                      const colorHex = getTeamColorHex(colorName);
+                      const score = scoreCalculations.finalScores[colorName] || 0;
+                      const winsPts = scoreCalculations.wins[colorName] || 0;
+                      const tokCount = scoreCalculations.tokensCount[colorName] || 0;
+                      const ded = scoreCalculations.deductions[colorName] || 0;
+                      const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
+                      
+                      return (
+                        <div key={colorName} className="glass-panel hover-lift" style={{ 
+                          padding: '14px', 
+                          borderLeft: `4px solid ${colorHex}`,
+                          background: 'rgba(13, 20, 38, 0.45)',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-15px',
+                            right: '-15px',
+                            width: '50px',
+                            height: '50px',
+                            background: `radial-gradient(circle, ${colorHex}15 0%, transparent 70%)`,
+                            borderRadius: '50%',
+                            pointerEvents: 'none'
+                          }} />
+                          
+                          <h4 style={{ 
+                            fontSize: '0.85rem', 
+                            fontWeight: '800', 
+                            color: '#ffffff', 
+                            margin: '0 0 4px 0',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <span>{customName}</span>
+                            {scoreCalculations.leadColor === colorName && (
+                              <span style={{ fontSize: '0.7rem', color: '#fbbf24', animation: 'pulse-glow 1.5s infinite' }}>👑 Lead</span>
+                            )}
+                          </h4>
+                          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1', marginBottom: '6px' }}>
+                            {score}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                            <div>🎮 Games: <strong style={{ color: '#ffffff' }}>{winsPts}</strong> pts</div>
+                            <div>🪙 Tokens: <strong style={{ color: '#ffffff' }}>{tokCount}</strong> ({(tokCount * 2)} pts)</div>
+                            {ded > 0 && <div style={{ color: '#ef4444' }}>⚠️ Deductions: <strong>-{ded}</strong> pts</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-panel animate-fade" style={{ padding: '16px', background: 'linear-gradient(180deg, rgba(20, 30, 58, 0.5) 0%, rgba(13, 20, 38, 0.7) 100%)' }}>
+                  <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Trophy size={18} style={{ color: '#fbbf24' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
+                    </div>
+                    {scoreCalculations.winner !== 'TIE' && (
+                      <span className={`badge ${scoreCalculations.winner === 'SHAKES' ? 'badge-shakes' : 'badge-fries'}`}>
+                        {scoreCalculations.winner} leading
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+                    <div>
+                      <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>{side1Name}</p>
+                      <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
+                        {scoreCalculations.shakesFinal}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>VS</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>{side2Name}</p>
+                      <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
+                        {scoreCalculations.friesFinal}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="tug-of-war-container">
+                    <div className="tug-of-war-bar-shakes" style={{ width: `${shakesPercentage}%` }} />
+                    <div className="tug-of-war-bar-fries" style={{ width: `${friesPercentage}%` }} />
+                    <div className="tug-of-war-center" />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff', marginBottom: '4px' }}>Game Score Entry</h2>
             
             {eventConfig.eventType === 'service' ? (
@@ -6787,7 +6825,20 @@ export default function App() {
       </main>
 
       {/* Navigation bar */}
-      <nav className="mobile-nav-bar" style={{ display: 'flex', width: '100%', justifyContent: 'space-around', alignItems: 'center' }}>
+      <nav 
+        className="mobile-nav-bar" 
+        style={{ 
+          display: 'flex', 
+          width: '100%', 
+          justifyContent: getActiveTabs().length > 5 ? 'flex-start' : 'space-around', 
+          alignItems: 'center',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          paddingLeft: getActiveTabs().length > 5 ? '12px' : '0px',
+          paddingRight: getActiveTabs().length > 5 ? '12px' : '0px',
+          gap: getActiveTabs().length > 5 ? '8px' : '0px'
+        }}
+      >
         {getActiveTabs().map((t) => {
           const Icon = t.icon;
           return (
@@ -6796,16 +6847,16 @@ export default function App() {
               className={`mobile-nav-item ${currentTab === t.id ? 'active' : ''}`}
               onClick={() => setCurrentTab(t.id)}
               style={{
-                flex: 1,
-                maxWidth: '120px',
+                flex: getActiveTabs().length > 5 ? '0 0 auto' : '1',
+                minWidth: getActiveTabs().length > 5 ? '68px' : '60px',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.78rem',
+                fontSize: '0.74rem',
                 fontWeight: '700',
-                padding: '6px 4px',
+                padding: '6px 8px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 background: 'transparent',
