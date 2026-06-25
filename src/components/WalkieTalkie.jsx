@@ -12,6 +12,7 @@ import {
   Users,
   Shield,
   Globe,
+  Trash2,
 } from 'lucide-react';
 import {
   VoiceRecorder,
@@ -20,6 +21,7 @@ import {
   CHANNELS,
   getChannelLabel,
   getChannelColor,
+  clearVoiceMessages,
 } from '../voip';
 import { playChime } from '../chimes';
 
@@ -329,7 +331,26 @@ function Spinner({ size = 22, color = '#fff' }) {
   );
 }
 
-// ── Main component ──────────────────────────────────────────  // Unlock audio context and HTML5 audio element on user interaction for iOS support
+// ── Main component ─────────────────────────────────────────────────────
+
+export default function WalkieTalkie({ eventCode, currentUser }) {
+  // currentUser shape: { name, role, uid? }
+  const allowed = getAllowedChannels(currentUser?.role);
+  const [activeChannel, setActiveChannel] = useState(allowed[0] || CHANNELS.GLOBAL);
+  const [messages, setMessages] = useState([]);
+  const [recording, setRecording] = useState(false);
+  const [recordTimer, setRecordTimer] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
+
+  const recorderRef = useRef(new VoiceRecorder());
+  const feedRef = useRef(null);
+  const timerRef = useRef(null);
+  const lastPlayedIdRef = useRef(null);
+  const initialLoadRef = useRef(true);
+  const liveAudioRef = useRef(null);
+
+  // Unlock audio context and HTML5 audio element on user interaction for iOS support
   const unlockAudio = useCallback(() => {
     const a = liveAudioRef.current;
     if (a && !a.src) {
@@ -355,10 +376,7 @@ function Spinner({ size = 22, color = '#fff' }) {
       window.removeEventListener('click', handleFirstInteraction, true);
       window.removeEventListener('touchstart', handleFirstInteraction, true);
     };
-  }, [unlockAudio]);VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs4AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs5AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs6AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs7AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQs8AAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
-      a.play().catch(() => {});
-    }
-  }, []);
+  }, [unlockAudio]);
 
   // Real-time subscription
   useEffect(() => {
@@ -515,6 +533,31 @@ function Spinner({ size = 22, color = '#fff' }) {
           >
             Walkie-Talkie
           </span>
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => {
+                if (window.confirm('Clear all messages in ' + getChannelLabel(activeChannel) + '?')) {
+                  clearVoiceMessages(eventCode, activeChannel)
+                    .catch((err) => alert('Error clearing messages: ' + err.message));
+                }
+              }}
+              style={{
+                marginLeft: 4,
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#ef4444',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 6,
+                borderRadius: 8,
+              }}
+              title="Clear Channel"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
 
         {/* Live Autoplay Toggle */}

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, 
+  enableMultiTabIndexedDbPersistence,
   doc, 
   getDoc,
   onSnapshot, 
@@ -32,6 +33,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 // 'db-vbt' is a dedicated Firestore database — completely separate from all other project databases.
 export const db = getFirestore(app, 'db-vbt');
+
+// Enable offline persistence
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Offline persistence failed: Multiple tabs open.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Offline persistence is not supported by the browser.');
+  } else {
+    console.error('Offline persistence error:', err);
+  }
+});
 
 // ─────────────────────────────────────────────
 // Helper: Build per-event Firestore paths

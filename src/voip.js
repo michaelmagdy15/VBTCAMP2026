@@ -13,6 +13,9 @@ import {
   onSnapshot,
   serverTimestamp,
   where,
+  getDocs,
+  deleteDoc,
+  doc
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -239,3 +242,25 @@ export function subscribeToVoiceMessages(eventCode, channel, callback, messageLi
     callback(messages);
   });
 }
+
+/**
+ * Delete all voice messages for a specific event and channel.
+ *
+ * @param {string} eventCode
+ * @param {string} channel
+ */
+export async function clearVoiceMessages(eventCode, channel) {
+  const colRef = collection(db, 'vbt_events', eventCode, 'voice_messages');
+  const q = query(colRef, where('channel', '==', channel));
+  try {
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map((document) => 
+      deleteDoc(doc(db, 'vbt_events', eventCode, 'voice_messages', document.id))
+    );
+    await Promise.all(deletePromises);
+  } catch (error) {
+    console.error('Error clearing voice messages:', error);
+    throw error;
+  }
+}
+
