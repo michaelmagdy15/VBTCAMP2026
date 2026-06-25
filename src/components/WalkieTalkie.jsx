@@ -570,6 +570,8 @@ export default function WalkieTalkie({ eventCode, currentUser }) {
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           borderBottom: `1px solid ${T.borderLight}`,
+          boxSizing: 'border-box',
+          width: '100%',
         }}
       >
         {CHANNEL_META.filter((ch) => allowed.includes(ch.key)).map(({ key, icon: Icon, color }) => {

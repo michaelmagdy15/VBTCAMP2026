@@ -4,13 +4,35 @@
 // ──────────────────────────────────────────────────────────────────────
 
 let audioCtx = null;
+let hasInteracted = false;
+
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    hasInteracted = true;
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      const p = audioCtx.resume();
+      if (p) p.catch(()=>{});
+    }
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio, { passive: true });
+    window.removeEventListener('keydown', unlockAudio);
+  };
+  window.addEventListener('click', unlockAudio);
+  window.addEventListener('touchstart', unlockAudio, { passive: true });
+  window.addEventListener('keydown', unlockAudio);
+}
 
 function getCtx() {
+  if (!hasInteracted) return null;
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    const p = audioCtx.resume();
+    if (p) p.catch(()=>{});
   }
   return audioCtx;
 }
@@ -20,6 +42,7 @@ function getCtx() {
 function playTone(frequency, duration, type = 'sine', volume = 0.15) {
   try {
     const ctx = getCtx();
+    if (!ctx) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = type;

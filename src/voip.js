@@ -89,12 +89,25 @@ export class VoiceRecorder {
   async startRecording() {
     if (this._recording) return;
 
-    this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this._stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
     this._chunks = [];
 
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm')
-      ? 'audio/webm'
-      : ''; // fallback to browser default
+    let mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else {
+        mimeType = ''; // fallback to browser default
+      }
+    }
 
     this._mediaRecorder = new MediaRecorder(this._stream, mimeType ? { mimeType } : undefined);
 
