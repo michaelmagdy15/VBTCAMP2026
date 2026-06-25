@@ -3389,8 +3389,8 @@ export default function App() {
         currentUser={currentUser}
         activeEventCode={currentEventCode}
         eventConfig={eventConfig}
-        campData={campState}
-        activeScheduleItem={activeScheduleItem}
+        campData={{ ...campData, campState }}
+        activeScheduleItem={currentActiveSlot}
         standings={scoreCalculations}
         onLogout={handleLogout}
         onSubmitDeduction={handleDumbSubmitDeduction}
