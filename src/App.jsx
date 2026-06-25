@@ -2653,7 +2653,7 @@ export default function App() {
                           style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
                         >
                           <option value="service">Service Mode (Dynamic 4 Teams)</option>
-                          <option value="camp">Camp Mode (Legacy 2 Teams)</option>
+                          <option value="camp" disabled style={{ color: 'var(--text-muted)' }}>Camp Mode (Legacy 2 Teams) — EXPIRED</option>
                         </select>
                       </div>
                       <div>
@@ -5359,12 +5359,6 @@ export default function App() {
                 <Navigation size={14} /> GPS Map
               </button>
               <button 
-                className={`toggle-btn ${infoSubTab === 'timeline' ? 'active' : ''}`}
-                onClick={() => setInfoSubTab('timeline')}
-              >
-                <Clock3 size={14} /> Timeline
-              </button>
-              <button 
                 className={`toggle-btn ${infoSubTab === 'faq' ? 'active' : ''}`}
                 onClick={() => setInfoSubTab('faq')}
               >
@@ -5472,28 +5466,7 @@ export default function App() {
               />
             )}
 
-            {/* Sub-tab Content: Day Timeline Schedule Image */}
-            {infoSubTab === 'timeline' && (
-              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '100%', overflowX: 'hidden' }}>
-                <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>Full Day Program Timeline</h3>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Pinch or scroll to zoom</span>
-                </div>
-                <div style={{ 
-                  overflow: 'auto', 
-                  borderRadius: '10px', 
-                  border: '1px solid var(--border-light)',
-                  maxHeight: '450px',
-                  background: '#070a13'
-                }}>
-                  <img 
-                    src="/image2.jpg" 
-                    alt="Camp Timeline Overview" 
-                    style={{ width: '100%', minWidth: '400px', height: 'auto', display: 'block' }} 
-                  />
-                </div>
-              </div>
-            )}
+
 
             {/* Sub-tab Content: FAQs collapsible list */}
             {infoSubTab === 'faq' && (
