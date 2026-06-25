@@ -11,39 +11,33 @@ export async function acquireChannelLock(channelId, userRole, userName, uid) {
   try {
     const success = await runTransaction(db, async (transaction) => {
       const lockDoc = await transaction.get(lockRef);
-      if (!lockDoc.exists()) {
-        // Channel is completely free
+      if (lockDoc.exists()) {
+        const data = lockDoc.data();
+        if (data.isBusy && data.currentSpeakerUid !== uid) {
+          // Check for stale lock (e.g. 15 seconds)
+          const now = Date.now();
+          const lockTime = data.timestamp ? data.timestamp.toMillis() : now;
+          if (now - lockTime < 15000) {
+            return Promise.reject('Channel is busy');
+          }
+        }
+        transaction.update(lockRef, {
+          isBusy: true,
+          currentSpeakerUid: uid,
+          currentSpeakerName: userName,
+          speakerRole: userRole,
+          timestamp: serverTimestamp()
+        });
+      } else {
         transaction.set(lockRef, {
           isBusy: true,
           currentSpeakerUid: uid,
           currentSpeakerName: userName,
           speakerRole: userRole,
-          timestamp: serverTimestamp(),
+          timestamp: serverTimestamp()
         });
-        return true;
       }
-
-      const data = lockDoc.data();
-      
-      // If there is a stale lock (e.g. someone got disconnected without releasing)
-      // we can override if it's older than 60 seconds.
-      const now = Date.now();
-      const lockTime = data.timestamp ? data.timestamp.toMillis() : now;
-      const isStale = (now - lockTime) > 60000;
-
-      if (!data.isBusy || isStale) {
-        transaction.set(lockRef, {
-          isBusy: true,
-          currentSpeakerUid: uid,
-          currentSpeakerName: userName,
-          speakerRole: userRole,
-          timestamp: serverTimestamp(),
-        });
-        return true;
-      }
-
-      // If we reach here, it's busy by someone else
-      return false;
+      return true;
     });
 
     return success;

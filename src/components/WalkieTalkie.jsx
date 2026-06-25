@@ -10,7 +10,7 @@ import {
   getChannelColor
 } from '../voip';
 import { playChime } from '../chimes';
-import { agoraClient, AGORA_APP_ID } from '../agoraConfig';
+import { agoraClient, AGORA_APP_ID, generateAgoraToken } from '../agoraConfig';
 import { acquireChannelLock, releaseChannelLock, subscribeToChannelLock } from '../liveAudio';
 import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks, usePublish } from "agora-rtc-react";
 
@@ -325,12 +325,27 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   const recorderRef = useRef(new VoiceRecorder());
   const feedRef = useRef(null);
 
+  const [token, setToken] = useState(null);
+
+  // Generate Token when channel changes
+  useEffect(() => {
+    if (eventCode && activeChannel) {
+      try {
+        const t = generateAgoraToken(`${eventCode}_${activeChannel}`);
+        setToken(t);
+      } catch (err) {
+        console.error("Token generation failed:", err);
+      }
+    }
+  }, [eventCode, activeChannel]);
+
   // Agora Integration
   useJoin({
     appid: AGORA_APP_ID,
     channel: `${eventCode}_${activeChannel}`,
-    token: null,
-  }, !!eventCode && !!activeChannel);
+    token: token,
+    uid: null // Let Agora assign UID, token built with uid 0 allows this
+  }, !!eventCode && !!activeChannel && !!token);
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
   usePublish([localMicrophoneTrack]);
