@@ -233,58 +233,11 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
             )}
           </div>
 
-          {/* ── Side Names ── */}
-          {eventConfig?.side1Name && eventConfig?.side2Name && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '24px',
-                marginBottom: '40px',
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "'Outfit', sans-serif",
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: '#0070f3',
-                }}
-              >
-                {eventConfig.side1Name}
-              </div>
-              <div
-                style={{
-                  fontSize: '16px',
-                  color: 'rgba(255,255,255,0.3)',
-                  fontWeight: 700,
-                }}
-              >
-                VS
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Outfit', sans-serif",
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: '#29b6f6',
-                }}
-              >
-                {eventConfig.side2Name}
-              </div>
-            </div>
-          )}
-
           {/* ── Matchup Rounds ── */}
           <div style={{ flex: 1 }}>
             {matchups.map((matchup, idx) => {
-              const shakeTeams = matchup.shakes
-                ? matchup.shakes.split(' vs ')
-                : [];
-              const friesTeams = matchup.fries
-                ? matchup.fries.split(' vs ')
-                : [];
+              const team1 = matchup.teamA || 'Team A';
+              const team2 = matchup.teamB || 'Team B';
 
               return (
                 <div
@@ -362,22 +315,12 @@ const ScheduleExporter = ({ scheduleData, eventConfig, campData, getTeamColorHex
 
                   {/* Team Matchups */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {shakeTeams.length === 2 && (
-                      <TeamMatchupRow
-                        label={side1Label}
-                        team1={shakeTeams[0]?.trim()}
-                        team2={shakeTeams[1]?.trim()}
-                        getTeamColorHex={getTeamColorHex}
-                      />
-                    )}
-                    {friesTeams.length === 2 && (
-                      <TeamMatchupRow
-                        label={side2Label}
-                        team1={friesTeams[0]?.trim()}
-                        team2={friesTeams[1]?.trim()}
-                        getTeamColorHex={getTeamColorHex}
-                      />
-                    )}
+                    <TeamMatchupRow
+                      label="MATCH"
+                      team1={team1}
+                      team2={team2}
+                      getTeamColorHex={getTeamColorHex}
+                    />
                   </div>
                 </div>
               );

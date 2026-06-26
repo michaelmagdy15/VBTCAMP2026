@@ -357,8 +357,8 @@ export default function GPSMap({
     if (!campData?.matchups) return [];
     const teams = new Set();
     campData.matchups.forEach(m => {
-      if (m.shakes && m.shakes !== 'Servants') teams.add(m.shakes);
-      if (m.fries && m.fries !== 'Servants') teams.add(m.fries);
+      if (m.teamA && m.teamA !== 'Servants') teams.add(m.teamA);
+      if (m.teamB && m.teamB !== 'Servants') teams.add(m.teamB);
     });
     return Array.from(teams).sort();
   }, [campData]);
@@ -377,11 +377,11 @@ export default function GPSMap({
     
     for (const loc of liveLocationStatus) {
       const match = loc.activeMatchup;
-      if (match && (match.shakes === highlightedTeam || match.fries === highlightedTeam)) {
+      if (match && (match.teamA === highlightedTeam || match.teamB === highlightedTeam)) {
         return {
           locationName: loc.name,
           game: match.game,
-          opponent: match.shakes === highlightedTeam ? match.fries : match.shakes,
+          opponent: match.teamA === highlightedTeam ? match.teamB : match.teamA,
           time: match.time,
         };
       }

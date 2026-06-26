@@ -18,11 +18,10 @@ import {
 
 const getSideColor = (sideName) => {
   const s = String(sideName || '').toLowerCase();
-  if (s.includes('shakes') || s.includes('blue') || s === 's') return 'var(--color-shakes)';
-  if (s.includes('fries') || s.includes('orange') || s === 'f') return 'var(--color-fries)';
-  if (s.includes('red')) return '#ef4444';
-  if (s.includes('white')) return '#ffffff';
-  if (s.includes('black')) return '#475569';
+  if (s.includes('red') || s === 'r') return '#ef4444';
+  if (s.includes('white') || s === 'w') return '#ffffff';
+  if (s.includes('black') || s === 'k') return '#94a3b8';
+  if (s.includes('blue') || s === 'b') return '#29b6f6';
   return 'var(--vbt-sky)';
 };
 
@@ -168,20 +167,11 @@ export default function DumbDashboard({
     const mySide = currentUser?.side || '';
     const myTeam = currentUser?.teamCode || '';
 
-    if (standings) {
-      const sideLower = mySide.toLowerCase();
-      if (sideLower.includes('shakes')) {
-        score = standings.shakesFinal || 0;
-        rank = (standings.shakesFinal >= (standings.friesFinal || 0)) ? 1 : 2;
-      } else if (sideLower.includes('fries')) {
-        score = standings.friesFinal || 0;
-        rank = ((standings.friesFinal || 0) >= standings.shakesFinal) ? 1 : 2;
-      } else if (standings.finalScores) {
-        score = standings.finalScores[myTeam] || standings.finalScores[mySide] || 0;
-        const sorted = Object.entries(standings.finalScores).sort((a, b) => b[1] - a[1]);
-        const idx = sorted.findIndex(([k]) => k.toLowerCase() === myTeam.toLowerCase() || k.toLowerCase() === mySide.toLowerCase());
-        if (idx !== -1) rank = idx + 1;
-      }
+    if (standings && standings.finalScores) {
+      score = standings.finalScores[mySide] || standings.finalScores[myTeam] || 0;
+      const sorted = Object.entries(standings.finalScores).sort((a, b) => b[1] - a[1]);
+      const idx = sorted.findIndex(([k]) => k.toLowerCase() === myTeam.toLowerCase() || k.toLowerCase() === mySide.toLowerCase());
+      if (idx !== -1) rank = idx + 1;
     } else if (campData?.teams && campData.teams[myTeam]) {
       score = campData.teams[myTeam].score || 0;
     }
@@ -261,8 +251,8 @@ export default function DumbDashboard({
     if (!selectedMatchup) return;
 
     const matchupId = selectedMatchup.id || `${selectedMatchup.block}_${selectedMatchup.round}_${selectedMatchup.game}`;
-    const teamA = selectedMatchup.shakes || selectedMatchup.teamA || 'Team A';
-    const teamB = selectedMatchup.fries || selectedMatchup.teamB || 'Team B';
+    const teamA = selectedMatchup.teamA || 'Team A';
+    const teamB = selectedMatchup.teamB || 'Team B';
 
     const scores = {
       scoreA,
@@ -280,8 +270,8 @@ export default function DumbDashboard({
     }
   };
 
-  const teamA = selectedMatchup?.shakes || selectedMatchup?.teamA || 'Team A';
-  const teamB = selectedMatchup?.fries || selectedMatchup?.teamB || 'Team B';
+  const teamA = selectedMatchup?.teamA || 'Team A';
+  const teamB = selectedMatchup?.teamB || 'Team B';
 
   return (
     <div style={S.container}>
@@ -484,7 +474,7 @@ export default function DumbDashboard({
                       {gameMatchups.map(m => {
                         const val = `${m.block}_${m.round}_${m.game}`;
                         const score = getMatchupScoreStatus(m);
-                        const label = `Block ${m.block} • R${m.round}: ${m.shakes || m.teamA} vs ${m.fries || m.teamB} ${score ? `(${score})` : '[UNSCORED]'}`;
+                        const label = `Block ${m.block} • R${m.round}: ${m.teamA} vs ${m.teamB} ${score ? `(${score})` : '[UNSCORED]'}`;
                         return (
                           <option key={val} value={val}>{label}</option>
                         );

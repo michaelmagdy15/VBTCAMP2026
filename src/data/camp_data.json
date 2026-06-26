@@ -1,87 +1,87 @@
 {
   "teams": {
-    "S5.1": {
-      "code": "S5.1",
-      "name": "S5.1",
+    "R5.1": {
+      "code": "R5.1",
+      "name": "R5.1",
       "leaders": "Karine Kastour / Maria N.",
-      "side": "Shakes",
+      "side": "Red",
       "grade": 5
     },
-    "S5.2": {
-      "code": "S5.2",
-      "name": "S5.2",
+    "R5.2": {
+      "code": "R5.2",
+      "name": "R5.2",
       "leaders": "Marla Isaac / Mark E.",
-      "side": "Shakes",
+      "side": "Red",
       "grade": 5
     },
-    "S5.3": {
-      "code": "S5.3",
-      "name": "S5.3",
+    "R5.3": {
+      "code": "R5.3",
+      "name": "R5.3",
       "leaders": "Youssef Sadek / Marina A.",
-      "side": "Shakes",
+      "side": "Red",
       "grade": 5
     },
-    "S6.1": {
-      "code": "S6.1",
-      "name": "S6.1",
+    "W6.1": {
+      "code": "W6.1",
+      "name": "W6.1",
       "leaders": "Jason",
-      "side": "Shakes",
+      "side": "White",
       "grade": 6
     },
-    "S6.2": {
-      "code": "S6.2",
-      "name": "S6.2",
+    "W6.2": {
+      "code": "W6.2",
+      "name": "W6.2",
       "leaders": "Philo Ehab / Mark",
-      "side": "Shakes",
+      "side": "White",
       "grade": 6
     },
-    "S6.3": {
-      "code": "S6.3",
-      "name": "S6.3",
+    "W6.3": {
+      "code": "W6.3",
+      "name": "W6.3",
       "leaders": "Maria Ehab / John E.",
-      "side": "Shakes",
+      "side": "White",
       "grade": 6
     },
-    "F5.1": {
-      "code": "F5.1",
-      "name": "F5.1",
+    "B5.1": {
+      "code": "B5.1",
+      "name": "B5.1",
       "leaders": "Karen Tadrous / Madonna H.",
-      "side": "Fries",
+      "side": "Blue",
       "grade": 5
     },
-    "F5.2": {
-      "code": "F5.2",
-      "name": "F5.2",
+    "B5.2": {
+      "code": "B5.2",
+      "name": "B5.2",
       "leaders": "Shady Shahir / Mary F.",
-      "side": "Fries",
+      "side": "Blue",
       "grade": 5
     },
-    "F5.3": {
-      "code": "F5.3",
-      "name": "F5.3",
+    "B5.3": {
+      "code": "B5.3",
+      "name": "B5.3",
       "leaders": "Kirmina Sadek / John A.",
-      "side": "Fries",
+      "side": "Blue",
       "grade": 5
     },
-    "F6.1": {
-      "code": "F6.1",
-      "name": "F6.1",
+    "K6.1": {
+      "code": "K6.1",
+      "name": "K6.1",
       "leaders": "Sherry Wael",
-      "side": "Fries",
+      "side": "Black",
       "grade": 6
     },
-    "F6.2": {
-      "code": "F6.2",
-      "name": "F6.2",
+    "K6.2": {
+      "code": "K6.2",
+      "name": "K6.2",
       "leaders": "Roberto",
-      "side": "Fries",
+      "side": "Black",
       "grade": 6
     },
-    "F6.3": {
-      "code": "F6.3",
-      "name": "F6.3",
+    "K6.3": {
+      "code": "K6.3",
+      "name": "K6.3",
       "leaders": "Ginevra",
-      "side": "Fries",
+      "side": "Black",
       "grade": 6
     }
   },
@@ -104,10 +104,10 @@
     "Golden Snitch 2": 15
   },
   "teamSchedules": {
-    "S5.1": [
+    "R5.1": [
       {
         "block": null,
-        "time": "S5.1 - KARINE K. / MARIA N.",
+        "time": "R5.1 - KARINE K. / MARIA N.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -274,10 +274,10 @@
         "defaultDeduction": 0
       }
     ],
-    "S5.2": [
+    "R5.2": [
       {
         "block": null,
-        "time": "S5.2 - MARLA I. / MARK E.",
+        "time": "R5.2 - MARLA I. / MARK E.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -444,10 +444,10 @@
         "defaultDeduction": 0
       }
     ],
-    "S5.3": [
+    "R5.3": [
       {
         "block": null,
-        "time": "S5.3 - YOUSSEF S. /MARINA A. ",
+        "time": "R5.3 - YOUSSEF S. /MARINA A. ",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -614,10 +614,10 @@
         "defaultDeduction": 0
       }
     ],
-    "S6.1": [
+    "W6.1": [
       {
         "block": null,
-        "time": "S6.1 - JASON / DANIEL S.",
+        "time": "W6.1 - JASON / DANIEL S.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -784,10 +784,10 @@
         "defaultDeduction": 0
       }
     ],
-    "S6.2": [
+    "W6.2": [
       {
         "block": null,
-        "time": "S6.2 - PHILO E. / MARK",
+        "time": "W6.2 - PHILO E. / MARK",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -954,10 +954,10 @@
         "defaultDeduction": 0
       }
     ],
-    "S6.3": [
+    "W6.3": [
       {
         "block": null,
-        "time": "S6.3 - MARIA E. / JOHN E.",
+        "time": "W6.3 - MARIA E. / JOHN E.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -1124,10 +1124,10 @@
         "defaultDeduction": 0
       }
     ],
-    "F5.1": [
+    "B5.1": [
       {
         "block": null,
-        "time": "F5.1 - KAREN T. / MADONNA H.",
+        "time": "B5.1 - KAREN T. / MADONNA H.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -1294,10 +1294,10 @@
         "defaultDeduction": 0
       }
     ],
-    "F5.2": [
+    "B5.2": [
       {
         "block": null,
-        "time": "F5.2 - SHADY S. / MARY F.",
+        "time": "B5.2 - SHADY S. / MARY F.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -1464,10 +1464,10 @@
         "defaultDeduction": 0
       }
     ],
-    "F5.3": [
+    "B5.3": [
       {
         "block": null,
-        "time": "F5.3 - KIRMINA S. / JOHN A. ",
+        "time": "B5.3 - KIRMINA S. / JOHN A. ",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -1634,10 +1634,10 @@
         "defaultDeduction": 0
       }
     ],
-    "F6.1": [
+    "K6.1": [
       {
         "block": null,
-        "time": "F6.1 - SHERRY W. / KIRO",
+        "time": "K6.1 - SHERRY W. / KIRO",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -1804,10 +1804,10 @@
         "defaultDeduction": 0
       }
     ],
-    "F6.2": [
+    "K6.2": [
       {
         "block": null,
-        "time": "F6.2 - ROBERTO / MICHAEL H.",
+        "time": "K6.2 - ROBERTO / MICHAEL H.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -1974,10 +1974,10 @@
         "defaultDeduction": 0
       }
     ],
-    "F6.3": [
+    "K6.3": [
       {
         "block": null,
-        "time": "F6.3 - GINEVRA / NADA N.",
+        "time": "K6.3 - GINEVRA / NADA N.",
         "game": null,
         "gameExtra": null,
         "location": null,
@@ -2151,738 +2151,738 @@
       "round": 1,
       "game": "Big Mac",
       "time": "11:00 AM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 1,
       "round": 1,
       "game": "Talk",
       "time": "11:00 AM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 1,
       "round": 1,
       "game": "SPLIT",
       "time": "11:00 AM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 1,
       "round": 1,
       "game": "Cone Memory",
       "time": "11:00 AM",
-      "shakes": "S6.3",
-      "fries": "F6.1",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.3",
+      "teamB": "K6.1"
     },
     {
       "block": 1,
       "round": 1,
       "game": "Scale",
       "time": "11:00 AM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 1,
       "round": 1,
       "game": "Chubby Bunny",
       "time": "11:00 AM",
-      "shakes": "S6.1",
-      "fries": "F6.3",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "W6.1",
+      "teamB": "K6.3"
     },
     {
       "block": 1,
       "round": 2,
       "game": "Big Mac",
       "time": "11:30 AM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 1,
       "round": 2,
       "game": "Talk",
       "time": "11:30 AM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 1,
       "round": 2,
       "game": "SPLIT",
       "time": "11:30 AM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 1,
       "round": 2,
       "game": "Cone Memory",
       "time": "11:20 AM",
-      "shakes": "S6.1",
-      "fries": "F6.2",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.1",
+      "teamB": "K6.2"
     },
     {
       "block": 1,
       "round": 2,
       "game": "Scale",
       "time": "11:20 AM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     },
     {
       "block": 1,
       "round": 2,
       "game": "Chubby Bunny",
       "time": "11:20 AM",
-      "shakes": "S6.2",
-      "fries": "F6.1",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "W6.2",
+      "teamB": "K6.1"
     },
     {
       "block": 1,
       "round": 3,
       "game": "Cone Memory",
       "time": "11:40 PM",
-      "shakes": "S6.2",
-      "fries": "F6.3",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.2",
+      "teamB": "K6.3"
     },
     {
       "block": 1,
       "round": 3,
       "game": "Scale",
       "time": "11:40 PM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 1,
       "round": 3,
       "game": "Chubby Bunny",
       "time": "11:40 PM",
-      "shakes": "S6.3",
-      "fries": "F6.2",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "W6.3",
+      "teamB": "K6.2"
     },
     {
       "block": 1,
       "round": 4,
       "game": "Big Mac",
       "time": "12:00 PM",
-      "shakes": "S6.3",
-      "fries": "F6.1",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.3",
+      "teamB": "K6.1"
     },
     {
       "block": 1,
       "round": 4,
       "game": "Talk",
       "time": "12:00 PM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 1,
       "round": 4,
       "game": "SPLIT",
       "time": "12:00 PM",
-      "shakes": "S6.1",
-      "fries": "F6.3",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "W6.1",
+      "teamB": "K6.3"
     },
     {
       "block": 1,
       "round": 4,
       "game": "Cone Memory",
       "time": "12:00 PM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 1,
       "round": 4,
       "game": "Scale",
       "time": "12:00 PM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 1,
       "round": 4,
       "game": "Chubby Bunny",
       "time": "12:00 PM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 1,
       "round": 5,
       "game": "Big Mac",
       "time": "12:30 PM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 1,
       "round": 5,
       "game": "Talk",
       "time": "12:30 PM",
-      "shakes": "S6.3",
-      "fries": "F6.1",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "W6.3",
+      "teamB": "K6.1"
     },
     {
       "block": 1,
       "round": 5,
       "game": "SPLIT",
       "time": "12:30 PM",
-      "shakes": "S6.1",
-      "fries": "F6.3",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "W6.1",
+      "teamB": "K6.3"
     },
     {
       "block": 1,
       "round": 5,
       "game": "Cone Memory",
       "time": "12:20 PM",
-      "shakes": "S5.3",
-      "fries": "F5.2",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.3",
+      "teamB": "B5.2"
     },
     {
       "block": 1,
       "round": 5,
       "game": "Scale",
       "time": "12:20 PM",
-      "shakes": "S5.1",
-      "fries": "F5.3",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "R5.1",
+      "teamB": "B5.3"
     },
     {
       "block": 1,
       "round": 5,
       "game": "Chubby Bunny",
       "time": "12:20 PM",
-      "shakes": "S5.2",
-      "fries": "F5.1",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "R5.2",
+      "teamB": "B5.1"
     },
     {
       "block": 1,
       "round": 6,
       "game": "Cone Memory",
       "time": "12:40 PM",
-      "shakes": "S5.2",
-      "fries": "F5.3",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.2",
+      "teamB": "B5.3"
     },
     {
       "block": 1,
       "round": 6,
       "game": "Scale",
       "time": "12:40 PM",
-      "shakes": "S5.3",
-      "fries": "F5.1",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "R5.3",
+      "teamB": "B5.1"
     },
     {
       "block": 1,
       "round": 6,
       "game": "Chubby Bunny",
       "time": "12:40 PM",
-      "shakes": "S5.1",
-      "fries": "F5.2",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "R5.1",
+      "teamB": "B5.2"
     },
     {
       "block": 2,
       "round": 1,
       "game": "Cheesy Strings",
       "time": "05:00 PM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     },
     {
       "block": 2,
       "round": 1,
       "game": "Talk",
       "time": "05:00 PM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 2,
       "round": 1,
       "game": "SPLIT",
       "time": "05:00 PM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 2,
       "round": 1,
       "game": "Lift",
       "time": "05:00 PM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 2,
       "round": 1,
       "game": "Bible Whispers",
       "time": "05:00 PM",
-      "shakes": "S5.2",
-      "fries": "F5.1",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "R5.2",
+      "teamB": "B5.1"
     },
     {
       "block": 2,
       "round": 1,
       "game": "Puzzle",
       "time": "05:00 PM",
-      "shakes": "S5.1",
-      "fries": "F5.2",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.1",
+      "teamB": "B5.2"
     },
     {
       "block": 2,
       "round": 2,
       "game": "Cheesy Strings",
       "time": "05:30 PM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 2,
       "round": 2,
       "game": "Talk",
       "time": "05:30 PM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     },
     {
       "block": 2,
       "round": 2,
       "game": "SPLIT",
       "time": "05:30 PM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 2,
       "round": 2,
       "game": "Lift",
       "time": "05:20 PM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 2,
       "round": 2,
       "game": "Bible Whispers",
       "time": "05:20 PM",
-      "shakes": "S5.3",
-      "fries": "F5.2",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "R5.3",
+      "teamB": "B5.2"
     },
     {
       "block": 2,
       "round": 2,
       "game": "Puzzle",
       "time": "05:20 PM",
-      "shakes": "S5.2",
-      "fries": "F5.3",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.2",
+      "teamB": "B5.3"
     },
     {
       "block": 2,
       "round": 3,
       "game": "Lift",
       "time": "05:40 PM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 2,
       "round": 3,
       "game": "Bible Whispers",
       "time": "05:40 PM",
-      "shakes": "S5.1",
-      "fries": "F5.3",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "R5.1",
+      "teamB": "B5.3"
     },
     {
       "block": 2,
       "round": 3,
       "game": "Puzzle",
       "time": "05:40 PM",
-      "shakes": "S5.3",
-      "fries": "F5.1",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.3",
+      "teamB": "B5.1"
     },
     {
       "block": 2,
       "round": 4,
       "game": "Cheesy Strings",
       "time": "06:00 PM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 2,
       "round": 4,
       "game": "Talk",
       "time": "06:00 PM",
-      "shakes": "S5.2",
-      "fries": "F5.1",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "R5.2",
+      "teamB": "B5.1"
     },
     {
       "block": 2,
       "round": 4,
       "game": "SPLIT",
       "time": "06:00 PM",
-      "shakes": "S5.1",
-      "fries": "F5.2",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "R5.1",
+      "teamB": "B5.2"
     },
     {
       "block": 2,
       "round": 4,
       "game": "Lift",
       "time": "06:00 PM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     },
     {
       "block": 2,
       "round": 4,
       "game": "Bible Whispers",
       "time": "06:00 PM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 2,
       "round": 4,
       "game": "Puzzle",
       "time": "06:00 PM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 2,
       "round": 5,
       "game": "Cheesy Strings",
       "time": "06:30 PM",
-      "shakes": "S5.2",
-      "fries": "F5.1",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.2",
+      "teamB": "B5.1"
     },
     {
       "block": 2,
       "round": 5,
       "game": "Talk",
       "time": "06:30 PM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Main Hall"
+      "location": "Main Hall",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 2,
       "round": 5,
       "game": "SPLIT",
       "time": "06:30 PM",
-      "shakes": "S5.1",
-      "fries": "F5.2",
-      "location": "Main Hall / Football Field"
+      "location": "Main Hall / Football Field",
+      "teamA": "R5.1",
+      "teamB": "B5.2"
     },
     {
       "block": 2,
       "round": 5,
       "game": "Lift",
       "time": "06:20 PM",
-      "shakes": "S6.2",
-      "fries": "F6.1",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "W6.2",
+      "teamB": "K6.1"
     },
     {
       "block": 2,
       "round": 5,
       "game": "Bible Whispers",
       "time": "06:20 PM",
-      "shakes": "S6.3",
-      "fries": "F6.2",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "W6.3",
+      "teamB": "K6.2"
     },
     {
       "block": 2,
       "round": 5,
       "game": "Puzzle",
       "time": "06:20 PM",
-      "shakes": "S6.1",
-      "fries": "F6.3",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.1",
+      "teamB": "K6.3"
     },
     {
       "block": 2,
       "round": 6,
       "game": "Lift",
       "time": "06:40 PM",
-      "shakes": "S6.1",
-      "fries": "F6.2",
-      "location": "Terrace"
+      "location": "Terrace",
+      "teamA": "W6.1",
+      "teamB": "K6.2"
     },
     {
       "block": 2,
       "round": 6,
       "game": "Bible Whispers",
       "time": "06:40 PM",
-      "shakes": "S6.2",
-      "fries": "F6.3",
-      "location": "Pool"
+      "location": "Pool",
+      "teamA": "W6.2",
+      "teamB": "K6.3"
     },
     {
       "block": 2,
       "round": 6,
       "game": "Puzzle",
       "time": "06:40 PM",
-      "shakes": "S6.3",
-      "fries": "F6.1",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.3",
+      "teamB": "K6.1"
     },
     {
       "block": 3,
       "round": 1,
       "game": "Big Bucket 1",
       "time": "07:15 PM",
-      "shakes": "S5.1",
-      "fries": "F5.3",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.1",
+      "teamB": "B5.3"
     },
     {
       "block": 3,
       "round": 1,
       "game": "Big Bucket 2",
       "time": "07:15 PM",
-      "shakes": "S6.1",
-      "fries": "F6.2",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.1",
+      "teamB": "K6.2"
     },
     {
       "block": 3,
       "round": 2,
       "game": "Big Bucket 1",
       "time": "07:45 PM",
-      "shakes": "S5.3",
-      "fries": "F5.2",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.3",
+      "teamB": "B5.2"
     },
     {
       "block": 3,
       "round": 2,
       "game": "Big Bucket 2",
       "time": "07:45 PM",
-      "shakes": "S6.2",
-      "fries": "F6.3",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.2",
+      "teamB": "K6.3"
     },
     {
       "block": 4,
       "round": 1,
       "game": "Golden Snitch 1",
       "time": "10:00 AM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 4,
       "round": 1,
       "game": "Nadala+ 1",
       "time": "10:00 AM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Roof"
+      "location": "Roof",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 4,
       "round": 1,
       "game": "Balloon Darts 1",
       "time": "10:30 AM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 4,
       "round": 2,
       "game": "Nadala+ 1",
       "time": "10:30 AM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Roof"
+      "location": "Roof",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 4,
       "round": 2,
       "game": "Balloon Darts 1",
       "time": "11:00 AM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 4,
       "round": 2,
       "game": "Golden Snitch 1",
       "time": "11:00 AM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 4,
       "round": 3,
       "game": "Balloon Darts 1",
       "time": "11:30 AM",
-      "shakes": "S5.1",
-      "fries": "F5.1",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "R5.1",
+      "teamB": "B5.1"
     },
     {
       "block": 4,
       "round": 3,
       "game": "Golden Snitch 1",
       "time": "11:30 AM",
-      "shakes": "S5.2",
-      "fries": "F5.2",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "R5.2",
+      "teamB": "B5.2"
     },
     {
       "block": 4,
       "round": 3,
       "game": "Nadala+ 1",
       "time": "11:30 AM",
-      "shakes": "S5.3",
-      "fries": "F5.3",
-      "location": "Roof"
+      "location": "Roof",
+      "teamA": "R5.3",
+      "teamB": "B5.3"
     },
     {
       "block": 4,
       "round": 1,
       "game": "Golden Snitch 2",
       "time": "10:00 AM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 4,
       "round": 1,
       "game": "Nadala+ 2",
       "time": "10:00 AM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Roof"
+      "location": "Roof",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 4,
       "round": 1,
       "game": "Balloon Darts 2",
       "time": "10:30 AM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     },
     {
       "block": 4,
       "round": 2,
       "game": "Nadala+ 2",
       "time": "10:30 AM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Roof"
+      "location": "Roof",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 4,
       "round": 2,
       "game": "Balloon Darts 2",
       "time": "11:00 AM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 4,
       "round": 2,
       "game": "Golden Snitch 2",
       "time": "11:00 AM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     },
     {
       "block": 4,
       "round": 3,
       "game": "Balloon Darts 2",
       "time": "11:30 AM",
-      "shakes": "S6.1",
-      "fries": "F6.1",
-      "location": "Court"
+      "location": "Court",
+      "teamA": "W6.1",
+      "teamB": "K6.1"
     },
     {
       "block": 4,
       "round": 3,
       "game": "Golden Snitch 2",
       "time": "11:30 AM",
-      "shakes": "S6.2",
-      "fries": "F6.2",
-      "location": "Football Field"
+      "location": "Football Field",
+      "teamA": "W6.2",
+      "teamB": "K6.2"
     },
     {
       "block": 4,
       "round": 3,
       "game": "Nadala+ 2",
       "time": "11:30 AM",
-      "shakes": "S6.3",
-      "fries": "F6.3",
-      "location": "Roof"
+      "location": "Roof",
+      "teamA": "W6.3",
+      "teamB": "K6.3"
     }
   ]
 }

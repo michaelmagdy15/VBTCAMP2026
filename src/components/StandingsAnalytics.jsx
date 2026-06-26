@@ -14,8 +14,7 @@ const TABS = [
 ];
 
 /* Camp-mode side colors */
-const SIDE_COLORS = { shakes: '#00b0ff', fries: '#ff9100' };
-/* Service-mode team colors */
+/* Side/team colors */
 const SERVICE_COLORS = { red: '#ef4444', white: '#ffffff', black: '#94a3b8', blue: '#29b6f6' };
 
 const TOKEN_POINTS_EACH = 2;
@@ -23,7 +22,7 @@ const TOKEN_POINTS_EACH = 2;
 /* ── helpers ─────────────────────────────────────────── */
 
 function isService(eventConfig) {
-  return eventConfig?.eventType === 'service';
+  return eventConfig?.eventType !== 'normal';
 }
 
 /** Return ordered round keys found in blockScores.
@@ -47,15 +46,12 @@ function deriveRoundKeys(blockScores) {
 function buildScoreSeries(campState, campData, eventConfig) {
   const { blockScores = {} } = campState || {};
   const { gamePoints = {} } = campData || {};
-  const service = isService(eventConfig);
 
   const roundKeys = deriveRoundKeys(blockScores);
   if (roundKeys.length === 0) return null;
 
   /* Sides array */
-  const sides = service
-    ? ['red', 'white', 'black', 'blue']
-    : ['shakes', 'fries'];
+  const sides = ['red', 'white', 'black', 'blue'];
 
   /* Build per-round increments for each side */
   const increments = roundKeys.map(() => {
@@ -181,8 +177,7 @@ function ScoreCurveCanvas({ campState, campData, eventConfig }) {
     const yOf = (v) => pad.top + ch - (v / maxY) * ch;
 
     /* Color map */
-    const service = isService(eventConfig);
-    const colorMap = service ? SERVICE_COLORS : SIDE_COLORS;
+    const colorMap = SERVICE_COLORS;
 
     /* Draw each series */
     sides.forEach((side) => {
@@ -250,12 +245,7 @@ function ScoreCurveCanvas({ campState, campData, eventConfig }) {
     ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    const sideLabels = service
-      ? { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' }
-      : {
-          shakes: eventConfig?.side1Name || 'Shakes',
-          fries: eventConfig?.side2Name || 'Fries',
-        };
+    const sideLabels = { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' };
     sides.forEach((side) => {
       const c = colorMap[side] || '#888';
       ctx.fillStyle = c;
@@ -309,17 +299,12 @@ function DeductionLeaderboard({ campState, campData, eventConfig }) {
         const team = teams[code];
         let color = '#94a3b8';
         if (team) {
-          if (service) {
-            const sideKey = (team.side || '').toLowerCase();
-            color = SERVICE_COLORS[sideKey] || '#94a3b8';
-          } else {
-            const sideKey = (team.side || '').toLowerCase();
-            color = SIDE_COLORS[sideKey] || '#94a3b8';
-          }
+          const sideKey = (team.side || '').toLowerCase();
+          color = SERVICE_COLORS[sideKey] || '#94a3b8';
         }
         return { code, value: val, color, name: team?.name || code };
       });
-  }, [teamDeductions, campData?.teams, eventConfig]);
+  }, [teamDeductions, campData?.teams]);
 
   if (sorted.length === 0) {
     return (
@@ -362,33 +347,14 @@ function DeductionLeaderboard({ campState, campData, eventConfig }) {
 function TokenContributionGrid({ campState, eventConfig }) {
   const cards = useMemo(() => {
     const tokens = campState?.tokens || {};
-    const service = isService(eventConfig);
-    if (service) {
-      return Object.entries(SERVICE_COLORS).map(([key, color]) => ({
-        key,
-        label: key.charAt(0).toUpperCase() + key.slice(1),
-        count: tokens[key] || 0,
-        color,
-        textColor: key === 'black' ? '#f8fafc' : key === 'white' ? '#0f172a' : '#f8fafc',
-      }));
-    }
-    return [
-      {
-        key: 'shakes',
-        label: eventConfig?.side1Name || 'Shakes',
-        count: tokens.shakes || 0,
-        color: SIDE_COLORS.shakes,
-        textColor: '#f8fafc',
-      },
-      {
-        key: 'fries',
-        label: eventConfig?.side2Name || 'Fries',
-        count: tokens.fries || 0,
-        color: SIDE_COLORS.fries,
-        textColor: '#f8fafc',
-      },
-    ];
-  }, [campState?.tokens, eventConfig]);
+    return Object.entries(SERVICE_COLORS).map(([key, color]) => ({
+      key,
+      label: key.charAt(0).toUpperCase() + key.slice(1),
+      count: tokens[key] || 0,
+      color,
+      textColor: key === 'black' ? '#f8fafc' : key === 'white' ? '#0f172a' : '#f8fafc',
+    }));
+  }, [campState?.tokens]);
 
   const anyTokens = cards.some((c) => c.count > 0);
 

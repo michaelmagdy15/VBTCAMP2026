@@ -134,11 +134,11 @@ const faqsList = [
   },
   {
     q: "How do point deductions work?",
-    a: "Camp leaders can penalize sub-teams (e.g., F5.2, S6.1) for lateness, poor sportsmanship, or missing team gear. Each deduction point subtracts 1 point from that team's overall side score (Fries or Shakes total score)."
+    a: "Camp leaders can penalize sub-teams (e.g., R1.1, W2.1) for lateness, poor sportsmanship, or missing team gear. Each deduction point subtracts 1 point from that team's overall score."
   },
   {
     q: "How do tokens work?",
-    a: "Tokens can be awarded to either side throughout the day. Each token is worth +2 points and is added directly to the side's Final Total."
+    a: "Tokens can be awarded to teams throughout the day. Each token is worth +2 points and is added directly to the team's Final Total."
   },
   {
     q: "What are the location numbers on the map?",
@@ -426,6 +426,7 @@ export default function App() {
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const [infoSubTab, setInfoSubTab] = useState('map');
   const [settingsSubTab, setSettingsSubTab] = useState('config');
+  const [auditLogFilter, setAuditLogFilter] = useState('All');
 
   // Refs for tracking state/data changes to trigger chimes
   const prevCampStateRef = useRef(null);
@@ -442,6 +443,8 @@ export default function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isWhereIsEveryoneCollapsed, setIsWhereIsEveryoneCollapsed] = useState(true);
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [isRosterCollapsed, setIsRosterCollapsed] = useState(true);
   const [refereeSelectedGame, setRefereeSelectedGame] = useState(() => localStorage.getItem('vbt_ref_selected_game') || '');
   const [uploadImage, setUploadImage] = useState(null);
   const [mapConfig, setMapConfig] = useState(null);
@@ -1017,6 +1020,41 @@ export default function App() {
     return () => unsub();
   }, [currentEventCode]);
 
+  // Handle remote cache clear request
+  useEffect(() => {
+    if (eventConfig && eventConfig.clearCacheVersion) {
+      const localVer = localStorage.getItem('vbt_clear_cache_version');
+      if (localVer !== String(eventConfig.clearCacheVersion)) {
+        console.log('[CacheClear] Mismatch detected. Local:', localVer, 'Remote:', eventConfig.clearCacheVersion);
+        
+        // Clear all caches
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            return Promise.all(names.map(name => caches.delete(name)));
+          }).catch(err => console.error('[CacheClear] Failed to clear caches:', err));
+        }
+
+        // Unregister service workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let registration of registrations) {
+              registration.unregister();
+            }
+          }).catch(err => console.error('[CacheClear] Failed to unregister SW:', err));
+        }
+
+        // Save new version to avoid infinite loop
+        localStorage.setItem('vbt_clear_cache_version', String(eventConfig.clearCacheVersion));
+
+        // Reload the page forcing fresh fetch
+        console.log('[CacheClear] Reloading page to apply updates...');
+        setTimeout(() => {
+          window.location.reload(true);
+        }, 800);
+      }
+    }
+  }, [eventConfig]);
+
   // Subscribe to Map Config
   useEffect(() => {
     if (!currentEventCode) return;
@@ -1077,7 +1115,7 @@ export default function App() {
   // Live configurator state sync when active event config changes
   useEffect(() => {
     if (eventConfig) {
-      if (eventConfig.eventType === 'service') {
+      if (eventConfig.eventType !== 'normal') {
         setEditKidCount(eventConfig.kidCount || 100);
         setEditDaysCount(eventConfig.daysCount || 1);
         setEditAttending(eventConfig.activeServants || []);
@@ -1919,29 +1957,31 @@ export default function App() {
       return;
     }
 
-    const currentShakesScore = m.shakesScore || 0;
-    const currentFriesScore = m.friesScore || 0;
+    const currentTeamAScore = m.teamAScore || m.shakesScore || 0;
+    const currentTeamBScore = m.teamBScore || m.friesScore || 0;
     
-    let newShakesScore = currentShakesScore;
-    let newFriesScore = currentFriesScore;
+    let newTeamAScore = currentTeamAScore;
+    let newTeamBScore = currentTeamBScore;
     
-    if (teamSide === 'Shakes') {
-      newShakesScore = Math.max(0, currentShakesScore + delta);
-    } else if (teamSide === 'Fries') {
-      newFriesScore = Math.max(0, currentFriesScore + delta);
+    if (teamSide === 'teamA' || teamSide === 'Shakes') {
+      newTeamAScore = Math.max(0, currentTeamAScore + delta);
+    } else if (teamSide === 'teamB' || teamSide === 'Fries') {
+      newTeamBScore = Math.max(0, currentTeamBScore + delta);
     }
     
     let computedWinner = 'NA';
-    if (newShakesScore > 0 || newFriesScore > 0) {
-      if (newShakesScore > newFriesScore) computedWinner = 'Shakes';
-      else if (newFriesScore > newShakesScore) computedWinner = 'Fries';
+    if (newTeamAScore > 0 || newTeamBScore > 0) {
+      if (newTeamAScore > newTeamBScore) computedWinner = 'teamA';
+      else if (newTeamBScore > newTeamAScore) computedWinner = 'teamB';
       else computedWinner = 'TIE';
     }
     
     // Update matchup scores in Firestore
     await handleUpdateMatchupTime(m, {
-      shakesScore: newShakesScore,
-      friesScore: newFriesScore
+      teamAScore: newTeamAScore,
+      teamBScore: newTeamBScore,
+      shakesScore: newTeamAScore,
+      friesScore: newTeamBScore
     });
     
     // Automatically toggle block winner in Firestore
@@ -1953,7 +1993,9 @@ export default function App() {
       await syncToGoogleSheet({ blockScores: newBlockScores });
       
       if (currentUser) {
-        const msg = `updated ${m.game} (Block ${m.block}, Rd ${m.round}) score: ${m.shakes} ${newShakesScore} - ${newFriesScore} ${m.fries}`;
+        const teamNameA = m.teamA || m.shakes || 'Team A';
+        const teamNameB = m.teamB || m.fries || 'Team B';
+        const msg = `updated ${m.game} (Block ${m.block}, Rd ${m.round}) score: ${teamNameA} ${newTeamAScore} - ${newTeamBScore} ${teamNameB}`;
         await addAnnouncement(currentEventCode, msg, currentUser.name, 'score');
       }
     }
@@ -3903,30 +3945,21 @@ export default function App() {
     if (!currentUser) return [];
     
     if (eventConfig?.eventType === 'service') {
-      const tabs = [
+      return [
         { id: 'schedule', label: 'Schedule', icon: Calendar },
-        { id: 'service', label: 'Service', icon: BookOpen }
-      ];
-      
-      // Only show Walkie-Talkie to roles with communication access
-      if (['admin', 'leader', 'referee'].includes(currentUser.role)) {
-        tabs.push({ id: 'walkie', label: 'Walkie', icon: Radio });
-      } else {
-        tabs.push({ id: 'scoreboard', label: 'Scores', icon: Trophy });
-      }
-      
-      tabs.push(
+        { id: 'service', label: 'Service', icon: BookOpen },
+        { id: 'walkie', label: 'Walkie', icon: Radio },
+        { id: 'scoreboard', label: 'Scores', icon: Trophy },
         { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
         { id: 'more', label: 'More', icon: MoreHorizontal }
-      );
-      
-      return tabs;
+      ];
     }
     
     return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
       { id: 'info', label: 'Map', icon: MapIcon },
+      { id: 'walkie', label: 'Walkie', icon: Radio },
       { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
       { id: 'more', label: 'More', icon: MoreHorizontal }
     ];
@@ -3935,6 +3968,22 @@ export default function App() {
   const totalBothSides = scoreCalculations.shakesFinal + scoreCalculations.friesFinal;
   const shakesPercentage = totalBothSides > 0 ? (scoreCalculations.shakesFinal / totalBothSides) * 100 : 50;
   const friesPercentage = totalBothSides > 0 ? (scoreCalculations.friesFinal / totalBothSides) * 100 : 50;
+
+  const isReferee = currentUser && currentUser.role === 'referee';
+  const getRefereeAssignedGame = () => {
+    if (!currentUser || currentUser.role !== 'referee') return null;
+    const roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[currentUser.id];
+    if (roleCode) {
+      if (roleCode.startsWith('station_')) {
+        return eventConfig.stations?.[roleCode]?.name || null;
+      } else if (roleCode.startsWith('big_game_')) {
+        return eventConfig.bigGameName || 'Loyalty (Big Game)';
+      } else if (roleCode === 'reflection') {
+        return eventConfig.reflectionName || 'Reflection';
+      }
+    }
+    return currentUser.assignedGame || currentUser.game || null;
+  };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -4134,8 +4183,8 @@ export default function App() {
             )}
             <div className="header-user-info" style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: '600' }}>{currentUser.name}</p>
-              <p style={{ fontSize: '0.65rem', color: currentUser.side === 'Shakes' ? 'var(--color-shakes)' : 'var(--color-fries)', fontWeight: '700' }}>
-                {currentUser.side.toUpperCase()} ({currentUser.teamCode})
+              <p style={{ fontSize: '0.65rem', color: getTeamColorHex(currentUser.side), fontWeight: '700' }}>
+                {(eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side).toUpperCase()} ({currentUser.teamCode})
               </p>
             </div>
             <button 
@@ -4155,10 +4204,78 @@ export default function App() {
         </div>
       </header>
 
-
-
       {/* Content tabs */}
       <main className="content-area animate-fade">
+        {currentUser?.role === 'leader' && (
+          <div className="glass-panel animate-fade" style={{
+            padding: '24px',
+            marginBottom: '16px',
+            border: `2px solid ${getTeamColorHex(currentUser.side)}`,
+            borderRadius: '16px',
+            background: `linear-gradient(135deg, rgba(13,20,38,0.65), rgba(13,20,38,0.45))`,
+            boxShadow: `0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 15px ${getTeamColorHex(currentUser.side)}44`,
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Soft background glow */}
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: getTeamColorHex(currentUser.side),
+              filter: 'blur(60px)',
+              opacity: 0.15,
+              zIndex: 0,
+              pointerEvents: 'none'
+            }} />
+            
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <span style={{
+                fontSize: '0.85rem',
+                fontWeight: '700',
+                color: 'var(--text-secondary)',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                display: 'block',
+                marginBottom: '6px'
+              }}>
+                Welcome back, Team Leader!
+              </span>
+              <h1 style={{
+                fontSize: '2.25rem',
+                fontWeight: '900',
+                margin: 0,
+                color: '#ffffff',
+                fontFamily: 'var(--font-title)',
+                textShadow: `0 0 12px ${getTeamColorHex(currentUser.side)}ff, 0 0 4px ${getTeamColorHex(currentUser.side)}aa`,
+                letterSpacing: '-0.02em',
+                lineHeight: '1.2'
+              }}>
+                {eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side}
+              </h1>
+              <span style={{
+                display: 'inline-block',
+                marginTop: '8px',
+                padding: '4px 14px',
+                borderRadius: '9999px',
+                fontSize: '0.8rem',
+                fontWeight: '800',
+                background: `${getTeamColorHex(currentUser.side)}22`,
+                border: `1px solid ${getTeamColorHex(currentUser.side)}55`,
+                color: '#ffffff',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                {currentUser.teamCode}
+              </span>
+            </div>
+          </div>
+        )}
         
         {/* Tab 1: Scoreboard Accordions */}
         {currentTab === 'scoreboard' && (
@@ -4166,7 +4283,7 @@ export default function App() {
             
             {/* Standings section rendered inside Scores page only */}
             <div style={{ width: '100%', marginBottom: '8px' }}>
-              {eventConfig.eventType === 'service' ? (
+              {eventConfig.eventType !== 'normal' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Trophy size={18} style={{ color: '#fbbf24' }} />
@@ -4281,7 +4398,18 @@ export default function App() {
                       <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
                     </div>
                     {scoreCalculations.winner !== 'TIE' && (
-                      <span className={`badge ${scoreCalculations.winner === 'SHAKES' ? 'badge-shakes' : 'badge-fries'}`}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        fontSize: '0.65rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        background: scoreCalculations.winner === 'SHAKES' ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 145, 0, 0.15)',
+                        border: scoreCalculations.winner === 'SHAKES' ? '1px solid rgba(0, 176, 255, 0.3)' : '1px solid rgba(255, 145, 0, 0.3)',
+                        color: scoreCalculations.winner === 'SHAKES' ? 'var(--color-shakes)' : 'var(--color-fries)'
+                      }}>
                         {scoreCalculations.winner} leading
                       </span>
                     )}
@@ -4316,7 +4444,7 @@ export default function App() {
 
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff', marginBottom: '4px' }}>Game Score Entry</h2>
             
-            {eventConfig.eventType === 'service' ? (
+            {eventConfig.eventType !== 'normal' ? (
               currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
                 <div style={{
                   background: 'rgba(41, 182, 246, 0.1)',
@@ -4357,7 +4485,7 @@ export default function App() {
                 <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(41, 182, 246, 0.06)', border: '1px solid rgba(41, 182, 246, 0.2)', borderRadius: '12px' }}>
                   <p style={{ fontSize: '0.78rem', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
                     <span style={{ fontSize: '1rem' }}>📝</span>
-                    <span><strong>{currentUser.role === 'admin' ? 'Coordinator' : 'Game Leader'} View:</strong> Tap the winner options (Shakes, Tie, Fries) below to submit scores in real-time. Any changes immediately update all devices.</span>
+                    <span><strong>{currentUser.role === 'admin' ? 'Coordinator' : 'Game Leader'} View:</strong> Tap the winner options below to submit scores in real-time. Any changes immediately update all devices.</span>
                   </p>
                 </div>
               ) : (
@@ -4407,7 +4535,7 @@ export default function App() {
                     <div>
                       <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{blockTitle}</h3>
                       <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {eventConfig.eventType === 'service' ? (
+                        {eventConfig.eventType !== 'normal' ? (
                           <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             {['Red', 'White', 'Black', 'Blue'].map((c, i) => {
                               const customColorName = eventConfig.teamNames?.[c.toLowerCase()] || c;
@@ -4470,7 +4598,7 @@ export default function App() {
                                             </span>
                                           </div>
                                           {isActive && (
-                                            <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '1px 4px', fontSize: '0.6rem' }}>
+                                            <span style={{ borderRadius: '9999px', animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 6px', fontSize: '0.6rem', fontWeight: '800', letterSpacing: '0.05em' }}>
                                               LIVE
                                             </span>
                                           )}
@@ -4479,13 +4607,13 @@ export default function App() {
                                       <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: '800' }}>
                                         {winner === 'NA' ? (
                                           <span style={{ color: 'var(--text-muted)' }}>Pending</span>
-                                        ) : winner === 'Shakes' ? (
-                                          <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.shakes) : 'var(--color-shakes)' }}>
-                                            {eventConfig.eventType === 'service' ? `${m.shakes} Win` : 'Shakes Win'}
+                                        ) : winner === 'teamA' || winner === 'Shakes' ? (
+                                          <span style={{ color: getTeamColorHex(m.teamA || m.shakes) }}>
+                                            {m.teamA || m.shakes} Win
                                           </span>
-                                        ) : winner === 'Fries' ? (
-                                          <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.fries) : 'var(--color-fries)' }}>
-                                            {eventConfig.eventType === 'service' ? `${m.fries} Win` : 'Fries Win'}
+                                        ) : winner === 'teamB' || winner === 'Fries' ? (
+                                          <span style={{ color: getTeamColorHex(m.teamB || m.fries) }}>
+                                            {m.teamB || m.fries} Win
                                           </span>
                                         ) : (
                                           <span style={{ color: 'var(--color-tie)' }}>Tie</span>
@@ -4494,44 +4622,54 @@ export default function App() {
                                     </div>
                                     
                                     <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '8px' }}>
-                                      {eventConfig.eventType === 'service' ? (
-                                        <>
-                                          <span style={{ color: getTeamColorHex(m.shakes), fontWeight: '600' }}>{m.shakes}</span>
-                                          <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                          <span style={{ color: getTeamColorHex(m.fries), fontWeight: '600' }}>{m.fries}</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <span style={{ color: 'var(--color-shakes)', fontWeight: '600' }}>{m.shakes} (Shakes)</span>
-                                          <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                          <span style={{ color: 'var(--color-fries)', fontWeight: '600' }}>{m.fries} (Fries)</span>
-                                        </>
-                                      )}
+                                      <>
+                                        <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '600' }}>{m.teamA || m.shakes}</span>
+                                        <span style={{ color: 'var(--text-muted)' }}>vs</span>
+                                        <span style={{ color: getTeamColorHex(m.teamB || m.fries), fontWeight: '600' }}>{m.teamB || m.fries}</span>
+                                      </>
                                     </div>
                                     
                                     {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') && (
                                       <div className="winner-selector">
                                         <button 
-                                          className={`winner-option ${winner === 'Shakes' ? 'active-shakes' : ''}`}
-                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Shakes')}
+                                          className={`winner-option ${winner === 'teamA' || winner === 'Shakes' ? 'active' : ''}`}
+                                          style={{
+                                            background: winner === 'teamA' || winner === 'Shakes' ? getTeamColorHex(m.teamA || m.shakes) : 'transparent',
+                                            color: winner === 'teamA' || winner === 'Shakes' ? '#ffffff' : getTeamColorHex(m.teamA || m.shakes),
+                                            border: `1px solid ${getTeamColorHex(m.teamA || m.shakes)}`,
+                                            borderRadius: '4px',
+                                            padding: '4px 8px'
+                                          }}
+                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamA')}
                                         >
-                                          {eventConfig.eventType === 'service' ? m.shakes : 'Shakes'}
+                                          {m.teamA || m.shakes}
                                         </button>
                                         <button 
-                                          className={`winner-option ${winner === 'TIE' ? 'active-tie' : ''}`}
+                                          className={`winner-option ${winner === 'TIE' ? 'active' : ''}`}
+                                          style={{
+                                            borderRadius: '4px',
+                                            padding: '4px 8px'
+                                          }}
                                           onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
                                         >
                                           Tie
                                         </button>
                                         <button 
-                                          className={`winner-option ${winner === 'Fries' ? 'active-fries' : ''}`}
-                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Fries')}
+                                          className={`winner-option ${winner === 'teamB' || winner === 'Fries' ? 'active' : ''}`}
+                                          style={{
+                                            background: winner === 'teamB' || winner === 'Fries' ? getTeamColorHex(m.teamB || m.fries) : 'transparent',
+                                            color: winner === 'teamB' || winner === 'Fries' ? '#ffffff' : getTeamColorHex(m.teamB || m.fries),
+                                            border: `1px solid ${getTeamColorHex(m.teamB || m.fries)}`,
+                                            borderRadius: '4px',
+                                            padding: '4px 8px'
+                                          }}
+                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamB')}
                                         >
-                                          {eventConfig.eventType === 'service' ? m.fries : 'Fries'}
+                                          {m.teamB || m.fries}
                                         </button>
                                         <button 
                                           className={`winner-option`}
-                                          style={{ color: winner === 'NA' ? '#ffffff' : 'var(--text-muted)' }}
+                                          style={{ color: winner === 'NA' ? '#ffffff' : 'var(--text-muted)', borderRadius: '4px', padding: '4px 8px' }}
                                           onClick={() => handleToggleWinner(m.block, m.round, m.game, 'NA')}
                                         >
                                           Reset
@@ -4596,7 +4734,7 @@ export default function App() {
                                   {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(m.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : m.time}
                                 </span>
                                 {isActive && (
-                                  <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '1px 4px', fontSize: '0.6rem', marginLeft: '6px' }}>
+                                  <span style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 6px', fontSize: '0.6rem', borderRadius: '4px', fontWeight: '800', letterSpacing: '0.05em', marginLeft: '6px' }}>
                                     LIVE
                                   </span>
                                 )}
@@ -4604,13 +4742,13 @@ export default function App() {
                               <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: '800' }}>
                                 {winner === 'NA' ? (
                                   <span style={{ color: 'var(--text-muted)' }}>Pending</span>
-                                ) : winner === 'Shakes' ? (
-                                  <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.shakes) : 'var(--color-shakes)' }}>
-                                    {eventConfig.eventType === 'service' ? `${m.shakes} Win` : 'Shakes Win'}
+                                ) : winner === 'teamA' || winner === 'Shakes' ? (
+                                  <span style={{ color: getTeamColorHex(m.teamA || m.shakes) }}>
+                                    {m.teamA || m.shakes} Win
                                   </span>
-                                ) : winner === 'Fries' ? (
-                                  <span style={{ color: eventConfig.eventType === 'service' ? getTeamColorHex(m.fries) : 'var(--color-fries)' }}>
-                                    {eventConfig.eventType === 'service' ? `${m.fries} Win` : 'Fries Win'}
+                                ) : winner === 'teamB' || winner === 'Fries' ? (
+                                  <span style={{ color: getTeamColorHex(m.teamB || m.fries) }}>
+                                    {m.teamB || m.fries} Win
                                   </span>
                                 ) : (
                                   <span style={{ color: 'var(--color-tie)' }}>Tie</span>
@@ -4619,44 +4757,54 @@ export default function App() {
                             </div>
                             
                             <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '8px' }}>
-                              {eventConfig.eventType === 'service' ? (
-                                <>
-                                  <span style={{ color: getTeamColorHex(m.shakes), fontWeight: '600' }}>{m.shakes}</span>
-                                  <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                  <span style={{ color: getTeamColorHex(m.fries), fontWeight: '600' }}>{m.fries}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span style={{ color: 'var(--color-shakes)', fontWeight: '600' }}>{m.shakes} (Shakes)</span>
-                                  <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                  <span style={{ color: 'var(--color-fries)', fontWeight: '600' }}>{m.fries} (Fries)</span>
-                                </>
-                              )}
+                              <>
+                                <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '600' }}>{m.teamA || m.shakes}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>vs</span>
+                                <span style={{ color: getTeamColorHex(m.teamB || m.fries), fontWeight: '600' }}>{m.teamB || m.fries}</span>
+                              </>
                             </div>
                             
                             {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') && (
                               <div className="winner-selector">
                                 <button 
-                                  className={`winner-option ${winner === 'Shakes' ? 'active-shakes' : ''}`}
-                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Shakes')}
+                                  className={`winner-option ${winner === 'teamA' || winner === 'Shakes' ? 'active-shakes' : ''}`}
+                                  style={{
+                                    background: winner === 'teamA' || winner === 'Shakes' ? getTeamColorHex(m.teamA || m.shakes) : 'transparent',
+                                    color: winner === 'teamA' || winner === 'Shakes' ? '#ffffff' : getTeamColorHex(m.teamA || m.shakes),
+                                    border: `1px solid ${getTeamColorHex(m.teamA || m.shakes)}`,
+                                    borderRadius: '4px',
+                                    padding: '4px 8px'
+                                  }}
+                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamA')}
                                 >
-                                  {eventConfig.eventType === 'service' ? m.shakes : 'Shakes'}
+                                  {m.teamA || m.shakes}
                                 </button>
                                 <button 
                                   className={`winner-option ${winner === 'TIE' ? 'active-tie' : ''}`}
+                                  style={{
+                                    borderRadius: '4px',
+                                    padding: '4px 8px'
+                                  }}
                                   onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
                                 >
                                   Tie
                                 </button>
                                 <button 
-                                  className={`winner-option ${winner === 'Fries' ? 'active-fries' : ''}`}
-                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'Fries')}
+                                  className={`winner-option ${winner === 'teamB' || winner === 'Fries' ? 'active-fries' : ''}`}
+                                  style={{
+                                    background: winner === 'teamB' || winner === 'Fries' ? getTeamColorHex(m.teamB || m.fries) : 'transparent',
+                                    color: winner === 'teamB' || winner === 'Fries' ? '#ffffff' : getTeamColorHex(m.teamB || m.fries),
+                                    border: `1px solid ${getTeamColorHex(m.teamB || m.fries)}`,
+                                    borderRadius: '4px',
+                                    padding: '4px 8px'
+                                  }}
+                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamB')}
                                 >
-                                  {eventConfig.eventType === 'service' ? m.fries : 'Fries'}
+                                  {m.teamB || m.fries}
                                 </button>
                                 <button 
                                   className={`winner-option`}
-                                  style={{ color: winner === 'NA' ? '#ffffff' : 'var(--text-muted)' }}
+                                  style={{ color: winner === 'NA' ? '#ffffff' : 'var(--text-muted)', borderRadius: '4px', padding: '4px 8px' }}
                                   onClick={() => handleToggleWinner(m.block, m.round, m.game, 'NA')}
                                 >
                                   Reset
@@ -4680,7 +4828,20 @@ export default function App() {
             <div className="glass-panel" style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.1) 0%, rgba(13, 20, 38, 0.4) 100%)' }}>
               <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <span className={`badge ${currentUser.side === 'Shakes' ? 'badge-shakes' : 'badge-fries'}`}>{currentUser.side} Side</span>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '4px 10px',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    background: `${getTeamColorHex(currentUser.side)}22`,
+                    border: `1px solid ${getTeamColorHex(currentUser.side)}55`,
+                    color: '#ffffff',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {(eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side).toUpperCase()}
+                  </span>
                   <h2 style={{ fontSize: '1.75rem', color: '#ffffff', marginTop: '6px' }}>Team {currentUser.teamCode}</h2>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Leaders: {myTeamInfo.leaders}</p>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Grade: {myTeamInfo.grade}</p>
@@ -4786,7 +4947,7 @@ export default function App() {
                       </span>
                     </div>
                     {getEffectiveTimeShift() > 0 && (
-                      <span className="badge badge-shakes" style={{ background: '#ef4444', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 6px' }}>
+                      <span style={{ display: 'inline-block', borderRadius: '9999px', background: '#ef4444', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         +{getEffectiveTimeShift()}m delay
                       </span>
                     )}
@@ -4857,7 +5018,7 @@ export default function App() {
                                       {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
                                     </span>
                                     {isActive && (
-                                      <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
+                                      <span style={{ display: 'inline-block', borderRadius: '9999px', animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 8px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.05em' }}>
                                         LIVE NOW
                                       </span>
                                     )}
@@ -4900,38 +5061,31 @@ export default function App() {
                 <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>Camp Teams Directory</h3>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                {/* Shakes Side */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <h4 style={{ fontSize: '0.75rem', color: 'var(--color-shakes)', fontWeight: '700', textTransform: 'uppercase', borderBottom: '1px solid rgba(0, 176, 255, 0.2)', paddingBottom: '4px' }}>
-                    Shakes Side
-                  </h4>
-                  {Object.entries(campData.teams)
-                    .filter(([_, t]) => t.side === 'Shakes')
-                    .map(([code, t]) => (
-                      <div key={code} style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                        <p style={{ fontWeight: '700', color: '#ffffff' }}>{code} (Grade {t.grade})</p>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem' }}>{t.leaders}</p>
-                      </div>
-                    ))
-                  }
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
+                {['Red', 'White', 'Black', 'Blue'].map(colorName => {
+                  const colorHex = getTeamColorHex(colorName);
+                  const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
+                  const colorTeams = Object.entries(campData.teams || {})
+                    .filter(([_, t]) => t.side === colorName);
 
-                {/* Fries Side */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <h4 style={{ fontSize: '0.75rem', color: 'var(--color-fries)', fontWeight: '700', textTransform: 'uppercase', borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '4px' }}>
-                    Fries Side
-                  </h4>
-                  {Object.entries(campData.teams)
-                    .filter(([_, t]) => t.side === 'Fries')
-                    .map(([code, t]) => (
-                      <div key={code} style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                        <p style={{ fontWeight: '700', color: '#ffffff' }}>{code} (Grade {t.grade})</p>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem' }}>{t.leaders}</p>
-                      </div>
-                    ))
-                  }
-                </div>
+                  return (
+                    <div key={colorName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <h4 style={{ fontSize: '0.75rem', color: colorHex, fontWeight: '700', textTransform: 'uppercase', borderBottom: `1px solid ${colorHex}33`, paddingBottom: '4px' }}>
+                        {customName}
+                      </h4>
+                      {colorTeams.length === 0 ? (
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No teams</p>
+                      ) : (
+                        colorTeams.map(([code, t]) => (
+                          <div key={code} style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', fontSize: '0.75rem', borderLeft: `3px solid ${colorHex}` }}>
+                            <p style={{ fontWeight: '700', color: '#ffffff', margin: 0 }}>{code} (Grade {t.grade})</p>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', margin: '4px 0 0 0' }}>{t.leaders}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -4940,6 +5094,34 @@ export default function App() {
         {/* Tab 3: Full Schedule filterable */}
         {currentTab === 'schedule' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {isReferee && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowFullSchedule(!showFullSchedule)}
+                  className="glass-btn"
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(41, 182, 246, 0.3)',
+                    background: showFullSchedule ? 'rgba(41, 182, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    color: '#ffffff',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {showFullSchedule ? '👁️ Hide Full Schedule' : '👁️ Show Full Schedule'}
+                </button>
+              </div>
+            )}
+
+            {(!isReferee || showFullSchedule) && (
+              <>
             <ScheduleExporter
               scheduleData={campData}
               campData={campData}
@@ -5115,7 +5297,7 @@ export default function App() {
                 </div>
               );
             })()}
-            {eventConfig.eventType === 'service' ? (
+            {eventConfig.eventType !== 'normal' ? (
               <div style={{
                 background: 'rgba(41, 182, 246, 0.1)',
                 border: '1px solid rgba(41, 182, 246, 0.3)',
@@ -5181,7 +5363,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <h2 style={{ fontSize: '1.2rem', color: '#ffffff' }}>Matchups & Locations</h2>
               <div className="schedule-filter-dropdowns" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {eventConfig.eventType === 'service' ? (
+                {eventConfig.eventType !== 'normal' ? (
                   <select 
                     value={scheduleBlockFilter}
                     onChange={(e) => setScheduleBlockFilter(e.target.value)}
@@ -5469,7 +5651,7 @@ export default function App() {
                   </span>
                 </div>
                 {campState.isTimerPaused && (
-                  <span className="badge badge-shakes" style={{ background: '#ef4444', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '1px 6px' }}>
+                  <span style={{ display: 'inline-block', borderRadius: '9999px', background: '#ef4444', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     PAUSED
                   </span>
                 )}
@@ -5549,9 +5731,9 @@ export default function App() {
                             color: '#ffffff',
                             border: '1px solid rgba(255,255,255,0.03)'
                           }}>
-                            <span style={{ color: 'var(--color-shakes)' }}>{active.shakes}</span>
+                            <span style={{ color: getTeamColorHex(active.teamA || active.shakes) }}>{active.teamA || active.shakes}</span>
                             <span style={{ color: 'var(--text-muted)', margin: '0 4px', fontWeight: 'normal' }}>vs</span>
-                            <span style={{ color: 'var(--color-fries)' }}>{active.fries}</span>
+                            <span style={{ color: getTeamColorHex(active.teamB || active.fries) }}>{active.teamB || active.fries}</span>
                           </div>
                         )}
                       </div>
@@ -5560,6 +5742,8 @@ export default function App() {
                 </div>
               )}
             </div>
+          </>
+        )}
 
             {/* 📋 Game Leader Control Panel */}
             {currentUser && (currentUser.role === 'referee' || currentUser.role === 'admin') && (
@@ -5579,7 +5763,7 @@ export default function App() {
                       Game Leader Control Panel
                     </h3>
                   </div>
-                  <span className="badge badge-shakes" style={{ background: 'var(--vbt-sky)', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 6px', fontWeight: '700' }}>
+                  <span style={{ background: 'var(--vbt-sky)', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '700', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     ACTIVE GAME
                   </span>
                 </div>
@@ -5592,8 +5776,16 @@ export default function App() {
                   <select
                     value={refereeSelectedGame}
                     onChange={(e) => {
-                      setRefereeSelectedGame(e.target.value);
-                      localStorage.setItem('vbt_ref_selected_game', e.target.value);
+                      const selectedVal = e.target.value;
+                      const assignedGame = getRefereeAssignedGame();
+                      if (selectedVal && assignedGame && selectedVal !== assignedGame) {
+                        const proceed = window.confirm(
+                          `Warning: Your officially assigned station/game is "${assignedGame}". Are you sure you want to manage "${selectedVal}" instead?`
+                        );
+                        if (!proceed) return;
+                      }
+                      setRefereeSelectedGame(selectedVal);
+                      localStorage.setItem('vbt_ref_selected_game', selectedVal);
                     }}
                     style={{
                       padding: '8px 12px',
@@ -5701,14 +5893,14 @@ export default function App() {
 
                               {/* Simple point adjuster logic */}
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '8px 12px', borderRadius: '6px' }}>
-                                {/* Shakes side */}
+                                {/* teamA side */}
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-shakes)', fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
-                                    Shakes ({m.shakes})
+                                  <span style={{ fontSize: '0.7rem', color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
+                                    {m.teamA || m.shakes}
                                   </span>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'Shakes', -1)}
+                                      onClick={() => handleUpdateMatchupScore(m, 'teamA', -1)}
                                       style={{
                                         width: '26px',
                                         height: '26px',
@@ -5728,10 +5920,10 @@ export default function App() {
                                       -
                                     </button>
                                     <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                      {m.shakesScore || 0}
+                                      {m.teamAScore || m.shakesScore || 0}
                                     </span>
                                     <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'Shakes', 1)}
+                                      onClick={() => handleUpdateMatchupScore(m, 'teamA', 1)}
                                       style={{
                                         width: '26px',
                                         height: '26px',
@@ -5756,14 +5948,14 @@ export default function App() {
                                 {/* Divider */}
                                 <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(255,255,255,0.08)', margin: '0 8px' }} />
 
-                                {/* Fries side */}
+                                {/* teamB side */}
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-fries)', fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
-                                    Fries ({m.fries})
+                                  <span style={{ fontSize: '0.7rem', color: getTeamColorHex(m.teamB || m.fries), fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
+                                    {m.teamB || m.fries}
                                   </span>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'Fries', -1)}
+                                      onClick={() => handleUpdateMatchupScore(m, 'teamB', -1)}
                                       style={{
                                         width: '26px',
                                         height: '26px',
@@ -5783,10 +5975,10 @@ export default function App() {
                                       -
                                     </button>
                                     <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                      {m.friesScore || 0}
+                                      {m.teamBScore || m.friesScore || 0}
                                     </span>
                                     <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'Fries', 1)}
+                                      onClick={() => handleUpdateMatchupScore(m, 'teamB', 1)}
                                       style={{
                                         width: '26px',
                                         height: '26px',
@@ -5817,10 +6009,10 @@ export default function App() {
                                     <span style={{ 
                                       fontSize: '0.65rem', 
                                       fontWeight: '800', 
-                                      color: winner === 'Shakes' ? 'var(--color-shakes)' : winner === 'Fries' ? 'var(--color-fries)' : 'var(--color-tie)', 
+                                      color: (winner === 'teamA' || winner === 'Shakes') ? getTeamColorHex(m.teamA || m.shakes) : (winner === 'teamB' || winner === 'Fries') ? getTeamColorHex(m.teamB || m.fries) : 'var(--color-tie)', 
                                       textTransform: 'uppercase' 
                                     }}>
-                                      🏆 Winner: {winner === 'TIE' ? 'Tie Match' : winner}
+                                      🏆 Winner: {winner === 'TIE' ? 'Tie Match' : (winner === 'teamA' || winner === 'Shakes') ? (m.teamA || m.shakes) : (winner === 'teamB' || winner === 'Fries') ? (m.teamB || m.fries) : winner}
                                     </span>
                                   ) : (
                                     <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
@@ -5950,7 +6142,8 @@ export default function App() {
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {(!isReferee || showFullSchedule) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filteredMatchups.length === 0 ? (
                 <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No matchups fit the current filters.
@@ -5978,7 +6171,7 @@ export default function App() {
                             BLOCK {m.block} • RD {m.round}
                           </span>
                           {isActive && (
-                            <span className="badge badge-shakes" style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none' }}>
+                            <span style={{ display: 'inline-block', borderRadius: '9999px', animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 8px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.05em' }}>
                               LIVE
                             </span>
                           )}
@@ -6158,6 +6351,162 @@ export default function App() {
                 })
               )}
             </div>
+            )}
+
+            {/* Roster & Assignments Section */}
+            <div className="glass-panel animate-fade-in" style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', marginTop: '8px' }}>
+              <div 
+                onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isRosterCollapsed ? '0' : '12px' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={18} style={{ color: 'var(--vbt-sky)' }} />
+                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '700', margin: 0 }}>👥 Servant Roster & Assignments</h3>
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {isRosterCollapsed ? '▲ Expand' : '▼ Collapse'}
+                </span>
+              </div>
+
+              {!isRosterCollapsed && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Search servants, roles, or stations..."
+                    value={rosterSearch}
+                    onChange={(e) => setRosterSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      border: '1px solid var(--border-light)',
+                      color: '#ffffff',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                    {(() => {
+                      const activeServants = eventConfig.activeServants || [];
+                      const rosterList = globalServants
+                        .filter(s => activeServants.includes(s.id))
+                        .map(s => {
+                          const roleCode = eventConfig.servantAssignments?.[s.id] || 'volunteer';
+                          let roleName = 'Volunteer / Ref';
+                          let locationName = 'General';
+                          let teamName = 'None';
+                          let colorHex = '#94a3b8';
+                          
+                          if (roleCode === 'coordinator') {
+                            roleName = 'Coordinator';
+                            locationName = 'Main Hall / Control';
+                            colorHex = '#a855f7';
+                          } else if (roleCode === 'service_leader') {
+                            roleName = 'Service Day Leader';
+                            locationName = 'Main Hall';
+                            colorHex = '#ec4899';
+                          } else if (roleCode.startsWith('station_')) {
+                            const station = eventConfig.stations?.[roleCode];
+                            roleName = `${station?.name || roleCode.replace('station_', 'Station ')} Lead`;
+                            locationName = station?.location || 'Assigned Station';
+                            colorHex = '#f59e0b';
+                          } else if (roleCode.startsWith('big_game_')) {
+                            roleName = `Big Game Lead (${eventConfig.bigGameName || 'Loyalty'})`;
+                            locationName = 'Main Hall';
+                            colorHex = '#eab308';
+                          } else if (roleCode === 'reflection') {
+                            roleName = `Reflection Lead (${eventConfig.reflectionName || 'Reflection'})`;
+                            locationName = 'Classrooms';
+                            colorHex = '#14b8a6';
+                          } else if (roleCode === 'media') {
+                            roleName = 'Media Team';
+                            locationName = 'Roaming';
+                            colorHex = '#3b82f6';
+                          } else if (roleCode.startsWith('team_')) {
+                            const parts = roleCode.split('_');
+                            const color = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+                            const num = parts[2] || '1';
+                            const customName = eventConfig.teamNames?.[parts[1]] || color;
+                            roleName = `Team Leader (${customName} ${num})`;
+                            teamName = `${customName} ${num}`;
+                            locationName = 'With Sub-team (Schedule)';
+                            colorHex = getTeamColorHex(color);
+                          }
+                          
+                          return { servant: s, roleCode, roleName, locationName, teamName, colorHex };
+                        });
+
+                      const filteredRoster = rosterList.filter(item => {
+                        const searchLower = rosterSearch.toLowerCase();
+                        return (
+                          item.servant.name.toLowerCase().includes(searchLower) ||
+                          item.roleName.toLowerCase().includes(searchLower) ||
+                          item.locationName.toLowerCase().includes(searchLower) ||
+                          item.teamName.toLowerCase().includes(searchLower)
+                        );
+                      });
+
+                      if (filteredRoster.length === 0) {
+                        return (
+                          <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            No assignments found matching "{rosterSearch}"
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                          {filteredRoster.map(item => (
+                            <div 
+                              key={item.servant.id} 
+                              style={{ 
+                                padding: '10px', 
+                                background: 'rgba(255,255,255,0.02)', 
+                                border: '1px solid rgba(255,255,255,0.06)', 
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                borderLeft: `4px solid ${item.colorHex}`
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#ffffff' }}>
+                                  {item.servant.name}
+                                </span>
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: '800', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '4px', 
+                                  background: `${item.colorHex}22`,
+                                  color: item.colorHex,
+                                  border: `1px solid ${item.colorHex}44`
+                                }}>
+                                  {item.roleName}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                <span>📍 {item.locationName}</span>
+                                {item.teamName !== 'None' && (
+                                  <span style={{ fontWeight: '700', color: getTeamColorHex(item.teamName.split(' ')[0]) }}>
+                                    👥 {item.teamName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -6455,7 +6804,7 @@ export default function App() {
                       </svg>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-                      {eventConfig.eventType === 'service' ? (
+                      {eventConfig.eventType !== 'normal' ? (
                         ['Red', 'White', 'Black', 'Blue'].map(colorName => {
                           const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
                           const colorHex = getTeamColorHex(colorName);
@@ -6539,7 +6888,7 @@ export default function App() {
                   </div>
                 )}
 
-                {eventConfig.eventType === 'service' ? (
+                {eventConfig.eventType !== 'normal' ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     {['Red', 'White', 'Black', 'Blue'].map(colorName => {
                       const colorHex = getTeamColorHex(colorName);
@@ -6943,7 +7292,7 @@ export default function App() {
                 style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
                 onClick={() => setSettingsSubTab('config')}
               >
-                ⚙️ Service Setup
+                {eventConfig.eventType === 'service' ? '⚙️ Service Setup' : eventConfig.eventType === 'camp' ? '⚙️ Camp Setup' : '⚙️ Setup'}
               </button>
               <button 
                 className={`toggle-btn ${settingsSubTab === 'builder' ? 'active' : ''}`}
@@ -6951,6 +7300,13 @@ export default function App() {
                 onClick={() => setSettingsSubTab('builder')}
               >
                 📅 Schedule Builder
+              </button>
+              <button 
+                className={`toggle-btn ${settingsSubTab === 'logs' ? 'active' : ''}`}
+                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+                onClick={() => setSettingsSubTab('logs')}
+              >
+                📜 Audit Logs
               </button>
             </div>
 
@@ -7075,7 +7431,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Dynamic Configurator - Church Service Adaptability */}
                 <DynamicConfigurator
                   eventConfig={eventConfig}
                   onSaveConfig={async (updates) => {
@@ -7084,7 +7439,44 @@ export default function App() {
                   campData={campData}
                 />
 
-            {eventConfig.eventType === 'service' ? (
+                {/* 🧹 Force Cache Clear Card */}
+                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.03)' }}>
+                  <h3 style={{ fontSize: '0.9rem', color: '#f87171', fontWeight: '800', marginBottom: '4px' }}>🧹 System Maintenance & Cache Clear</h3>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    If you made code changes or updates and want to force everyone currently logged in on their phones to reload, clear their cache, and receive the latest updates, click below.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm("Are you sure you want to force a cache clear and reload for all active signed-in clients?")) {
+                        try {
+                          const nextVer = (eventConfig.clearCacheVersion || 0) + 1;
+                          await updateEventConfig(currentEventCode, { clearCacheVersion: nextVer });
+                          alert("Cache clear command successfully sent! All active signed-in clients will automatically clear their cache and reload shortly.");
+                        } catch (err) {
+                          alert("Error sending cache clear command: " + err.message);
+                        }
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                    }}
+                  >
+                    🧹 Force Cache Clear & Reload All Clients
+                  </button>
+                </div>
+
+            {eventConfig.eventType !== 'normal' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.02)' }}>
                   <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', marginBottom: '4px', fontWeight: '800' }}>⚙️ Live Service Configurator</h3>
@@ -7685,7 +8077,7 @@ export default function App() {
               <div className="glass-panel" style={{ padding: '16px' }}>
                 <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '8px' }}>Camp Tokens (+2 pts each)</h3>
                 
-                {eventConfig.eventType === 'service' ? (
+                {eventConfig.eventType !== 'normal' ? (
                   <div className="config-grid-2col" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                     {['red', 'white', 'black', 'blue'].map(colorKey => {
                       const colorNameCapitalized = colorKey.charAt(0).toUpperCase() + colorKey.slice(1);
@@ -8156,6 +8548,114 @@ export default function App() {
                   playChime('schedule');
                 }}
               />
+            )}
+
+            {settingsSubTab === 'logs' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(41, 182, 246, 0.3)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                    <h3 style={{ fontSize: '1rem', color: '#38bdf8', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                      📜 Chronological Audit Logs
+                    </h3>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {['All', 'score', 'deduction', 'system'].map((typeOption) => (
+                        <button
+                          key={typeOption}
+                          type="button"
+                          onClick={() => setAuditLogFilter(typeOption)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            background: auditLogFilter === typeOption ? 'var(--vbt-blue)' : 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid ' + (auditLogFilter === typeOption ? 'var(--vbt-sky)' : 'rgba(255, 255, 255, 0.1)'),
+                            color: '#ffffff',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            textTransform: 'capitalize',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {typeOption}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {(() => {
+                      const filteredLogs = announcements.filter(log => {
+                        if (auditLogFilter === 'All') {
+                          return ['score', 'deduction', 'system'].includes(log.type);
+                        }
+                        return log.type === auditLogFilter;
+                      }).sort((a, b) => {
+                        const timeA = a.timestamp ? (a.timestamp.seconds ? a.timestamp.seconds * 1000 : new Date(a.timestamp).getTime()) : 0;
+                        const timeB = b.timestamp ? (b.timestamp.seconds ? b.timestamp.seconds * 1000 : new Date(b.timestamp).getTime()) : 0;
+                        return timeB - timeA; // newest first
+                      });
+
+                      if (filteredLogs.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            No logs found matching filter: {auditLogFilter}
+                          </div>
+                        );
+                      }
+
+                      return filteredLogs.map((log) => {
+                        const logTime = log.timestamp ? (log.timestamp.seconds ? new Date(log.timestamp.seconds * 1000) : new Date(log.timestamp)) : new Date();
+                        const timeStr = logTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + logTime.toLocaleDateString();
+                        
+                        let badgeColor = '#94a3b8';
+                        if (log.type === 'score') badgeColor = '#22c55e';
+                        if (log.type === 'deduction') badgeColor = '#ef4444';
+                        if (log.type === 'system') badgeColor = '#38bdf8';
+
+                        return (
+                          <div
+                            key={log.id}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: `${badgeColor}22`,
+                                border: `1px solid ${badgeColor}44`,
+                                color: badgeColor,
+                                fontWeight: '700',
+                                textTransform: 'uppercase'
+                              }}>
+                                {log.type}
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {timeStr}
+                              </span>
+                            </div>
+                            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', lineHeight: '1.4' }}>
+                              {log.text}
+                            </p>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                              By: <strong>{log.sender}</strong> ({log.senderRole || 'unknown'})
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -8805,8 +9305,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Admin, Leader, Referee: Walkie Talkie (Only in Camp Mode, since in Service Mode it is on the bottom tab bar) */}
-              {['admin', 'leader', 'referee'].includes(currentUser.role) && eventConfig.eventType !== 'service' && (
+               {eventConfig.eventType !== 'service' && (
                 <button
                   className="more-drawer-item"
                   onClick={() => {

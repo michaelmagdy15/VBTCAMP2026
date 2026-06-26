@@ -123,13 +123,10 @@ export async function createEvent(eventCode, config) {
     });
 
     // Write empty live_scores doc (path: vbt_events/{eventCode}/live_scores/state)
-    const isService = config.eventType === 'service';
     await setDoc(doc(db, eventScoresPath(eventCode)), {
       blockScores: {},
       teamDeductions: {},
-      tokens: isService 
-        ? { red: 0, white: 0, black: 0, blue: 0 } 
-        : { shakes: 0, fries: 0 },
+      tokens: { red: 0, white: 0, black: 0, blue: 0 },
       timeShiftMinutes: 0,
       isTimerPaused: false,
       timerPausedAt: null,
@@ -760,9 +757,17 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
         const teamB = teamList[j];
         if (usedInRound.has(teamB)) continue;
 
-        const colorB = getBaseColor(teamB);
-        // Constraint: Teams of the same base color cannot play each other
-        if (colorA === colorB && colorA !== 'Servants') continue;
+        // Constraint: Red only plays Blue, White only plays Black, same-color matches are forbidden.
+        if (teamA !== 'Servants' && teamB !== 'Servants') {
+          const sideA = teams[teamA]?.side;
+          const sideB = teams[teamB]?.side;
+          const isValidColorMatch = 
+            (sideA === 'Red' && sideB === 'Blue') ||
+            (sideA === 'Blue' && sideB === 'Red') ||
+            (sideA === 'White' && sideB === 'Black') ||
+            (sideA === 'Black' && sideB === 'White');
+          if (!isValidColorMatch) continue;
+        }
 
         const pairKey = getPairKey(teamA, teamB);
         const isDuplicate = playedPairs.has(pairKey);
@@ -832,8 +837,8 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
           round: r,
           game: gameName,
           time: roundTimes[r],
-          shakes: teamA,
-          fries: teamB,
+          teamA: teamA,
+          teamB: teamB,
           location: locName
         });
       }
@@ -846,8 +851,8 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
       round: 1,
       game: bigGameName,
       time: "04:35 PM",
-      shakes: "All Teams",
-      fries: "Referees",
+      teamA: "All Teams",
+      teamB: "Referees",
       location: bigGameLoc
     });
 
@@ -858,8 +863,8 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
       round: 1,
       game: reflectionName,
       time: "05:10 PM",
-      shakes: "All Teams",
-      fries: "Bible Discussion",
+      teamA: "All Teams",
+      teamB: "Bible Discussion",
       location: reflectionLoc
     });
   }

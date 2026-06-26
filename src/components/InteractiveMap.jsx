@@ -331,21 +331,21 @@ export default function InteractiveMap({
                       className="team-dot"
                       style={{
                         background: getTeamColorHex
-                          ? getTeamColorHex(locationMap[selectedId].activeMatchup.shakes)
+                          ? getTeamColorHex(locationMap[selectedId].activeMatchup.teamA)
                           : '#f97316',
                       }}
                     />
-                    <span>{locationMap[selectedId].activeMatchup.shakes}</span>
+                    <span>{locationMap[selectedId].activeMatchup.teamA}</span>
                     <span style={{ color: '#64748b', margin: '0 2px' }}>vs</span>
                     <span
                       className="team-dot"
                       style={{
                         background: getTeamColorHex
-                          ? getTeamColorHex(locationMap[selectedId].activeMatchup.fries)
+                          ? getTeamColorHex(locationMap[selectedId].activeMatchup.teamB)
                           : '#8b5cf6',
                       }}
                     />
-                    <span>{locationMap[selectedId].activeMatchup.fries}</span>
+                    <span>{locationMap[selectedId].activeMatchup.teamB}</span>
                   </div>
                   <p className="map-tooltip-time">
                     ⏰ {locationMap[selectedId].activeMatchup.time}

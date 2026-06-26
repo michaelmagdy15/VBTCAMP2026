@@ -45,17 +45,7 @@ const CHANNEL_META = [
 ];
 
 function getAllowedChannels(role) {
-  switch ((role || '').toLowerCase()) {
-    case 'admin':
-      return [CHANNELS.COORDINATORS, CHANNELS.TEAM_LEADERS, CHANNELS.GAME_LEADERS, CHANNELS.GLOBAL];
-    case 'team leader':
-      return [CHANNELS.TEAM_LEADERS, CHANNELS.GLOBAL];
-    case 'referee':
-    case 'game leader':
-      return [CHANNELS.GAME_LEADERS, CHANNELS.GLOBAL];
-    default:
-      return [CHANNELS.GLOBAL];
-  }
+  return [CHANNELS.COORDINATORS, CHANNELS.TEAM_LEADERS, CHANNELS.GAME_LEADERS, CHANNELS.GLOBAL];
 }
 
 // ── Utility ────────────────────────────────────────────────────────────
@@ -141,13 +131,13 @@ function MessageBubble({ msg, channelColor }) {
     };
   }, []);
 
+  const cleanRole = (msg.senderRole || '').toLowerCase();
   const roleBadgeColor =
-    (msg.senderRole || '').toLowerCase() === 'admin'
+    cleanRole === 'admin'
       ? '#a855f7'
-      : (msg.senderRole || '').toLowerCase() === 'team leader'
+      : (cleanRole === 'team leader' || cleanRole === 'leader')
       ? '#29b6f6'
-      : (msg.senderRole || '').toLowerCase() === 'referee' ||
-        (msg.senderRole || '').toLowerCase() === 'game leader'
+      : (cleanRole === 'referee' || cleanRole === 'game leader')
       ? '#f59e0b'
       : '#22c55e';
 
