@@ -1896,7 +1896,7 @@ export default function App() {
       actualEnd: stopTime,
       delayAddedMinutes: delayMins,
       delayAddedSeconds: delaySecs,
-      delayCause: `${m.game} (${m.shakes} vs ${m.fries})`
+      delayCause: `${m.game} (${m.teamA || m.shakes} vs ${m.teamB || m.fries})`
     };
     
     await handleUpdateMatchupTime(m, trackingUpdate);
@@ -2077,12 +2077,14 @@ export default function App() {
           const winner = blockScores[key] || 'NA';
           const points = campData.gamePoints?.[m.game] || 0;
 
-          if (winner === 'Shakes' && m.shakes && m.shakes !== "All Teams") {
-            teamScores[m.shakes] += points;
-            teamWins[m.shakes] += 1;
-          } else if (winner === 'Fries' && m.fries && m.fries !== "Referees") {
-            teamScores[m.fries] += points;
-            teamWins[m.fries] += 1;
+          const teamA = m.teamA || m.shakes;
+          const teamB = m.teamB || m.fries;
+          if (winner === 'Shakes' && teamA && teamA !== "All Teams") {
+            teamScores[teamA] += points;
+            teamWins[teamA] += 1;
+          } else if (winner === 'Fries' && teamB && teamB !== "Referees") {
+            teamScores[teamB] += points;
+            teamWins[teamB] += 1;
           }
         });
       }
@@ -2126,18 +2128,20 @@ export default function App() {
           const winner = blockScores[key] || 'NA';
           const points = campData.gamePoints?.[m.game] || 0;
           
-          if (m.shakes === "All Teams") {
+          const teamA = m.teamA || m.shakes;
+          const teamB = m.teamB || m.fries;
+          if (teamA === "All Teams") {
             if (winner === 'Shakes') {
               colors.forEach(c => { wins[c] += points; });
             }
           } else {
             if (winner === 'Shakes') {
-              const team = campData.teams?.[m.shakes];
+              const team = campData.teams?.[teamA];
               if (team && colors.includes(team.side)) {
                 wins[team.side] += points;
               }
             } else if (winner === 'Fries') {
-              const team = campData.teams?.[m.fries];
+              const team = campData.teams?.[teamB];
               if (team && colors.includes(team.side)) {
                 wins[team.side] += points;
               }
@@ -2178,18 +2182,20 @@ export default function App() {
             const winner = blockScores[key] || 'NA';
             const points = campData.gamePoints?.[m.game] || 0;
             
-            if (m.shakes === "All Teams") {
+            const teamA = m.teamA || m.shakes;
+            const teamB = m.teamB || m.fries;
+            if (teamA === "All Teams") {
               if (winner === 'Shakes') {
                 colors.forEach(c => { blockWins[c] += points; });
               }
             } else {
               if (winner === 'Shakes') {
-                const team = campData.teams?.[m.shakes];
+                const team = campData.teams?.[teamA];
                 if (team && colors.includes(team.side)) {
                   blockWins[team.side] += points;
                 }
               } else if (winner === 'Fries') {
-                const team = campData.teams?.[m.fries];
+                const team = campData.teams?.[teamB];
                 if (team && colors.includes(team.side)) {
                   blockWins[team.side] += points;
                 }
@@ -2618,7 +2624,9 @@ export default function App() {
         return false;
       }
       if (scheduleTeamFilter) {
-        if (m.shakes !== scheduleTeamFilter && m.fries !== scheduleTeamFilter) {
+        const teamA = m.teamA || m.shakes;
+        const teamB = m.teamB || m.fries;
+        if (teamA !== scheduleTeamFilter && teamB !== scheduleTeamFilter) {
           return false;
         }
       }
@@ -2667,18 +2675,22 @@ export default function App() {
     let rawSchedule = [];
     if (isService) {
       rawSchedule = (campData.matchups || [])
-        .filter(m => m.shakes === currentUser.teamCode || m.fries === currentUser.teamCode)
-        .map(m => ({
-          day: m.day || 1,
-          block: `Block ${m.block}`,
-          round: m.round,
-          game: m.game,
-          time: m.time,
-          location: m.location,
-          opponent: m.shakes === currentUser.teamCode ? m.fries : m.shakes,
-          shakes: m.shakes,
-          fries: m.fries
-        }));
+        .filter(m => (m.teamA || m.shakes) === currentUser.teamCode || (m.teamB || m.fries) === currentUser.teamCode)
+        .map(m => {
+          const teamA = m.teamA || m.shakes;
+          const teamB = m.teamB || m.fries;
+          return {
+            day: m.day || 1,
+            block: `Block ${m.block}`,
+            round: m.round,
+            game: m.game,
+            time: m.time,
+            location: m.location,
+            opponent: teamA === currentUser.teamCode ? teamB : teamA,
+            shakes: teamA,
+            fries: teamB
+          };
+        });
     } else {
       rawSchedule = campData.teamSchedules?.[currentUser.teamCode] || [];
     }
@@ -6261,13 +6273,13 @@ export default function App() {
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
-                            <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{m.shakes}</span>
+                            <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{m.teamA || m.shakes}</span>
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>vs</span>
-                            <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{m.fries}</span>
+                            <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{m.teamB || m.fries}</span>
                           </div>
-                          {((m.shakesScore !== undefined && m.shakesScore !== null) || (m.friesScore !== undefined && m.friesScore !== null)) && (
+                          {((m.teamAScore !== undefined && m.teamAScore !== null) || (m.teamBScore !== undefined && m.teamBScore !== null) || (m.shakesScore !== undefined && m.shakesScore !== null) || (m.friesScore !== undefined && m.friesScore !== null)) && (
                             <div style={{ fontSize: '0.8rem', fontWeight: '800', color: '#ffffff', marginTop: '4px', textAlign: 'center', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
-                              {m.shakesScore || 0} - {m.friesScore || 0}
+                              {m.teamAScore !== undefined ? m.teamAScore : m.shakesScore || 0} - {m.teamBScore !== undefined ? m.teamBScore : m.friesScore || 0}
                             </div>
                           )}
                           {winner !== 'NA' && (
@@ -7186,7 +7198,7 @@ export default function App() {
                                       }}
                                     >
                                       <span>{getEffectiveTimeShift() > 0 ? getShiftedTimeStr(m.time, getEffectiveTimeShift()) : m.time} (Block {m.block}){getEffectiveTimeShift() > 0 ? ` (+${getEffectiveTimeShift()}m)` : ''}</span>
-                                      <span style={{ fontWeight: '700', color: '#ffffff' }}>{m.game}: {m.shakes} vs {m.fries}</span>
+                                      <span style={{ fontWeight: '700', color: '#ffffff' }}>{m.game}: {m.teamA || m.shakes} vs {m.teamB || m.fries}</span>
                                     </div>
                                   );
                                 })
