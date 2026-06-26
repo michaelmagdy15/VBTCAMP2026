@@ -686,6 +686,21 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
   }
 
   const P = teamListForPairs.length / 2;
+
+  if (configData.randomizeMatchups) {
+    const subTeamsPart = teamListForPairs.filter(t => t !== 'Servants');
+    for (let i = subTeamsPart.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [subTeamsPart[i], subTeamsPart[j]] = [subTeamsPart[j], subTeamsPart[i]];
+    }
+    if (T % 2 !== 0) {
+      subTeamsPart.push("Servants");
+    }
+    for (let i = 0; i < teamListForPairs.length; i++) {
+      teamListForPairs[i] = subTeamsPart[i];
+    }
+  }
+
   const matchups = [];
 
   const stations = configData.stations || {
@@ -904,6 +919,11 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
       name: `Big Game: ${bigGameName} (Led by ${getLeaderNamesForBigGame()})`,
       howToPlay: configData.bigGameHowToPlay || "No rules provided.",
       lesson: configData.bigGameLesson || "No lesson details provided."
+    },
+    {
+      name: `Reflection: ${reflectionName}`,
+      howToPlay: configData.reflectionHowToPlay || "No rules provided.",
+      lesson: configData.reflectionLesson || "No lesson details provided."
     }
   ];
 

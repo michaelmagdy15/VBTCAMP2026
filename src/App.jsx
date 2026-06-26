@@ -324,6 +324,9 @@ export default function App() {
   const [editBigGameLocation, setEditBigGameLocation] = useState('');
   const [editBigGameHowToPlay, setEditBigGameHowToPlay] = useState('');
   const [editBigGameLesson, setEditBigGameLesson] = useState('');
+  const [editReflectionName, setEditReflectionName] = useState('Reflection');
+  const [editReflectionLocation, setEditReflectionLocation] = useState('Main Hall');
+  const [editDefaultMatchupSortMode, setEditDefaultMatchupSortMode] = useState('block');
 
   // Event setup edit state (for existing event)
   const [editEventConfig, setEditEventConfig] = useState(null);
@@ -433,6 +436,7 @@ export default function App() {
   const [scheduleTeamFilter, setScheduleTeamFilter] = useState('');
   const [scheduleBlockFilter, setScheduleBlockFilter] = useState('All');
   const [scheduleDayFilter, setScheduleDayFilter] = useState('1');
+  const [scheduleSortMode, setScheduleSortMode] = useState('block');
   const [announcementText, setAnnouncementText] = useState('');
   const [announcements, setAnnouncements] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -601,6 +605,122 @@ export default function App() {
     } catch (e) {
       return false;
     }
+  };
+
+  const parseTimeToMs = (timeStr) => {
+    try {
+      const match = timeStr.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return 0;
+      const hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const isPM = match[3].toUpperCase() === 'PM';
+      
+      const date = new Date(currentTime);
+      date.setHours(isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours));
+      date.setMinutes(minutes);
+      date.setSeconds(0);
+      date.setMilliseconds(0);
+      return date.getTime();
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  const getEventTimeRange = () => {
+    if (!campData.matchups || campData.matchups.length === 0) return null;
+    const currentDay = getEventCurrentDay();
+    const todaysMatchups = campData.matchups.filter(m => {
+      const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return String(mDay) === String(currentDay);
+    });
+    
+    if (todaysMatchups.length === 0) return null;
+    
+    let earliest = Infinity;
+    let latest = -Infinity;
+    
+    todaysMatchups.forEach(m => {
+      const ms = parseTimeToMs(m.time);
+      if (ms > 0) {
+        if (ms < earliest) earliest = ms;
+        if (ms > latest) latest = ms;
+      }
+    });
+    
+    if (earliest === Infinity || latest === -Infinity) return null;
+    
+    const shift = getEffectiveTimeShift() * 60 * 1000;
+    const startMs = earliest + shift;
+    const endMs = latest + shift + (30 * 60 * 1000);
+    
+    return { startMs, endMs };
+  };
+
+  const getActiveSlotProgress = () => {
+    if (!campData.matchups || campData.matchups.length === 0) return null;
+    const currentDay = getEventCurrentDay();
+    const todaysMatchups = campData.matchups.filter(m => {
+      const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return String(mDay) === String(currentDay);
+    });
+    
+    if (todaysMatchups.length === 0) return null;
+    
+    const timeToMsMap = {};
+    todaysMatchups.forEach(m => {
+      const ms = parseTimeToMs(m.time);
+      if (ms > 0) {
+        timeToMsMap[m.time] = ms;
+      }
+    });
+    
+    const uniqueTimes = Object.keys(timeToMsMap).sort((a, b) => timeToMsMap[a] - timeToMsMap[b]);
+    const shift = getEffectiveTimeShift() * 60 * 1000;
+    const now = currentTime.getTime();
+    
+    for (let i = 0; i < uniqueTimes.length; i++) {
+      const timeStr = uniqueTimes[i];
+      const startMs = timeToMsMap[timeStr] + shift;
+      let endMs = 0;
+      
+      if (i < uniqueTimes.length - 1) {
+        endMs = timeToMsMap[uniqueTimes[i + 1]] + shift;
+      } else {
+        endMs = startMs + (30 * 60 * 1000);
+      }
+      
+      if (now >= startMs && now < endMs) {
+        const sampleMatch = todaysMatchups.find(m => m.time === timeStr);
+        let slotName = sampleMatch ? sampleMatch.game : "Round";
+        if (sampleMatch) {
+          if (sampleMatch.block === 1) {
+            slotName = `Round ${sampleMatch.round}: Rotational Stations`;
+          } else if (sampleMatch.block === 2) {
+            slotName = `${sampleMatch.game}`;
+          } else if (sampleMatch.block === 3) {
+            slotName = `${sampleMatch.game}`;
+          }
+        }
+        
+        const totalDuration = endMs - startMs;
+        const elapsed = now - startMs;
+        const remaining = endMs - now;
+        const percent = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+        
+        return {
+          name: slotName,
+          startMs,
+          endMs,
+          timeStr,
+          totalDuration,
+          elapsed,
+          remaining,
+          percent
+        };
+      }
+    }
+    
+    return null;
   };
 
   const liveLocationStatus = useMemo(() => {
@@ -943,6 +1063,11 @@ export default function App() {
         setEditBigGameLocation(eventConfig.bigGameLocation || 'Football Field');
         setEditBigGameHowToPlay(eventConfig.bigGameHowToPlay || '');
         setEditBigGameLesson(eventConfig.bigGameLesson || '');
+        setEditReflectionName(eventConfig.reflectionName || 'Reflection');
+        setEditReflectionLocation(eventConfig.reflectionLocation || 'Main Hall');
+        const defaultSort = eventConfig.defaultMatchupSortMode || 'block';
+        setEditDefaultMatchupSortMode(defaultSort);
+        setScheduleSortMode(defaultSort);
       } else {
         setEditDaysCount(eventConfig.daysCount || 2);
       }
@@ -1569,6 +1694,50 @@ export default function App() {
     }
   };
 
+  const handleToggleEventMode = async () => {
+    if (!currentEventCode || !eventConfig) return;
+    const newMode = eventConfig.eventType === 'service' ? 'camp' : 'service';
+    const confirmMsg = `Are you sure you want to switch this event to ${newMode === 'service' ? 'Service Mode' : 'Camp Mode'}? This will change the scoring and matchup structure.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setSavingEventConfig(true);
+    try {
+      const updates = { eventType: newMode };
+      
+      if (newMode === 'service') {
+        if (!eventConfig.stations) {
+          updates.stations = {
+            station_1: { name: 'Commitment', location: 'Football Field', howToPlay: '', lesson: '' },
+            station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: '', lesson: '' },
+            station_3: { name: 'Trust', location: 'Court', howToPlay: '', lesson: '' },
+            station_4: { name: 'Communication', location: 'Pool', howToPlay: '', lesson: '' }
+          };
+          updates.bigGameName = 'Loyalty (Big Game)';
+          updates.bigGameLocation = 'Football Field';
+          updates.reflectionName = 'Reflection';
+          updates.reflectionLocation = 'Main Hall';
+        }
+      }
+      
+      await updateEventConfig(currentEventCode, updates);
+      
+      setEventConfig(prev => ({
+        ...prev,
+        ...updates
+      }));
+      setEditEventConfig(prev => ({
+        ...prev,
+        ...updates
+      }));
+      
+      alert(`Event successfully switched to ${newMode === 'service' ? 'Service Mode' : 'Camp Mode'}!`);
+    } catch (err) {
+      alert('Failed to switch event mode: ' + err.message);
+    } finally {
+      setSavingEventConfig(false);
+    }
+  };
+
   const handleSaveAndRegenerateSchedule = async () => {
     if (!currentEventCode || !editEventConfig) return;
     setSavingEventConfig(true);
@@ -1589,7 +1758,10 @@ export default function App() {
         bigGameName: editBigGameName,
         bigGameLocation: editBigGameLocation,
         bigGameHowToPlay: editBigGameHowToPlay,
-        bigGameLesson: editBigGameLesson
+        bigGameLesson: editBigGameLesson,
+        reflectionName: editReflectionName,
+        reflectionLocation: editReflectionLocation,
+        defaultMatchupSortMode: editDefaultMatchupSortMode
       };
       
       await generateAndSaveServiceSchedule(currentEventCode, updatedConfig, editAttending, globalServants);
@@ -2103,7 +2275,7 @@ export default function App() {
 
 
   const filteredMatchups = useMemo(() => {
-    return campData.matchups.filter(m => {
+    let list = campData.matchups.filter(m => {
       // Day filter
       if (daysCount > 1) {
         const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
@@ -2121,7 +2293,42 @@ export default function App() {
       }
       return true;
     });
-  }, [scheduleTeamFilter, scheduleBlockFilter, scheduleDayFilter, campData.matchups, eventConfig.eventType, daysCount]);
+
+    if (scheduleSortMode === 'game') {
+      // Sort by game/station name first, then round, then day
+      list = [...list].sort((a, b) => {
+        const gameA = a.game || '';
+        const gameB = b.game || '';
+        if (gameA !== gameB) {
+          return gameA.localeCompare(gameB);
+        }
+        if (a.day !== b.day) {
+          return (a.day || 1) - (b.day || 1);
+        }
+        if (a.block !== b.block) {
+          return (a.block || 1) - (b.block || 1);
+        }
+        return (a.round || 1) - (b.round || 1);
+      });
+    } else {
+      // Standard chronological sorting: Day, Block, Round, Game
+      list = [...list].sort((a, b) => {
+        if (a.day !== b.day) {
+          return (a.day || 1) - (b.day || 1);
+        }
+        if (a.block !== b.block) {
+          return (a.block || 1) - (b.block || 1);
+        }
+        if (a.round !== b.round) {
+          return (a.round || 1) - (b.round || 1);
+        }
+        const gameA = a.game || '';
+        const gameB = b.game || '';
+        return gameA.localeCompare(gameB);
+      });
+    }
+    return list;
+  }, [scheduleTeamFilter, scheduleBlockFilter, scheduleDayFilter, campData.matchups, eventConfig.eventType, daysCount, scheduleSortMode]);
 
   const myTeamInfo = useMemo(() => {
     if (!currentUser) return null;
@@ -3487,8 +3694,52 @@ export default function App() {
           <div className="header-branding" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <img src={eventConfig.logoUrl || '/Final VBT Re-Branding 2026-02 (3).png'} alt="Logo" style={{ height: '32px', width: 'auto' }} />
             <div>
-              <h2 style={{ fontSize: '0.95rem', color: '#ffffff', lineHeight: 1.1 }}>{eventConfig.eventName || 'VBT CAMP'}</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '0.95rem', color: '#ffffff', lineHeight: 1.1, margin: 0 }}>{eventConfig.eventName || 'VBT CAMP'}</h2>
+                {(() => {
+                  const range = getEventTimeRange();
+                  if (!range) return null;
+                  const now = currentTime.getTime();
+                  if (now < range.startMs) {
+                    const diff = range.startMs - now;
+                    const mins = Math.floor(diff / 60000);
+                    const secs = Math.floor((diff % 60000) / 1000);
+                    return (
+                      <span style={{ 
+                        fontSize: '0.55rem', 
+                        background: 'rgba(167, 139, 250, 0.2)', 
+                        border: '1px solid rgba(167, 139, 250, 0.4)', 
+                        color: '#c4b5fd', 
+                        padding: '1px 4px', 
+                        borderRadius: '4px', 
+                        fontWeight: '700',
+                        animation: 'pulse-glow 2s infinite'
+                      }}>
+                        {mins}m {secs}s
+                      </span>
+                    );
+                  } else if (now >= range.startMs && now < range.endMs) {
+                    const diff = range.endMs - now;
+                    const mins = Math.floor(diff / 60000);
+                    const secs = Math.floor((diff % 60000) / 1000);
+                    return (
+                      <span style={{ 
+                        fontSize: '0.55rem', 
+                        background: 'rgba(34, 197, 94, 0.2)', 
+                        border: '1px solid rgba(34, 197, 94, 0.4)', 
+                        color: '#4ade80', 
+                        padding: '1px 4px', 
+                        borderRadius: '4px', 
+                        fontWeight: '700'
+                      }}>
+                        {mins}m left
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                 <span className={`live-dot`} />
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Syncing</span>
               </div>
@@ -4303,6 +4554,175 @@ export default function App() {
               eventConfig={eventConfig}
               getTeamColorHex={getTeamColorHex}
             />
+
+            {/* Live Service Countdown & Timeline Tracker Card */}
+            {(() => {
+              const range = getEventTimeRange();
+              if (!range) return null;
+              
+              const now = currentTime.getTime();
+              const totalDuration = range.endMs - range.startMs;
+              const currentProgress = Math.max(0, Math.min(100, ((now - range.startMs) / totalDuration) * 100));
+              
+              const todaysMatchups = campData.matchups.filter(m => {
+                const currentDay = getEventCurrentDay();
+                const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                return String(mDay) === String(currentDay);
+              });
+              
+              const timeToMsMap = {};
+              todaysMatchups.forEach(m => {
+                const ms = parseTimeToMs(m.time);
+                if (ms > 0) timeToMsMap[m.time] = ms;
+              });
+              
+              const sortedTimeLabels = Object.keys(timeToMsMap).sort((a, b) => timeToMsMap[a] - timeToMsMap[b]);
+              const shift = getEffectiveTimeShift() * 60 * 1000;
+              const activeSlot = getActiveSlotProgress();
+              
+              let statusText = "";
+              let countdownText = "";
+              let statusColor = "var(--vbt-sky)";
+              
+              if (now < range.startMs) {
+                statusText = "Service Starting Soon";
+                statusColor = "#c4b5fd";
+                const diff = range.startMs - now;
+                const hours = Math.floor(diff / 3600000);
+                const mins = Math.floor((diff % 3600000) / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                countdownText = `${hours > 0 ? hours + 'h ' : ''}${mins}m ${secs}s`;
+              } else if (now >= range.startMs && now < range.endMs) {
+                statusText = "Service is Live";
+                statusColor = "#4ade80";
+                const diff = range.endMs - now;
+                const hours = Math.floor(diff / 3600000);
+                const mins = Math.floor((diff % 3600000) / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                countdownText = `${hours > 0 ? hours + 'h ' : ''}${mins}m ${secs}s left`;
+              } else {
+                statusText = "Service has Completed";
+                statusColor = "var(--text-muted)";
+                countdownText = "Finished";
+              }
+              
+              return (
+                <div className="glass-panel animate-fade-in" style={{ padding: '16px', background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.08) 0%, rgba(13, 20, 38, 0.6) 100%)', borderColor: now >= range.startMs && now < range.endMs ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '700' }}>Event Status</span>
+                      <h3 style={{ fontSize: '1.05rem', color: '#ffffff', fontWeight: '800', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: statusColor, boxShadow: `0 0 8px ${statusColor}` }} />
+                        {statusText}
+                      </h3>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '700' }}>Countdown</span>
+                      <p style={{ fontSize: '1.05rem', color: statusColor, fontWeight: '800', margin: '2px 0 0 0', fontFamily: 'monospace' }}>
+                        {countdownText}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div style={{ position: 'relative', height: '24px', marginTop: '16px', marginBottom: '24px', padding: '0 10px' }}>
+                    <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: '10px', 
+                      left: '10px', 
+                      width: `calc(${currentProgress}% - 20px)`, 
+                      height: '4px', 
+                      background: 'var(--gradient-vbt)', 
+                      borderRadius: '2px',
+                      boxShadow: '0 0 8px var(--vbt-sky)',
+                      transition: 'width 0.5s ease-in-out'
+                    }} />
+                    
+                    {sortedTimeLabels.map((timeLabel, idx) => {
+                      const timeMs = timeToMsMap[timeLabel];
+                      const pct = ((timeMs + shift - range.startMs) / totalDuration) * 100;
+                      
+                      const match = todaysMatchups.find(m => m.time === timeLabel);
+                      let labelText = `R${idx + 1}`;
+                      if (match) {
+                        if (match.block === 2) labelText = "BG";
+                        else if (match.block === 3) labelText = "Ref";
+                      }
+                      
+                      const isPast = (timeMs + shift) <= now;
+                      const isCurrent = activeSlot && activeSlot.timeStr === timeLabel;
+                      
+                      return (
+                        <div 
+                          key={timeLabel} 
+                          style={{ 
+                            position: 'absolute', 
+                            left: `${pct}%`, 
+                            transform: 'translateX(-50%)',
+                            top: '2px', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center',
+                            cursor: 'help'
+                          }}
+                          title={`${match ? match.game : ''} (${timeLabel})`}
+                        >
+                          <div style={{ 
+                            width: '12px', 
+                            height: '12px', 
+                            borderRadius: '50%', 
+                            background: isCurrent ? '#4ade80' : isPast ? 'var(--vbt-sky)' : '#334155', 
+                            border: '2px solid var(--bg-surface)',
+                            boxShadow: isCurrent ? '0 0 10px #4ade80' : 'none',
+                            transition: 'all 0.3s ease'
+                          }} />
+                          <span style={{ 
+                            fontSize: '0.58rem', 
+                            color: isCurrent ? '#4ade80' : isPast ? '#ffffff' : 'var(--text-muted)', 
+                            fontWeight: isCurrent || isPast ? '800' : '500',
+                            marginTop: '4px' 
+                          }}>
+                            {labelText}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {activeSlot && (
+                    <div style={{ 
+                      marginTop: '12px', 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.05)', 
+                      padding: '12px', 
+                      borderRadius: '8px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '8px' 
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
+                          ⚡ Active Round: <span style={{ color: 'var(--vbt-sky)' }}>{activeSlot.name}</span>
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                          {Math.floor(activeSlot.remaining / 60000)}m {Math.floor((activeSlot.remaining % 60000) / 1000)}s left
+                        </span>
+                      </div>
+                      
+                      <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                        <div style={{ 
+                          width: `${activeSlot.percent}%`, 
+                          height: '100%', 
+                          background: 'linear-gradient(90deg, var(--vbt-sky) 0%, #4ade80 100%)',
+                          borderRadius: '4px',
+                          transition: 'width 1s linear'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {eventConfig.eventType === 'service' ? (
               <div style={{
                 background: 'rgba(41, 182, 246, 0.1)',
@@ -4441,6 +4861,24 @@ export default function App() {
                   {Object.keys(campData.teams).map(code => (
                     <option key={code} value={code}>{code}</option>
                   ))}
+                </select>
+
+                <select 
+                  value={scheduleSortMode}
+                  onChange={(e) => setScheduleSortMode(e.target.value)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-light)',
+                    color: '#ffffff',
+                    fontSize: '0.75rem',
+                    outline: 'none',
+                    fontWeight: '600'
+                  }}
+                >
+                  <option value="block">Sort: Block Order</option>
+                  <option value="game">Sort: Game Order</option>
                 </select>
               </div>
             </div>
@@ -5589,14 +6027,45 @@ export default function App() {
 
             {settingsSubTab === 'config' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Event Mode Switcher Card */}
+                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', fontWeight: '800', margin: 0 }}>🛡️ Active Event Mode</h3>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                        Current mode: <strong>{eventConfig.eventType === 'service' ? '⛪ Church Service Mode' : '🏕️ Summer Camp Mode'}</strong>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleEventMode}
+                      disabled={savingEventConfig}
+                      className="btn-glow"
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        background: eventConfig.eventType === 'service' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        border: '1px solid',
+                        borderColor: eventConfig.eventType === 'service' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.4)',
+                        color: eventConfig.eventType === 'service' ? '#ef4444' : '#4ade80',
+                        fontSize: '0.78rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {eventConfig.eventType === 'service' ? '🏕️ Switch to Camp Mode' : '⛪ Switch to Service Mode'}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Dynamic Configurator - Church Service Adaptability */}
                 <DynamicConfigurator
-              eventConfig={eventConfig}
-              onSaveConfig={async (updates) => {
-                await updateEventConfig(currentEventCode, updates);
-              }}
-              campData={campData}
-            />
+                  eventConfig={eventConfig}
+                  onSaveConfig={async (updates) => {
+                    await updateEventConfig(currentEventCode, updates);
+                  }}
+                  campData={campData}
+                />
 
             {eventConfig.eventType === 'service' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -5649,6 +6118,129 @@ export default function App() {
                         <div>
                           <label style={{ display: 'block', fontSize: '0.65rem', color: '#29b6f6', marginBottom: '4px', fontWeight: '700' }}>Blue Team</label>
                           <input type="text" value={editTeamBlue} onChange={(e) => setEditTeamBlue(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rename Stations & Games Panel */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏁 Rename Games & Locations</h4>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Change station names, locations, Big Game, and Reflection details.</p>
+                      
+                      {['station_1', 'station_2', 'station_3', 'station_4'].map((stKey, idx) => {
+                        const st = editStations[stKey] || { name: '', location: '' };
+                        return (
+                          <div key={stKey} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.65rem', color: '#c4b5fd', marginBottom: '4px', fontWeight: '700' }}>Station {idx + 1} Name</label>
+                              <input 
+                                type="text" 
+                                value={st.name || ''} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditStations(prev => ({
+                                    ...prev,
+                                    [stKey]: { ...prev[stKey], name: val }
+                                  }));
+                                }} 
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.65rem', color: '#c4b5fd', marginBottom: '4px', fontWeight: '700' }}>Station {idx + 1} Location</label>
+                              <input 
+                                type="text" 
+                                value={st.location || ''} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditStations(prev => ({
+                                    ...prev,
+                                    [stKey]: { ...prev[stKey], location: val }
+                                  }));
+                                }} 
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Big Game Renaming */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#f59e0b', marginBottom: '4px', fontWeight: '700' }}>Big Game Name</label>
+                          <input 
+                            type="text" 
+                            value={editBigGameName || ''} 
+                            onChange={(e) => setEditBigGameName(e.target.value)} 
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#f59e0b', marginBottom: '4px', fontWeight: '700' }}>Big Game Location</label>
+                          <input 
+                            type="text" 
+                            value={editBigGameLocation || ''} 
+                            onChange={(e) => setEditBigGameLocation(e.target.value)} 
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Reflection Renaming */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#10b981', marginBottom: '4px', fontWeight: '700' }}>Reflection Name</label>
+                          <input 
+                            type="text" 
+                            value={editReflectionName || ''} 
+                            onChange={(e) => setEditReflectionName(e.target.value)} 
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#10b981', marginBottom: '4px', fontWeight: '700' }}>Reflection Location</label>
+                          <input 
+                            type="text" 
+                            value={editReflectionLocation || ''} 
+                            onChange={(e) => setEditReflectionLocation(e.target.value)} 
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Default Sort Mode and Randomize Schedule Pairings Settings */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔀 Matchup & Pairing Settings</h4>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Default Matchup Display Order</label>
+                          <select 
+                            value={editDefaultMatchupSortMode}
+                            onChange={(e) => setEditDefaultMatchupSortMode(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="block">Chronological Block Order (Block/Round)</option>
+                            <option value="game">Grouped Game Order (Game/Station)</option>
+                          </select>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                          <input
+                            type="checkbox"
+                            id="randomizeMatchups"
+                            checked={!!(editEventConfig && editEventConfig.randomizeMatchups)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setEditEventConfig(prev => ({ ...prev, randomizeMatchups: checked }));
+                            }}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+                          <label htmlFor="randomizeMatchups" style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}>
+                            🔀 Randomize Matchup Pairings (Rotational Rounds)
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -6320,7 +6912,25 @@ export default function App() {
                       <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#29b6f6', fontWeight: '700' }}>
                         Teams ({teams.length})
                       </label>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const shuffled = [...teams];
+                            for (let i = shuffled.length - 1; i > 0; i--) {
+                              const j = Math.floor(Math.random() * (i + 1));
+                              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                            }
+                            updateTeams(shuffled);
+                          }}
+                          style={{
+                            padding: '0 8px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-light)',
+                            background: 'rgba(167,139,250,0.15)', color: '#c4b5fd',
+                            fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                          }}
+                        >
+                          🔀 Randomize
+                        </button>
                         <button
                           type="button"
                           onClick={() => { if (teams.length > 2) updateTeams(teams.slice(0, -1)); }}
