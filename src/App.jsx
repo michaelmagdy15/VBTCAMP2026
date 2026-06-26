@@ -720,26 +720,36 @@ export default function App() {
   // unless triggered from a direct user gesture (tap/click). This mirrors the audio unlock pattern.
   useEffect(() => {
     if (!currentUser) return;
-    // If already granted, subscribe immediately via a micro-task (works on Android/desktop)
+
+    const trySubscribe = async () => {
+      try {
+        const uid  = currentUser.id || currentUser.uid || currentUser.name || 'user';
+        const name = currentUser.name || 'Unknown';
+        const role = currentUser.role || 'viewer';
+        await subscribeToWebPush(uid, name, role);
+        console.log('[Push] Subscribed successfully');
+      } catch (err) {
+        console.warn('[Push] Subscription failed:', err);
+      }
+    };
+
+    // If permission is already granted, we can try to subscribe immediately.
+    // However, iOS Safari might block it if not called from a user gesture.
+    // So we try immediately, but we ALSO fall back to registering a one-time gesture listener
+    // to ensure subscription succeeds on the first user interaction.
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      const uid  = currentUser.uid  || currentUser.name || 'user';
-      const name = currentUser.name || 'Unknown';
-      const role = currentUser.role || 'viewer';
-      subscribeToWebPush(uid, name, role).catch(() => {});
-      return;
+      trySubscribe().catch(() => {});
     }
 
-    // For iOS: wait for the first user gesture then request permission + subscribe
     const handleGesture = async () => {
       window.removeEventListener('click',      handleGesture);
       window.removeEventListener('touchstart', handleGesture);
       try {
-        const permission = await Notification.requestPermission();
+        const permission = (typeof Notification !== 'undefined') 
+          ? await Notification.requestPermission() 
+          : 'default';
         if (permission !== 'granted') return;
-        const uid  = currentUser.uid  || currentUser.name || 'user';
-        const name = currentUser.name || 'Unknown';
-        const role = currentUser.role || 'viewer';
-        await subscribeToWebPush(uid, name, role);
+        await trySubscribe();
         console.log('[Push] Subscribed via gesture handler');
       } catch (err) {
         console.warn('[Push] Gesture-based subscribe failed:', err);
@@ -3475,21 +3485,29 @@ export default function App() {
           
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Notification Permission Request */}
-            {('Notification' in window) && Notification.permission !== 'granted' && (
+            {('Notification' in window) && (
               <button
                 onClick={async () => {
                   const granted = await requestNotificationPermission();
                   if (granted) {
-                    await setupPushNotifications(currentUser, WEBPUSH_VAPID_KEY);
-                    alert("Notifications enabled! You will now receive camp chimes and sync alerts in your Notification Center.");
+                    const uid  = currentUser?.id || currentUser?.uid || currentUser?.name || 'user';
+                    const name = currentUser?.name || 'Unknown';
+                    const role = currentUser?.role || 'viewer';
+                    try {
+                      await subscribeToWebPush(uid, name, role);
+                      await setupPushNotifications(currentUser, WEBPUSH_VAPID_KEY);
+                      alert("Notifications active & registered! You will receive all camp chimes and sync alerts.");
+                    } catch (err) {
+                      alert("Registered but subscription warning: " + err.message);
+                    }
                   } else {
                     alert("Permission denied. To enable notifications, go to your iPhone Settings -> Safari -> Page Settings.");
                   }
                 }}
                 style={{
-                  background: 'rgba(251, 191, 36, 0.15)',
-                  border: '1px solid rgba(251, 191, 36, 0.3)',
-                  color: '#fbbf24',
+                  background: Notification.permission === 'granted' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(251, 191, 36, 0.15)',
+                  border: Notification.permission === 'granted' ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(251, 191, 36, 0.3)',
+                  color: Notification.permission === 'granted' ? '#22c55e' : '#fbbf24',
                   width: '32px',
                   height: '32px',
                   borderRadius: '8px',
@@ -3499,9 +3517,9 @@ export default function App() {
                   justifyContent: 'center',
                   flexShrink: 0
                 }}
-                title="Enable Alerts"
+                title={Notification.permission === 'granted' ? "Notifications Active (Click to Force Resubscribe)" : "Enable Alerts"}
               >
-                <Bell size={16} style={{ animation: 'pulse-glow 1.5s infinite' }} />
+                <Bell size={16} style={Notification.permission === 'granted' ? {} : { animation: 'pulse-glow 1.5s infinite' }} />
               </button>
             )}
             <div className="header-user-info" style={{ textAlign: 'right' }}>
