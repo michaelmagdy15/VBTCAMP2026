@@ -978,6 +978,16 @@ export default function App() {
       if (cfg) {
         setEventConfig({ ...defaultEventConfig, ...cfg });
         setEditEventConfig({ ...defaultEventConfig, ...cfg });
+        
+        // Auto-switch to schedule if in service mode and on camp-specific tabs
+        if (cfg.eventType === 'service') {
+          setCurrentTab(prev => {
+            if (prev === 'scoreboard' || prev === 'myteam') {
+              return 'schedule';
+            }
+            return prev;
+          });
+        }
       }
     });
     return () => unsub();
@@ -1341,11 +1351,11 @@ export default function App() {
       setLoginPassword('');
       
       if (resolvedRole === 'admin' || resolvedRole === 'service_leader' || resolvedRole === 'referee') {
-        setCurrentTab('scoreboard');
+        setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
       } else if (resolvedRole === 'leader') {
-        setCurrentTab('myteam');
+        setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'myteam');
       } else {
-        setCurrentTab('scoreboard');
+        setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
       }
       
       if (!isOfflineMode) {
@@ -1382,7 +1392,7 @@ export default function App() {
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
       setLoginError('');
       setLoginPassword('');
-      setCurrentTab('myteam');
+      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'myteam');
       if (!isOfflineMode) {
         addAnnouncement(currentEventCode, `${user.name} logged in as team leader of ${user.teamCode}`, 'System', 'system');
       }
@@ -1403,7 +1413,7 @@ export default function App() {
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
       setLoginError('');
       setLoginPassword('');
-      setCurrentTab('scoreboard');
+      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
       if (!isOfflineMode) {
         addAnnouncement(currentEventCode, `Coordinator signed in`, 'System', 'system');
       }
@@ -1424,7 +1434,7 @@ export default function App() {
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
       setLoginError('');
       setLoginPassword('');
-      setCurrentTab('scoreboard');
+      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
       if (!isOfflineMode) {
         addAnnouncement(currentEventCode, `Game Leader signed in`, 'System', 'system');
       }
@@ -1730,6 +1740,7 @@ export default function App() {
         ...updates
       }));
       
+      setCurrentTab('schedule');
       alert(`Event successfully switched to ${newMode === 'service' ? 'Service Mode' : 'Camp Mode'}!`);
     } catch (err) {
       alert('Failed to switch event mode: ' + err.message);
@@ -3612,7 +3623,27 @@ export default function App() {
   const getActiveTabs = () => {
     if (!currentUser) return [];
     
-    // For both Service Mode and Camp Mode, we show exactly 5 bottom navigation tabs
+    if (eventConfig?.eventType === 'service') {
+      const tabs = [
+        { id: 'schedule', label: 'Schedule', icon: Calendar },
+        { id: 'service', label: 'Service', icon: BookOpen }
+      ];
+      
+      // Only show Walkie-Talkie to roles with communication access
+      if (['admin', 'leader', 'referee'].includes(currentUser.role)) {
+        tabs.push({ id: 'walkie', label: 'Walkie', icon: Radio });
+      } else {
+        tabs.push({ id: 'scoreboard', label: 'Scores', icon: Trophy });
+      }
+      
+      tabs.push(
+        { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+        { id: 'more', label: 'More', icon: MoreHorizontal }
+      );
+      
+      return tabs;
+    }
+    
     return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
@@ -3739,9 +3770,45 @@ export default function App() {
                   return null;
                 })()}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <span className={`live-dot`} />
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Syncing</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className={`live-dot`} />
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Syncing</span>
+                </div>
+                
+                {/* Event Mode Badge/Toggle Switch */}
+                {(() => {
+                  const isService = eventConfig.eventType === 'service';
+                  const isAdmin = currentUser?.role === 'admin';
+                  return (
+                    <button
+                      onClick={isAdmin ? handleToggleEventMode : undefined}
+                      disabled={!isAdmin}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: isService ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        border: isService ? '1px solid rgba(41, 182, 246, 0.3)' : '1px solid rgba(34, 197, 94, 0.3)',
+                        color: isService ? '#29b6f6' : '#4ade80',
+                        fontSize: '0.62rem',
+                        fontWeight: '700',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        cursor: isAdmin ? 'pointer' : 'default',
+                        transition: 'all 0.2s ease',
+                        textTransform: 'uppercase',
+                        outline: 'none',
+                        borderStyle: 'solid',
+                        alignSelf: 'center'
+                      }}
+                      title={isAdmin ? `Click to switch to ${isService ? 'Camp Mode' : 'Service Mode'}` : `${isService ? 'Service Mode' : 'Camp Mode'} Active`}
+                    >
+                      <span>{isService ? '⛪ Service Mode' : '🏕️ Camp Mode'}</span>
+                      {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -7573,7 +7640,8 @@ export default function App() {
       >
         {getActiveTabs().map((t) => {
           const Icon = t.icon;
-          const isMoreActive = t.id === 'more' && !['schedule', 'scoreboard', 'info', 'timeline'].includes(currentTab);
+          const mainTabIds = getActiveTabs().filter(tab => tab.id !== 'more').map(tab => tab.id);
+          const isMoreActive = t.id === 'more' && !mainTabIds.includes(currentTab);
           const isActive = currentTab === t.id || isMoreActive;
           return (
             <button 
@@ -7786,8 +7854,8 @@ export default function App() {
                 </button>
               )}
 
-              {/* Admin, Leader, Referee: Walkie Talkie */}
-              {['admin', 'leader', 'referee'].includes(currentUser.role) && (
+              {/* Admin, Leader, Referee: Walkie Talkie (Only in Camp Mode, since in Service Mode it is on the bottom tab bar) */}
+              {['admin', 'leader', 'referee'].includes(currentUser.role) && eventConfig.eventType !== 'service' && (
                 <button
                   className="more-drawer-item"
                   onClick={() => {
@@ -7813,6 +7881,67 @@ export default function App() {
                   }}
                 >
                   <Radio size={18} color="var(--vbt-sky)" /> Walkie-Talkie Channels
+                </button>
+              )}
+
+              {/* Service Mode specific: Camp Scoreboard (Only for admin, leader, referee, since other roles have it on the bottom tab bar) */}
+              {eventConfig.eventType === 'service' && ['admin', 'leader', 'referee'].includes(currentUser.role) && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('scoreboard');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Trophy size={18} color="var(--vbt-sky)" /> Camp Scoreboard
+                </button>
+              )}
+
+              {/* Service Mode specific: Camp Map & GPS (For everyone, since in Service Mode it is replaced by Service on the bottom tab bar) */}
+              {eventConfig.eventType === 'service' && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('info');
+                    setInfoSubTab('map');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <MapIcon size={18} color="var(--vbt-sky)" /> Camp Map & GPS
                 </button>
               )}
 
