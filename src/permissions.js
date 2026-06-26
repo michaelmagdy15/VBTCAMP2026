@@ -10,6 +10,7 @@ export const ROLES = {
   REFEREE: 'referee',
   LEADER: 'leader',
   SERVICE_LEADER: 'service_leader',
+  SERVICE_DAY_LEADER: 'service_day_leader',
   ADMIN: 'admin',
 };
 
@@ -44,7 +45,7 @@ export function canViewScoreboard(/* user */) {
 export function canEditScore(user, matchup /*, eventConfig */) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) return true;
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER) return true;
 
   if (role === ROLES.REFEREE) {
     const assignedGames = user?.assignedGames || [];
@@ -66,7 +67,7 @@ export function canEditScore(user, matchup /*, eventConfig */) {
 export function canEditDeductions(user, teamCode /*, eventConfig */) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) return true;
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER) return true;
 
   if (role === ROLES.LEADER) {
     const assignedTeams = user?.assignedTeams || [];
@@ -92,7 +93,7 @@ export function canEditTokens(user) {
  */
 export function canPostAnnouncement(user) {
   const role = getPermissionLevel(user);
-  return role === ROLES.ADMIN || role === ROLES.LEADER || role === ROLES.SERVICE_LEADER;
+  return role === ROLES.ADMIN || role === ROLES.LEADER || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER;
 }
 
 // ─── Config ──────────────────────────────────────────────────
@@ -111,7 +112,7 @@ export function canEditConfig(user) {
  */
 export function canSendPing(user) {
   const role = getPermissionLevel(user);
-  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER;
+  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER;
 }
 
 // ─── Alerts ──────────────────────────────────────────────────
@@ -121,7 +122,7 @@ export function canSendPing(user) {
  */
 export function canCreateAlert(user) {
   const role = getPermissionLevel(user);
-  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER;
+  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER;
 }
 
 // ─── Editable Scopes ─────────────────────────────────────────
@@ -136,7 +137,7 @@ export function canCreateAlert(user) {
 export function getEditableTeams(user, campData) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) {
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER) {
     // Return all team codes found in campData
     if (Array.isArray(campData?.teams)) {
       return campData.teams.map((t) => t.code || t.teamCode).filter(Boolean);
@@ -164,7 +165,7 @@ export function getEditableTeams(user, campData) {
 export function getEditableGames(user, campData) {
   const role = getPermissionLevel(user);
 
-  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER) {
+  if (role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER) {
     if (Array.isArray(campData?.games)) {
       return campData.games.map((g) => g.name || g.game).filter(Boolean);
     }
@@ -179,4 +180,17 @@ export function getEditableGames(user, campData) {
   }
 
   return [];
+}
+
+// ─── Stopwatch Controls ─────────────────────────────────────────
+
+/**
+ * Determines whether a user may control the matchup stopwatch.
+ *
+ * - Admin / Service Leader / Service Day Leader / Referee: always allowed
+ * - Others: never
+ */
+export function canControlStopwatch(user) {
+  const role = getPermissionLevel(user);
+  return role === ROLES.ADMIN || role === ROLES.SERVICE_LEADER || role === ROLES.SERVICE_DAY_LEADER || role === ROLES.REFEREE;
 }

@@ -54,7 +54,8 @@ import {
   deleteServant,
   generateAndSaveServiceSchedule,
   subscribeToWebPush,
-  NOTIFY_SERVICE_URL
+  NOTIFY_SERVICE_URL,
+  updateScheduleData
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -66,7 +67,7 @@ import StandingsAnalytics from './components/StandingsAnalytics';
 import './components/StandingsAnalytics.css';
 import AlertBanner from './components/AlertBanner';
 import { soundBoard, ttsAnnouncer, transitionAlerter } from './notifications';
-import { canEditScore, canEditDeductions, canEditTokens, canPostAnnouncement, canEditConfig, canSendPing, canCreateAlert } from './permissions';
+import { canEditScore, canEditDeductions, canEditTokens, canPostAnnouncement, canEditConfig, canSendPing, canCreateAlert, canControlStopwatch, ROLES } from './permissions';
 import RoleLogin from './components/RoleLogin';
 import PhotoFeed from './components/PhotoFeed';
 import DynamicConfigurator from './components/DynamicConfigurator';
@@ -440,6 +441,8 @@ export default function App() {
   const [announcementText, setAnnouncementText] = useState('');
   const [announcements, setAnnouncements] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isWhereIsEveryoneCollapsed, setIsWhereIsEveryoneCollapsed] = useState(true);
+  const [refereeSelectedGame, setRefereeSelectedGame] = useState(() => localStorage.getItem('vbt_ref_selected_game') || '');
   const [uploadImage, setUploadImage] = useState(null);
   const [mapConfig, setMapConfig] = useState(null);
 
@@ -885,6 +888,27 @@ export default function App() {
     };
   }, [currentUser]);
 
+  // Auto-populate refereeSelectedGame for Service Mode referees based on their roleCode
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'referee' && eventConfig.eventType === 'service' && currentUser.roleCode) {
+      let autoGame = '';
+      if (currentUser.roleCode.startsWith('station_')) {
+        const key = currentUser.roleCode;
+        if (eventConfig.stations?.[key]?.name) {
+          autoGame = eventConfig.stations[key].name;
+        }
+      } else if (currentUser.roleCode.startsWith('big_game_')) {
+        autoGame = eventConfig.bigGameName || 'Loyalty (Big Game)';
+      } else if (currentUser.roleCode === 'reflection') {
+        autoGame = eventConfig.reflectionName || 'Reflection';
+      }
+      if (autoGame && autoGame !== refereeSelectedGame) {
+        setRefereeSelectedGame(autoGame);
+        localStorage.setItem('vbt_ref_selected_game', autoGame);
+      }
+    }
+  }, [currentUser, eventConfig, refereeSelectedGame]);
+
   // Listen for native push notifications in the foreground
   useEffect(() => {
     const handleNativePush = (e) => {
@@ -1316,6 +1340,11 @@ export default function App() {
         resolvedRole = 'admin';
         teamCode = 'ADMIN';
         name = servant.name || 'Coordinator';
+      } else if (servant.defaultRole === 'service_leader' || roleCode === 'service_leader') {
+        resolvedRole = 'service_day_leader';
+        teamCode = 'SERVICE';
+        side = 'System';
+        name = servant.name || 'Service Leader';
       } else if (roleCode.startsWith('team_')) {
         resolvedRole = 'leader';
         const parts = roleCode.split('_'); // ["team", "white", "1"]
@@ -1614,13 +1643,21 @@ export default function App() {
     setCreateEventError('');
     
     try {
-      if (newEventType === 'service') {
+      let finalEventType = newEventType;
+      let finalDaysCount = parseInt(newDaysCount, 10) || (newEventType === 'service' ? 1 : 2);
+      
+      if (newEventType === 'service' && finalDaysCount > 1) {
+        alert("⛪ Service Mode is only supported for 1-day events. Forcing 🏕️ Summer Camp Mode instead.");
+        finalEventType = 'camp';
+      }
+
+      if (finalEventType === 'service') {
         const configData = {
           eventName: newEventName.trim(),
           description: newServiceBrief,
           eventDate: newEventDate || new Date().toISOString().split('T')[0],
           eventType: 'service',
-          daysCount: parseInt(newDaysCount, 10) || 1,
+          daysCount: finalDaysCount,
           kidCount: parseInt(newKidCount, 10) || 100,
           primaryColor: '#a78bfa',
           logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
@@ -1663,7 +1700,7 @@ export default function App() {
           description: 'Camp Outreach',
           eventDate: newEventDate || new Date().toISOString().split('T')[0],
           eventType: 'camp',
-          daysCount: parseInt(newDaysCount, 10) || 2,
+          daysCount: finalDaysCount,
           side1Name: newEventSide1 || 'Shakes',
           side2Name: newEventSide2 || 'Fries',
           primaryColor: '#1441a1',
@@ -1706,8 +1743,31 @@ export default function App() {
 
   const handleToggleEventMode = async () => {
     if (!currentEventCode || !eventConfig) return;
-    const newMode = eventConfig.eventType === 'service' ? 'camp' : 'service';
-    const confirmMsg = `Are you sure you want to switch this event to ${newMode === 'service' ? 'Service Mode' : 'Camp Mode'}? This will change the scoring and matchup structure.`;
+    
+    const choice = window.prompt("Choose Event Mode:\n1 - Normal Mode\n2 - Service Mode\n3 - Camp Mode\nEnter 1, 2, or 3:");
+    if (!choice) return;
+    
+    let newMode = '';
+    if (choice === '1') newMode = 'normal';
+    else if (choice === '2') newMode = 'service';
+    else if (choice === '3') newMode = 'camp';
+    else {
+      alert("Invalid choice. Please enter 1, 2, or 3.");
+      return;
+    }
+    
+    if (newMode === eventConfig.eventType) {
+      alert(`Event is already in ${newMode === 'service' ? 'Service Mode' : newMode === 'normal' ? 'Normal Mode' : 'Camp Mode'}!`);
+      return;
+    }
+    
+    if (newMode === 'service' && eventConfig.daysCount > 1) {
+      alert("Service Mode is only supported for 1-day events. Please set Day Count to 1 first.");
+      return;
+    }
+    
+    const modeLabel = newMode === 'service' ? 'Service Mode' : newMode === 'normal' ? 'Normal Mode' : 'Camp Mode';
+    const confirmMsg = `Are you sure you want to switch this event to ${modeLabel}? This will change the scoring and matchup structure.`;
     if (!window.confirm(confirmMsg)) return;
 
     setSavingEventConfig(true);
@@ -1741,7 +1801,7 @@ export default function App() {
       }));
       
       setCurrentTab('schedule');
-      alert(`Event successfully switched to ${newMode === 'service' ? 'Service Mode' : 'Camp Mode'}!`);
+      alert(`Event successfully switched to ${modeLabel}!`);
     } catch (err) {
       alert('Failed to switch event mode: ' + err.message);
     } finally {
@@ -1749,14 +1809,172 @@ export default function App() {
     }
   };
 
+  const handleUpdateMatchupTime = async (m, trackingUpdate) => {
+    if (!currentEventCode || !campData?.matchups) return;
+    
+    const updatedMatchups = campData.matchups.map(item => {
+      if (item.day === m.day && item.block === m.block && item.round === m.round && item.game === m.game) {
+        return {
+          ...item,
+          ...trackingUpdate
+        };
+      }
+      return item;
+    });
+    
+    try {
+      await updateScheduleData(currentEventCode, { matchups: updatedMatchups });
+    } catch (err) {
+      alert("Failed to update matchup tracking: " + err.message);
+    }
+  };
+
+  const handleStartMatchupTimer = async (m) => {
+    const startTime = new Date().toISOString();
+    await handleUpdateMatchupTime(m, {
+      actualStart: startTime,
+      actualEnd: null,
+      delayAddedMinutes: null,
+      delayAddedSeconds: null,
+      delayCause: null
+    });
+    
+    const startMsg = `⏱️ ${m.game} has started at ${new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`;
+    await addAnnouncement(currentEventCode, startMsg, currentUser?.name || 'System', 'system');
+  };
+
+  const handleStopMatchupTimer = async (m) => {
+    if (!m.actualStart) return;
+    const stopTime = new Date().toISOString();
+    const startTimeMs = new Date(m.actualStart).getTime();
+    const stopTimeMs = new Date(stopTime).getTime();
+    const actualDurationSecs = Math.round((stopTimeMs - startTimeMs) / 1000);
+    const expectedDurationSecs = 30 * 60; // 30 mins
+    const delaySecs = actualDurationSecs - expectedDurationSecs;
+    const delayMins = Math.round(delaySecs / 60);
+    
+    // Update local and firestore matchup
+    const trackingUpdate = {
+      actualEnd: stopTime,
+      delayAddedMinutes: delayMins,
+      delayAddedSeconds: delaySecs,
+      delayCause: `${m.game} (${m.shakes} vs ${m.fries})`
+    };
+    
+    await handleUpdateMatchupTime(m, trackingUpdate);
+    
+    // Allocate the delay shift globally
+    const currentShift = campState.timeShiftMinutes || 0;
+    const newShift = Math.max(0, currentShift + delayMins);
+    
+    if (newShift !== currentShift) {
+      await handleUpdateCampState({ timeShiftMinutes: newShift });
+      await syncToGoogleSheet({ timeShiftMinutes: newShift });
+    }
+    
+    // Post delay notification/announcement
+    const actualMins = Math.floor(actualDurationSecs / 60);
+    const actualSecs = actualDurationSecs % 60;
+    const sign = delayMins >= 0 ? '+' : '';
+    
+    let alertMsg = "";
+    if (delayMins > 0) {
+      alertMsg = `🚨 Delay Alert: ${m.game} took ${actualMins}m ${actualSecs}s (${sign}${delayMins}m over scheduled 30m). All subsequent rounds delayed by +${delayMins}m.`;
+    } else if (delayMins < 0) {
+      alertMsg = `⚡ Early Finish: ${m.game} took ${actualMins}m ${actualSecs}s (finished ${Math.abs(delayMins)}m early). Subsequent rounds shifted forward by -${Math.abs(delayMins)}m.`;
+    } else {
+      alertMsg = `✅ ${m.game} completed on schedule (took ${actualMins}m ${actualSecs}s).`;
+    }
+    
+    await addAnnouncement(currentEventCode, alertMsg, currentUser?.name || 'System', 'system');
+    await triggerRemotePushNotification("Schedule Update", alertMsg);
+  };
+
+  const handleResetMatchupTimer = async (m) => {
+    const prevAdded = m.delayAddedMinutes || 0;
+    
+    await handleUpdateMatchupTime(m, {
+      actualStart: null,
+      actualEnd: null,
+      delayAddedMinutes: null,
+      delayAddedSeconds: null,
+      delayCause: null
+    });
+    
+    // Revert the global delay shift
+    const currentShift = campState.timeShiftMinutes || 0;
+    const newShift = Math.max(0, currentShift - prevAdded);
+    if (newShift !== currentShift) {
+      await handleUpdateCampState({ timeShiftMinutes: newShift });
+      await syncToGoogleSheet({ timeShiftMinutes: newShift });
+      
+      const resetMsg = `🔄 Match timer for ${m.game} was reset. Overall schedule delay adjusted back by -${prevAdded}m.`;
+      await addAnnouncement(currentEventCode, resetMsg, currentUser?.name || 'System', 'system');
+    }
+  };
+
+  const handleUpdateMatchupScore = async (m, teamSide, delta) => {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'referee')) {
+      alert("Permission denied. Only Coordinators and Game Leaders can edit scores.");
+      return;
+    }
+
+    const currentShakesScore = m.shakesScore || 0;
+    const currentFriesScore = m.friesScore || 0;
+    
+    let newShakesScore = currentShakesScore;
+    let newFriesScore = currentFriesScore;
+    
+    if (teamSide === 'Shakes') {
+      newShakesScore = Math.max(0, currentShakesScore + delta);
+    } else if (teamSide === 'Fries') {
+      newFriesScore = Math.max(0, currentFriesScore + delta);
+    }
+    
+    let computedWinner = 'NA';
+    if (newShakesScore > 0 || newFriesScore > 0) {
+      if (newShakesScore > newFriesScore) computedWinner = 'Shakes';
+      else if (newFriesScore > newShakesScore) computedWinner = 'Fries';
+      else computedWinner = 'TIE';
+    }
+    
+    // Update matchup scores in Firestore
+    await handleUpdateMatchupTime(m, {
+      shakesScore: newShakesScore,
+      friesScore: newFriesScore
+    });
+    
+    // Automatically toggle block winner in Firestore
+    const key = `${m.block}_${m.round}_${m.game}`;
+    const prevWinner = (campState.blockScores || {})[key] || 'NA';
+    if (prevWinner !== computedWinner) {
+      const newBlockScores = { ...(campState.blockScores || {}), [key]: computedWinner };
+      await handleUpdateCampState({ blockScores: newBlockScores });
+      await syncToGoogleSheet({ blockScores: newBlockScores });
+      
+      if (currentUser) {
+        const msg = `updated ${m.game} (Block ${m.block}, Rd ${m.round}) score: ${m.shakes} ${newShakesScore} - ${newFriesScore} ${m.fries}`;
+        await addAnnouncement(currentEventCode, msg, currentUser.name, 'score');
+      }
+    }
+  };
+
   const handleSaveAndRegenerateSchedule = async () => {
     if (!currentEventCode || !editEventConfig) return;
     setSavingEventConfig(true);
     try {
+      let finalDaysCount = parseInt(editDaysCount, 10) || 1;
+      let finalEventType = editEventConfig.eventType;
+      if (finalEventType === 'service' && finalDaysCount > 1) {
+        alert("⛪ Service Mode is only supported for 1-day events. Switching event to 🏕️ Summer Camp Mode.");
+        finalEventType = 'camp';
+      }
+
       const updatedConfig = {
         ...editEventConfig,
+        eventType: finalEventType,
         kidCount: parseInt(editKidCount, 10) || 100,
-        daysCount: parseInt(editDaysCount, 10) || 1,
+        daysCount: finalDaysCount,
         activeServants: editAttending,
         servantAssignments: editRoles,
         teamNames: {
@@ -1775,7 +1993,11 @@ export default function App() {
         defaultMatchupSortMode: editDefaultMatchupSortMode
       };
       
-      await generateAndSaveServiceSchedule(currentEventCode, updatedConfig, editAttending, globalServants);
+      if (finalEventType === 'service') {
+        await generateAndSaveServiceSchedule(currentEventCode, updatedConfig, editAttending, globalServants);
+      } else {
+        await updateEventConfig(currentEventCode, updatedConfig);
+      }
       
       if (!isOfflineMode) {
         await addAnnouncement(currentEventCode, "updated the servant roster and regenerated the schedule", currentUser.name, 'system');
@@ -1793,6 +2015,62 @@ export default function App() {
   // Score Calculator Logic (Excel formula compliance)
   const scoreCalculations = useMemo(() => {
     const { blockScores = {}, teamDeductions = {}, tokens = {} } = campState;
+
+    if (eventConfig.eventType === 'normal') {
+      const teamScores = {};
+      const teamWins = {};
+      const teamDeductionsList = {};
+      const teamTokens = {};
+
+      Object.keys(campData?.teams || {}).forEach(teamCode => {
+        teamScores[teamCode] = 0;
+        teamWins[teamCode] = 0;
+        teamDeductionsList[teamCode] = teamDeductions[teamCode] || 0;
+        teamTokens[teamCode] = tokens[teamCode] || 0;
+      });
+
+      if (campData && campData.matchups) {
+        campData.matchups.forEach(m => {
+          const key = `${m.block}_${m.round}_${m.game}`;
+          const winner = blockScores[key] || 'NA';
+          const points = campData.gamePoints?.[m.game] || 0;
+
+          if (winner === 'Shakes' && m.shakes && m.shakes !== "All Teams") {
+            teamScores[m.shakes] += points;
+            teamWins[m.shakes] += 1;
+          } else if (winner === 'Fries' && m.fries && m.fries !== "Referees") {
+            teamScores[m.fries] += points;
+            teamWins[m.fries] += 1;
+          }
+        });
+      }
+
+      const finalScores = {};
+      Object.keys(campData?.teams || {}).forEach(teamCode => {
+        const team = campData.teams[teamCode];
+        const sideTokens = tokens[team.side?.toLowerCase()] || 0;
+        const tok = teamTokens[teamCode] || sideTokens;
+        finalScores[teamCode] = teamScores[teamCode] + (tok * 2) - teamDeductionsList[teamCode];
+      });
+
+      const sortedTeams = Object.keys(campData?.teams || {}).sort((a, b) => finalScores[b] - finalScores[a]);
+
+      return {
+        isNormal: true,
+        sortedTeams,
+        wins: teamWins,
+        deductions: teamDeductionsList,
+        tokensCount: teamTokens,
+        finalScores,
+        winner: sortedTeams[0] || 'TIE',
+        shakesFinal: finalScores[sortedTeams[0]] || 0,
+        friesFinal: finalScores[sortedTeams[1]] || 0,
+        shakesBlocksTotal: teamScores[sortedTeams[0]] || 0,
+        friesBlocksTotal: teamScores[sortedTeams[1]] || 0,
+        shakesTokenPoints: 0,
+        friesTokenPoints: 0
+      };
+    }
 
     if (eventConfig.eventType === 'service') {
       const colors = ['Red', 'White', 'Black', 'Blue'];
@@ -3257,6 +3535,7 @@ export default function App() {
                               >
                                 <option value="volunteer">Volunteer/Ref</option>
                                 <option value="coordinator">Coordinator</option>
+                                <option value="service_leader">Service Day Leader</option>
                                 <option value="station_1">{(newStations.station_1.name || 'Station 1') + ' Lead'}</option>
                                 <option value="station_2">{(newStations.station_2.name || 'Station 2') + ' Lead'}</option>
                                 <option value="station_3">{(newStations.station_3.name || 'Station 3') + ' Lead'}</option>
@@ -3788,9 +4067,10 @@ export default function App() {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
-                        background: isService ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                        border: isService ? '1px solid rgba(41, 182, 246, 0.3)' : '1px solid rgba(34, 197, 94, 0.3)',
-                        color: isService ? '#29b6f6' : '#4ade80',
+                        background: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.15)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        border: '1px solid',
+                        borderColor: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.3)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.3)' : 'rgba(34, 197, 94, 0.3)',
+                        color: eventConfig.eventType === 'service' ? '#c4b5fd' : eventConfig.eventType === 'normal' ? '#29b6f6' : '#4ade80',
                         fontSize: '0.62rem',
                         fontWeight: '700',
                         padding: '2px 8px',
@@ -3802,9 +4082,9 @@ export default function App() {
                         borderStyle: 'solid',
                         alignSelf: 'center'
                       }}
-                      title={isAdmin ? `Click to switch to ${isService ? 'Camp Mode' : 'Service Mode'}` : `${isService ? 'Service Mode' : 'Camp Mode'} Active`}
+                      title={isAdmin ? "Click to change event mode globally" : `${eventConfig.eventType.toUpperCase()} Mode Active`}
                     >
-                      <span>{isService ? '⛪ Service Mode' : '🏕️ Camp Mode'}</span>
+                      <span>{eventConfig.eventType === 'service' ? '⛪ Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Camp Mode'}</span>
                       {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
                     </button>
                   );
@@ -3942,6 +4222,51 @@ export default function App() {
                             <div>🎮 Games: <strong style={{ color: '#ffffff' }}>{winsPts}</strong> pts</div>
                             <div>🪙 Tokens: <strong style={{ color: '#ffffff' }}>{tokCount}</strong> ({(tokCount * 2)} pts)</div>
                             {ded > 0 && <div style={{ color: '#ef4444' }}>⚠️ Deductions: <strong>-{ded}</strong> pts</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : eventConfig.eventType === 'normal' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Trophy size={18} style={{ color: '#fbbf24' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Leaderboard (Normal Mode)</span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {scoreCalculations.sortedTeams.map((teamCode, idx) => {
+                      const team = campData?.teams?.[teamCode];
+                      const score = scoreCalculations.finalScores[teamCode] || 0;
+                      const winsPts = scoreCalculations.wins[teamCode] || 0;
+                      const ded = scoreCalculations.deductions[teamCode] || 0;
+                      
+                      return (
+                        <div key={teamCode} className="glass-panel" style={{ 
+                          padding: '10px 14px', 
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          background: idx === 0 ? 'rgba(251, 191, 36, 0.08)' : 'rgba(13, 20, 38, 0.45)',
+                          borderColor: idx === 0 ? '#fbbf24' : 'var(--border-light)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: idx === 0 ? '#fbbf24' : 'var(--text-secondary)', width: '20px' }}>
+                              #{idx + 1}
+                            </span>
+                            <div>
+                              <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                                {teamCode} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>({team?.side})</span>
+                              </h4>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                Wins: <strong>{winsPts}</strong> • Deductions: <strong style={{ color: ded > 0 ? '#ef4444' : 'var(--text-muted)' }}>-{ded}</strong>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div style={{ fontSize: '1.4rem', fontWeight: '800', color: idx === 0 ? '#fbbf24' : '#ffffff', fontFamily: 'monospace' }}>
+                            {score} pts
                           </div>
                         </div>
                       );
@@ -4951,7 +5276,10 @@ export default function App() {
             </div>
 
             {/* Schedule Controls (Coordinators & Game Leaders) / Status Banner (Others) */}
-            {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
+            {currentUser && (
+              currentUser.role === 'admin' ||
+              (eventConfig.eventType === 'service' ? currentUser.role === 'service_day_leader' : currentUser.role === 'referee')
+            ) ? (
               <div className="glass-panel" style={{ 
                 padding: '12px', 
                 background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.12) 0%, rgba(13, 20, 38, 0.5) 100%)', 
@@ -5150,78 +5478,477 @@ export default function App() {
 
             {/* Where is everyone at (Live Location Tracker) */}
             <div className="glass-panel" style={{ padding: '16px', background: 'rgba(0,0,0,0.15)' }}>
-              <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div 
+                onClick={() => setIsWhereIsEveryoneCollapsed(!isWhereIsEveryoneCollapsed)}
+                style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isWhereIsEveryoneCollapsed ? '0' : '12px' }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MapPin size={18} style={{ color: 'var(--vbt-sky)' }} />
                   <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '700' }}>Where is everyone at? (Live Tracker)</h3>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span className="live-dot" style={{ animation: 'pulse-glow 1.5s infinite' }} />
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Locations</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="live-dot" style={{ animation: 'pulse-glow 1.5s infinite' }} />
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Locations</span>
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    {isWhereIsEveryoneCollapsed ? '▲ Expand' : '▼ Collapse'}
+                  </span>
                 </div>
               </div>
               
-              <div className="live-location-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-                {liveLocationStatus.map((loc) => {
-                  const active = loc.activeMatchup;
-                  return (
-                    <div 
-                      key={loc.id} 
-                      style={{ 
-                        background: active ? 'rgba(41, 182, 246, 0.08)' : 'rgba(255,255,255,0.02)',
-                        border: '1px solid',
-                        borderColor: active ? 'rgba(41, 182, 246, 0.25)' : 'var(--border-light)',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        minHeight: '100px',
-                        gap: '6px',
-                        transition: 'all 0.2s ease-in-out'
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', display: 'block', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '2px', marginBottom: '4px' }}>
-                          {loc.name}
-                        </span>
-                        {active ? (
-                          <>
-                            <p style={{ fontSize: '0.85rem', fontWeight: '800', color: '#ffffff', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                              {active.game}
+              {!isWhereIsEveryoneCollapsed && (
+                <div className="live-location-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+                  {liveLocationStatus.map((loc) => {
+                    const active = loc.activeMatchup;
+                    return (
+                      <div 
+                        key={loc.id} 
+                        style={{ 
+                          background: active ? 'rgba(41, 182, 246, 0.08)' : 'rgba(255,255,255,0.02)',
+                          border: '1px solid',
+                          borderColor: active ? 'rgba(41, 182, 246, 0.25)' : 'var(--border-light)',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '100px',
+                          gap: '6px',
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', display: 'block', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '2px', marginBottom: '4px' }}>
+                            {loc.name}
+                          </span>
+                          {active ? (
+                            <>
+                              <p style={{ fontSize: '0.85rem', fontWeight: '800', color: '#ffffff', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                {active.game}
+                              </p>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+                                Block {active.block} • Rd {active.round}
+                              </span>
+                            </>
+                          ) : (
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '4px 0 0 0' }}>
+                              Empty / Free Play
                             </p>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
-                              Block {active.block} • Rd {active.round}
-                            </span>
-                          </>
-                        ) : (
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '4px 0 0 0' }}>
-                            Empty / Free Play
-                          </p>
+                          )}
+                        </div>
+                        
+                        {active && (
+                          <div style={{ 
+                            background: 'rgba(0,0,0,0.25)', 
+                            padding: '4px', 
+                            borderRadius: '4px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            color: '#ffffff',
+                            border: '1px solid rgba(255,255,255,0.03)'
+                          }}>
+                            <span style={{ color: 'var(--color-shakes)' }}>{active.shakes}</span>
+                            <span style={{ color: 'var(--text-muted)', margin: '0 4px', fontWeight: 'normal' }}>vs</span>
+                            <span style={{ color: 'var(--color-fries)' }}>{active.fries}</span>
+                          </div>
                         )}
                       </div>
-                      
-                      {active && (
-                        <div style={{ 
-                          background: 'rgba(0,0,0,0.25)', 
-                          padding: '4px', 
-                          borderRadius: '4px', 
-                          fontSize: '0.7rem', 
-                          fontWeight: '700',
-                          textAlign: 'center',
-                          color: '#ffffff',
-                          border: '1px solid rgba(255,255,255,0.03)'
-                        }}>
-                          <span style={{ color: 'var(--color-shakes)' }}>{active.shakes}</span>
-                          <span style={{ color: 'var(--text-muted)', margin: '0 4px', fontWeight: 'normal' }}>vs</span>
-                          <span style={{ color: 'var(--color-fries)' }}>{active.fries}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            {/* 📋 Game Leader Control Panel */}
+            {currentUser && (currentUser.role === 'referee' || currentUser.role === 'admin') && (
+              <div className="glass-panel animate-fade-in" style={{ 
+                padding: '16px', 
+                background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.15) 0%, rgba(13, 20, 38, 0.7) 100%)', 
+                border: '1px solid rgba(41, 182, 246, 0.4)',
+                borderRadius: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>📋</span>
+                    <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '800', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Game Leader Control Panel
+                    </h3>
+                  </div>
+                  <span className="badge badge-shakes" style={{ background: 'var(--vbt-sky)', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 6px', fontWeight: '700' }}>
+                    ACTIVE GAME
+                  </span>
+                </div>
+
+                {/* Game Selection Dropdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>
+                    Assigned Game / Station
+                  </label>
+                  <select
+                    value={refereeSelectedGame}
+                    onChange={(e) => {
+                      setRefereeSelectedGame(e.target.value);
+                      localStorage.setItem('vbt_ref_selected_game', e.target.value);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid rgba(41, 182, 246, 0.3)',
+                      color: '#ffffff',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      width: '100%'
+                    }}
+                  >
+                    <option value="">-- Select Game --</option>
+                    {(() => {
+                      const gameNames = Array.from(new Set(campData.matchups.map(m => m.game).filter(Boolean))).sort();
+                      return gameNames.map(gName => (
+                        <option key={gName} value={gName}>{gName}</option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+
+                {/* Matchups list for the selected game */}
+                {refereeSelectedGame ? (
+                  (() => {
+                    const refMatchups = campData.matchups.filter(m => {
+                      if (m.game !== refereeSelectedGame) return false;
+                      if (daysCount > 1) {
+                        const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                        if (scheduleDayFilter !== String(mDay)) return false;
+                      }
+                      return true;
+                    }).sort((a, b) => {
+                      if (a.block !== b.block) return (a.block || 1) - (b.block || 1);
+                      return (a.round || 1) - (b.round || 1);
+                    });
+
+                    if (refMatchups.length === 0) {
+                      return (
+                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                          No matchups scheduled for this game on Day {scheduleDayFilter}.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {refMatchups.map((m, idx) => {
+                          const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+                          const isMatchActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
+                          const matchupKey = `${m.block}_${m.round}_${m.game}`;
+                          const winner = (campState.blockScores || {})[matchupKey] || 'NA';
+
+                          // Format shift
+                          const effectiveShift = getEffectiveTimeShift();
+                          const shiftMs = effectiveShift * 60 * 1000;
+                          const baseStartMs = parseTimeToMs(m.time);
+                          let timeString = m.time;
+                          if (baseStartMs > 0 && effectiveShift !== 0) {
+                            const date = new Date(baseStartMs + shiftMs);
+                            timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          }
+
+                          return (
+                            <div 
+                              key={idx} 
+                              style={{ 
+                                padding: '12px', 
+                                background: isMatchActive ? 'rgba(20, 65, 161, 0.2)' : 'rgba(0, 0, 0, 0.25)', 
+                                border: '1px solid',
+                                borderColor: isMatchActive ? 'var(--vbt-sky)' : 'rgba(255, 255, 255, 0.08)',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                              }}
+                            >
+                              {/* Header info */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
+                                    Round {m.round} (Block {m.block})
+                                  </span>
+                                  {isMatchActive && (
+                                    <span style={{ 
+                                      background: 'rgba(74, 222, 128, 0.2)', 
+                                      color: '#4ade80', 
+                                      fontSize: '0.6rem', 
+                                      padding: '1px 5px', 
+                                      borderRadius: '4px',
+                                      fontWeight: '800',
+                                      letterSpacing: '0.05em',
+                                      border: '1px solid rgba(74, 222, 128, 0.3)'
+                                    }}>
+                                      LIVE
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--vbt-sky)', fontWeight: '800', fontFamily: 'monospace' }}>
+                                  🕒 {timeString}
+                                </span>
+                              </div>
+
+                              {/* Simple point adjuster logic */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '8px 12px', borderRadius: '6px' }}>
+                                {/* Shakes side */}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-shakes)', fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
+                                    Shakes ({m.shakes})
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <button
+                                      onClick={() => handleUpdateMatchupScore(m, 'Shakes', -1)}
+                                      style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        background: 'rgba(239, 68, 68, 0.2)',
+                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        color: '#ffffff',
+                                        fontWeight: '800',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.9rem'
+                                      }}
+                                    >
+                                      -
+                                    </button>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
+                                      {m.shakesScore || 0}
+                                    </span>
+                                    <button
+                                      onClick={() => handleUpdateMatchupScore(m, 'Shakes', 1)}
+                                      style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        background: 'rgba(34, 197, 94, 0.2)',
+                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                        color: '#ffffff',
+                                        fontWeight: '800',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.9rem'
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Divider */}
+                                <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(255,255,255,0.08)', margin: '0 8px' }} />
+
+                                {/* Fries side */}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-fries)', fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
+                                    Fries ({m.fries})
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <button
+                                      onClick={() => handleUpdateMatchupScore(m, 'Fries', -1)}
+                                      style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        background: 'rgba(239, 68, 68, 0.2)',
+                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        color: '#ffffff',
+                                        fontWeight: '800',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.9rem'
+                                      }}
+                                    >
+                                      -
+                                    </button>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
+                                      {m.friesScore || 0}
+                                    </span>
+                                    <button
+                                      onClick={() => handleUpdateMatchupScore(m, 'Fries', 1)}
+                                      style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        background: 'rgba(34, 197, 94, 0.2)',
+                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                        color: '#ffffff',
+                                        fontWeight: '800',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.9rem'
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Winner Indicator / Live Timer controls */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                {/* Winner badge */}
+                                <div>
+                                  {winner !== 'NA' ? (
+                                    <span style={{ 
+                                      fontSize: '0.65rem', 
+                                      fontWeight: '800', 
+                                      color: winner === 'Shakes' ? 'var(--color-shakes)' : winner === 'Fries' ? 'var(--color-fries)' : 'var(--color-tie)', 
+                                      textTransform: 'uppercase' 
+                                    }}>
+                                      🏆 Winner: {winner === 'TIE' ? 'Tie Match' : winner}
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                      Waiting for scores...
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Timer / Duration tracker */}
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                                  {(() => {
+                                    if (m.actualStart && !m.actualEnd) {
+                                      const start = new Date(m.actualStart).getTime();
+                                      const nowMs = currentTime.getTime();
+                                      const elapsed = Math.max(0, Math.floor((nowMs - start) / 1000));
+                                      const elapsedMins = Math.floor(elapsed / 60);
+                                      const elapsedSecs = elapsed % 60;
+                                      return (
+                                        <span style={{ color: '#4ade80', fontWeight: '700', fontFamily: 'monospace' }}>
+                                          ⏱️ RUNNING: {elapsedMins}m {elapsedSecs < 10 ? '0' : ''}{elapsedSecs}s
+                                        </span>
+                                      );
+                                    } else if (m.actualStart && m.actualEnd) {
+                                      const start = new Date(m.actualStart).getTime();
+                                      const end = new Date(m.actualEnd).getTime();
+                                      const totalSecs = Math.max(0, Math.floor((end - start) / 1000));
+                                      const totalMins = Math.floor(totalSecs / 60);
+                                      const totalSecsPart = totalSecs % 60;
+                                      return (
+                                        <span style={{ color: 'var(--text-muted)' }}>
+                                          ⏱️ TOOK: {totalMins}m {totalSecsPart < 10 ? '0' : ''}{totalSecsPart}s
+                                        </span>
+                                      );
+                                    }
+                                    return <span style={{ color: 'var(--text-muted)' }}>⏱️ Scheduled: 30m</span>;
+                                  })()}
+                                </div>
+                              </div>
+
+                              {/* Stopwatch Actions */}
+                              {canControlStopwatch(currentUser) && (
+                                <div style={{ display: 'flex', gap: '8px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '4px' }}>
+                                  {!m.actualStart && (
+                                    <button
+                                      onClick={() => handleStartMatchupTimer(m)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '6px',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        background: 'rgba(34, 197, 94, 0.15)',
+                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                        color: '#4ade80',
+                                        fontSize: '0.72rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      ▶️ Start Match
+                                    </button>
+                                  )}
+
+                                  {m.actualStart && !m.actualEnd && (
+                                    <button
+                                      onClick={() => handleStopMatchupTimer(m)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '6px',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        background: 'rgba(239, 68, 68, 0.15)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: '#f87171',
+                                        fontSize: '0.72rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      ⏹️ Stop Match
+                                    </button>
+                                  )}
+
+                                  {m.actualStart && m.actualEnd && (
+                                    <button
+                                      onClick={() => handleResetMatchupTimer(m)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '6px',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        color: '#ffffff',
+                                        fontSize: '0.72rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      🔄 Reset Timer
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                    Select a game above to manage matchups and scores.
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filteredMatchups.length === 0 ? (
@@ -5246,7 +5973,7 @@ export default function App() {
                       }}
                     >
                       <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.7rem', color: isActive ? 'var(--vbt-sky)' : 'var(--text-muted)', fontWeight: '700' }}>
                             BLOCK {m.block} • RD {m.round}
                           </span>
@@ -5255,6 +5982,37 @@ export default function App() {
                               LIVE
                             </span>
                           )}
+                          {/* Live Start Time display */}
+                          {m.actualStart && (
+                            <span style={{ fontSize: '0.62rem', color: '#29b6f6', background: 'rgba(41, 182, 246, 0.15)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700', fontFamily: 'monospace' }}>
+                              ⏱️ START: {new Date(m.actualStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                          )}
+                          
+                          {/* Live Running Stopwatch display */}
+                          {m.actualStart && !m.actualEnd && (() => {
+                            const elapsedSeconds = Math.max(0, Math.floor((currentTime.getTime() - new Date(m.actualStart).getTime()) / 1000));
+                            const elapsedMins = Math.floor(elapsedSeconds / 60);
+                            const elapsedSecs = elapsedSeconds % 60;
+                            const formattedSecs = elapsedSecs < 10 ? `0${elapsedSecs}` : elapsedSecs;
+                            return (
+                              <span style={{ 
+                                fontSize: '0.62rem', 
+                                color: '#fbbf24', 
+                                background: 'rgba(251, 191, 36, 0.15)', 
+                                padding: '1px 6px', 
+                                borderRadius: '4px', 
+                                fontWeight: '700',
+                                animation: 'pulse-glow 1.5s infinite',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontFamily: 'monospace'
+                              }}>
+                                🏃 RUNNING: {elapsedMins}:{formattedSecs}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '700' }}>
                           {getEffectiveTimeShift() > 0 ? (
@@ -5277,6 +6035,36 @@ export default function App() {
                             <MapPin size={10} style={{ color: 'var(--text-muted)' }} />
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{m.location}</span>
                           </div>
+                          
+                          {/* F1 Split Time / delay cause display */}
+                          {m.actualStart && m.actualEnd && (() => {
+                            const durationSecs = Math.round((new Date(m.actualEnd).getTime() - new Date(m.actualStart).getTime()) / 1000);
+                            const splitSecs = durationSecs - 1800; // 30 mins expected
+                            const absSplitSecs = Math.abs(splitSecs);
+                            const splitMins = Math.floor(absSplitSecs / 60);
+                            const splitSecsRemainder = absSplitSecs % 60;
+                            const splitFormatted = `${splitSecs >= 0 ? '+' : '-'}${splitMins}m ${splitSecsRemainder}s`;
+                            
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                                  Duration: {Math.floor(durationSecs / 60)}m {durationSecs % 60}s
+                                </span>
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: '800',
+                                  fontFamily: 'monospace',
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  background: splitSecs > 0 ? 'rgba(239, 68, 68, 0.15)' : splitSecs < 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                  border: splitSecs > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : splitSecs < 0 ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255, 255, 255, 0.15)',
+                                  color: splitSecs > 0 ? '#f87171' : splitSecs < 0 ? '#4ade80' : 'var(--text-muted)'
+                                }} title="Split time relative to scheduled 30 minutes">
+                                  🏎️ SPLIT: {splitFormatted}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
@@ -5284,6 +6072,11 @@ export default function App() {
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>vs</span>
                             <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{m.fries}</span>
                           </div>
+                          {((m.shakesScore !== undefined && m.shakesScore !== null) || (m.friesScore !== undefined && m.friesScore !== null)) && (
+                            <div style={{ fontSize: '0.8rem', fontWeight: '800', color: '#ffffff', marginTop: '4px', textAlign: 'center', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                              {m.shakesScore || 0} - {m.friesScore || 0}
+                            </div>
+                          )}
                           {winner !== 'NA' && (
                             <p style={{ fontSize: '0.6rem', color: winner === 'Shakes' ? 'var(--color-shakes)' : winner === 'Fries' ? 'var(--color-fries)' : 'var(--color-tie)', fontWeight: '800', textTransform: 'uppercase', marginTop: '4px' }}>
                               {winner} won
@@ -5291,6 +6084,75 @@ export default function App() {
                           )}
                         </div>
                       </div>
+                      
+                      {/* Individual Matchup Stopwatch Action Panel */}
+                      {canControlStopwatch(currentUser) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--border-light)' }}>
+                          {!m.actualStart && (
+                            <button
+                              onClick={() => handleStartMatchupTimer(m)}
+                              style={{
+                                flex: 1,
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: 'rgba(34, 197, 94, 0.2)',
+                                color: '#4ade80',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              ▶️ Start Match
+                            </button>
+                          )}
+                          
+                          {m.actualStart && !m.actualEnd && (
+                            <button
+                              onClick={() => handleStopMatchupTimer(m)}
+                              style={{
+                                flex: 1,
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                color: '#f87171',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              ⏹️ Stop Match
+                            </button>
+                          )}
+                          
+                          {m.actualStart && m.actualEnd && (
+                            <button
+                              onClick={() => handleResetMatchupTimer(m)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                color: '#f87171',
+                                fontSize: '0.65rem',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              🔄 Reset Timer
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -6096,32 +6958,120 @@ export default function App() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Event Mode Switcher Card */}
                 <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.03)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                    <div>
-                      <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', fontWeight: '800', margin: 0 }}>🛡️ Active Event Mode</h3>
-                      <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                        Current mode: <strong>{eventConfig.eventType === 'service' ? '⛪ Church Service Mode' : '🏕️ Summer Camp Mode'}</strong>
-                      </p>
+                  <div>
+                    <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', fontWeight: '800', marginBottom: '8px' }}>🛡️ Active Event Mode</h3>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                      Current mode: <strong>{eventConfig.eventType === 'service' ? '⛪ Church Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Summer Camp Mode'}</strong>
+                    </p>
+                    
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (eventConfig.eventType === 'normal') return;
+                          if (window.confirm("Switch to Normal Mode?")) {
+                            setSavingEventConfig(true);
+                            try {
+                              await updateEventConfig(currentEventCode, { eventType: 'normal' });
+                              setEventConfig(prev => ({ ...prev, eventType: 'normal' }));
+                              setEditEventConfig(prev => ({ ...prev, eventType: 'normal' }));
+                              alert("Switched to Normal Mode!");
+                            } catch (e) { alert(e.message); } finally { setSavingEventConfig(false); }
+                          }
+                        }}
+                        disabled={savingEventConfig}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          background: eventConfig.eventType === 'normal' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
+                          border: '1px solid var(--border-light)',
+                          color: '#ffffff',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🏀 Normal
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (eventConfig.eventType === 'service') return;
+                          if (eventConfig.daysCount > 1) {
+                            alert("Service Mode is only supported for 1-day events. Set Day Count to 1 first.");
+                            return;
+                          }
+                          if (window.confirm("Switch to Service Mode?")) {
+                            setSavingEventConfig(true);
+                            try {
+                              const updates = { eventType: 'service' };
+                              if (!eventConfig.stations) {
+                                updates.stations = {
+                                  station_1: { name: 'Commitment', location: 'Football Field', howToPlay: '', lesson: '' },
+                                  station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: '', lesson: '' },
+                                  station_3: { name: 'Trust', location: 'Court', howToPlay: '', lesson: '' },
+                                  station_4: { name: 'Communication', location: 'Pool', howToPlay: '', lesson: '' }
+                                };
+                                updates.bigGameName = 'Loyalty (Big Game)';
+                                updates.bigGameLocation = 'Football Field';
+                                updates.reflectionName = 'Reflection';
+                                updates.reflectionLocation = 'Main Hall';
+                              }
+                              await updateEventConfig(currentEventCode, updates);
+                              setEventConfig(prev => ({ ...prev, ...updates }));
+                              setEditEventConfig(prev => ({ ...prev, ...updates }));
+                              alert("Switched to Service Mode!");
+                            } catch (e) { alert(e.message); } finally { setSavingEventConfig(false); }
+                          }
+                        }}
+                        disabled={savingEventConfig}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          background: eventConfig.eventType === 'service' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
+                          border: '1px solid var(--border-light)',
+                          color: '#ffffff',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ⛪ Service
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (eventConfig.eventType === 'camp') return;
+                          if (window.confirm("Switch to Camp Mode?")) {
+                            setSavingEventConfig(true);
+                            try {
+                              await updateEventConfig(currentEventCode, { eventType: 'camp' });
+                              setEventConfig(prev => ({ ...prev, eventType: 'camp' }));
+                              setEditEventConfig(prev => ({ ...prev, eventType: 'camp' }));
+                              alert("Switched to Camp Mode!");
+                            } catch (e) { alert(e.message); } finally { setSavingEventConfig(false); }
+                          }
+                        }}
+                        disabled={savingEventConfig}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          background: eventConfig.eventType === 'camp' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
+                          border: '1px solid var(--border-light)',
+                          color: '#ffffff',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🏕️ Camp
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleToggleEventMode}
-                      disabled={savingEventConfig}
-                      className="btn-glow"
-                      style={{
-                        padding: '8px 14px',
-                        borderRadius: '8px',
-                        background: eventConfig.eventType === 'service' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                        border: '1px solid',
-                        borderColor: eventConfig.eventType === 'service' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.4)',
-                        color: eventConfig.eventType === 'service' ? '#ef4444' : '#4ade80',
-                        fontSize: '0.78rem',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {eventConfig.eventType === 'service' ? '🏕️ Switch to Camp Mode' : '⛪ Switch to Service Mode'}
-                    </button>
                   </div>
                 </div>
 
@@ -6365,6 +7315,7 @@ export default function App() {
                                   >
                                     <option value="volunteer">Volunteer/Ref</option>
                                     <option value="coordinator">Coordinator</option>
+                                    <option value="service_leader">Service Day Leader</option>
                                     <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
                                     <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
                                     <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>

@@ -937,3 +937,18 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
   });
 }
 
+/**
+ * Updates the schedule data in Firestore for a specific event.
+ * @param {string} eventCode
+ * @param {object} updates - Object containing state updates.
+ */
+export async function updateScheduleData(eventCode, updates) {
+  const docRef = doc(db, eventSchedulePath(eventCode));
+  try {
+    await setDoc(docRef, updates, { merge: true });
+  } catch (error) {
+    console.error("Error updating schedule data:", error);
+    throw error;
+  }
+}
+
