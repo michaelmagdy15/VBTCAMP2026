@@ -324,7 +324,7 @@ const styles = {
 
 // ── Component ─────────────────────────────────────────────────
 
-export default function DynamicConfigurator({ eventConfig, onSaveConfig, campData }) {
+export default function DynamicConfigurator({ eventConfig, onSaveConfig, campData, campState }) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -356,6 +356,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
   const [startTime, setStartTime] = useState(eventConfig?.startTime || '15:15');
   const [roundDuration, setRoundDuration] = useState(eventConfig?.roundDurationMinutes || 20);
   const [breakTime, setBreakTime] = useState(eventConfig?.breakMinutes || 0);
+  const [scheduleDelay, setScheduleDelay] = useState(campState?.timeShiftMinutes || 0);
 
   // ── Location Map Key ────────────────────────────────────────
   const [locations, setLocations] = useState(() => {
@@ -392,6 +393,13 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       if (eventConfig.locationKey) setLocations(eventConfig.locationKey);
     }
   }, [eventConfig]);
+
+  // ── Sync delay state with parent campState changes ──────────────────
+  useEffect(() => {
+    if (campState && campState.timeShiftMinutes !== undefined) {
+      setScheduleDelay(campState.timeShiftMinutes);
+    }
+  }, [campState]);
 
   // ── Sync team count with teams array ────────────────────────
   useEffect(() => {
@@ -432,6 +440,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
       roundDurationMinutes: roundDuration,
       breakMinutes: breakTime,
       locationKey: locations,
+      timeShiftMinutes: Number(scheduleDelay) || 0,
     };
   }
 
@@ -745,6 +754,21 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
               onChange={(e) => setBreakTime(Number(e.target.value) || 0)}
               min={0}
               max={60}
+            />
+          </div>
+          <div style={{ flex: isMobile ? 'none' : '1 1 0px', width: isMobile ? '100%' : 'auto' }}>
+            <label style={{ ...styles.label, fontSize: isMobile ? 11 : 13 }}>Schedule Delay (min)</label>
+            <input
+              style={{ 
+                ...(isMobile ? styles.input : styles.inputSmall), 
+                width: '100%',
+                fontSize: isMobile ? 13 : 14
+              }}
+              type="number"
+              value={scheduleDelay}
+              onChange={(e) => setScheduleDelay(Number(e.target.value) || 0)}
+              min={0}
+              max={600}
             />
           </div>
         </div>

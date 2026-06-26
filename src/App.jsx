@@ -55,7 +55,8 @@ import {
   generateAndSaveServiceSchedule,
   subscribeToWebPush,
   NOTIFY_SERVICE_URL,
-  updateScheduleData
+  updateScheduleData,
+  updateScheduleMatchupTimes
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -5561,6 +5562,60 @@ export default function App() {
                       >
                         +5m
                       </button>
+                      <input 
+                        type="number"
+                        id="customDelayInput"
+                        placeholder="Min"
+                        style={{
+                          width: '45px',
+                          padding: '6px 4px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-light)',
+                          background: 'rgba(0,0,0,0.4)',
+                          color: '#ffffff',
+                          fontSize: '0.72rem',
+                          outline: 'none',
+                          textAlign: 'center',
+                          height: '28px',
+                          boxSizing: 'border-box'
+                        }}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter') {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val !== 0) {
+                              await handleAdjustTimeShift(val);
+                              e.target.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <button 
+                        onClick={async () => {
+                          const input = document.getElementById('customDelayInput');
+                          const val = parseInt(input?.value, 10);
+                          if (!isNaN(val) && val !== 0) {
+                            await handleAdjustTimeShift(val);
+                            if (input) input.value = '';
+                          }
+                        }}
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-light)',
+                          background: 'rgba(255,255,255,0.05)',
+                          color: '#ffffff',
+                          fontWeight: '700',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                          height: '28px',
+                          boxSizing: 'border-box',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Apply custom delay shift"
+                      >
+                        Shift
+                      </button>
                       <button 
                         onClick={handleResetTimeShift}
                         disabled={getEffectiveTimeShift() === 0}
@@ -7445,8 +7500,28 @@ export default function App() {
 
                 <DynamicConfigurator
                   eventConfig={eventConfig}
+                  campState={campState}
                   onSaveConfig={async (updates) => {
-                    await updateEventConfig(currentEventCode, updates);
+                    try {
+                      const { timeShiftMinutes, ...configUpdates } = updates;
+                      await updateEventConfig(currentEventCode, configUpdates);
+                      
+                      if (timeShiftMinutes !== undefined && timeShiftMinutes !== campState.timeShiftMinutes) {
+                        await handleUpdateCampState({ timeShiftMinutes: Number(timeShiftMinutes) || 0 });
+                      }
+                      
+                      if (eventConfig.eventType === 'service') {
+                        await updateScheduleMatchupTimes(
+                          currentEventCode, 
+                          configUpdates.startTime || '15:00', 
+                          Number(configUpdates.roundDurationMinutes) || 20, 
+                          Number(configUpdates.breakMinutes) || 5
+                        );
+                      }
+                      alert("✨ Configuration and schedule times updated successfully!");
+                    } catch (err) {
+                      alert("Failed to save configuration: " + err.message);
+                    }
                   }}
                   campData={campData}
                 />
