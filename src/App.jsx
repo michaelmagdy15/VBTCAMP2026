@@ -4056,7 +4056,8 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Visual Ping Overlay (legacy) */}
       {activePingAlert.show && (
         <div style={{
@@ -9226,6 +9227,7 @@ export default function App() {
         )}
 
       </main>
+    </div>
 
       {/* Navigation bar */}
       <nav 
@@ -9610,6 +9612,6 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
