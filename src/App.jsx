@@ -157,7 +157,7 @@ function playBellChime() {
 }
 
 function playLoudDoubleChime() {
-  playChime('urgent'); // → Alarmed.wav from akx/Notifications (CC0)
+  playChime('round_start'); // → Loud horn/siren sound (same as start/end rounds)
 }
 
 // Vibration helper — works on Android Chrome; silently ignored on iOS
@@ -1371,7 +1371,7 @@ export default function App() {
       let grade = 'All';
       let name = servant.name;
       
-      if (servant.defaultRole === 'admin') {
+      if (servant.defaultRole === 'admin' || servant.id === 'michael_mitry') {
         resolvedRole = 'admin';
         teamCode = 'ADMIN';
         name = servant.name || 'Coordinator';
