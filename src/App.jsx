@@ -93,28 +93,28 @@ const WEBPUSH_VAPID_KEY = "BBWNlIKCRTY40ybSED7bBc5AUlRT7IHvZ0EajhdPVnxDcuSnZ7_3I
 
 // Default state when Firestore is empty
 const defaultCampState = {
-  blockScores: {}, // key: "blockIndex_roundIndex_gameName" -> "Shakes" | "Fries" | "TIE" | "NA"
+  blockScores: {}, // key: "blockIndex_roundIndex_gameName" -> "teamA" | "teamB" | "TIE" | "NA"
   teamDeductions: {}, // key: teamCode -> number
-  tokens: { shakes: 0, fries: 0 },
+  tokens: {},
   timeShiftMinutes: 0,
   isTimerPaused: false,
   timerPausedAt: null,
   appsScriptWebappUrl: ''
 };
 
-// Default event config for VBT 2026 Camp (backward compatibility)
-const VBT_2026_EVENT_CODE = 'vbt_2026_camp';
+// Default event config (Service Mode first)
 const defaultEventConfig = {
   eventName: 'VBT Sports Camp',
   description: 'Live scoring, schedule & team management',
   eventDate: '',
-  side1Name: 'Shakes',
-  side2Name: 'Fries',
+  side1Name: 'Team A',
+  side2Name: 'Team B',
   primaryColor: '#1441a1',
   logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
   passcodeCoordinator: 'VBTADMIN',
   passcodeGameLeader: 'VBTREF',
-  passcodeTeamLeader: 'VBT2026'
+  passcodeTeamLeader: 'VBT2026',
+  eventType: 'service'
 };
 
 // Map Location Key data
@@ -2189,16 +2189,16 @@ export default function App() {
           const teamA = m.teamA || m.shakes;
           const teamB = m.teamB || m.fries;
           if (teamA === "All Teams") {
-            if (winner === 'Shakes') {
+            if (winner === 'Shakes' || winner === 'teamA') {
               colors.forEach(c => { wins[c] += points; });
             }
           } else {
-            if (winner === 'Shakes') {
+            if (winner === 'Shakes' || winner === 'teamA') {
               const team = campData.teams?.[teamA];
               if (team && colors.includes(team.side)) {
                 wins[team.side] += points;
               }
-            } else if (winner === 'Fries') {
+            } else if (winner === 'Fries' || winner === 'teamB') {
               const team = campData.teams?.[teamB];
               if (team && colors.includes(team.side)) {
                 wins[team.side] += points;
@@ -2243,16 +2243,16 @@ export default function App() {
             const teamA = m.teamA || m.shakes;
             const teamB = m.teamB || m.fries;
             if (teamA === "All Teams") {
-              if (winner === 'Shakes') {
+              if (winner === 'Shakes' || winner === 'teamA') {
                 colors.forEach(c => { blockWins[c] += points; });
               }
             } else {
-              if (winner === 'Shakes') {
+              if (winner === 'Shakes' || winner === 'teamA') {
                 const team = campData.teams?.[teamA];
                 if (team && colors.includes(team.side)) {
                   blockWins[team.side] += points;
                 }
-              } else if (winner === 'Fries') {
+              } else if (winner === 'Fries' || winner === 'teamB') {
                 const team = campData.teams?.[teamB];
                 if (team && colors.includes(team.side)) {
                   blockWins[team.side] += points;
@@ -6396,8 +6396,8 @@ export default function App() {
                             </div>
                           )}
                           {winner !== 'NA' && (
-                            <p style={{ fontSize: '0.6rem', color: winner === 'Shakes' ? 'var(--color-shakes)' : winner === 'Fries' ? 'var(--color-fries)' : 'var(--color-tie)', fontWeight: '800', textTransform: 'uppercase', marginTop: '4px' }}>
-                              {winner} won
+                            <p style={{ fontSize: '0.6rem', color: (winner === 'Shakes' || winner === 'teamA') ? 'var(--color-shakes)' : (winner === 'Fries' || winner === 'teamB') ? 'var(--color-fries)' : 'var(--color-tie)', fontWeight: '800', textTransform: 'uppercase', marginTop: '4px' }}>
+                              {(winner === 'teamA' || winner === 'Shakes') ? (m.teamA || m.shakes) : (winner === 'teamB' || winner === 'Fries') ? (m.teamB || m.fries) : winner} won
                             </p>
                           )}
                         </div>
