@@ -696,6 +696,7 @@ export default function GPSMap({
   }, [pendingLatLng, formLabel, formGame]);
 
   const handleDeleteWaypoint = useCallback((id) => {
+    if (!window.confirm("Are you sure you want to delete this waypoint?")) return;
     setWaypoints((prev) => prev.filter((w) => w.id !== id));
     setDirty(true);
   }, []);

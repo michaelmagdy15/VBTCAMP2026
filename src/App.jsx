@@ -969,13 +969,21 @@ export default function App() {
 
   // Group helpers
   const handleAddGroup = () => setEditGroups(prev => [...prev, { leaderName: '', kidCount: '' }]);
-  const handleRemoveGroup = (idx) => setEditGroups(prev => prev.filter((_, i) => i !== idx));
+  const handleRemoveGroup = (idx) => {
+    const groupName = editGroups[idx]?.leaderName ? `Group led by ${editGroups[idx].leaderName}` : `this group`;
+    if (!window.confirm(`Are you sure you want to remove ${groupName}?`)) return;
+    setEditGroups(prev => prev.filter((_, i) => i !== idx));
+  };
   const handleGroupChange = (idx, field, val) => setEditGroups(prev => prev.map((g, i) => i === idx ? { ...g, [field]: val } : g));
   const totalKids = editGroups.reduce((sum, g) => sum + (parseInt(g.kidCount) || 0), 0);
 
   // Game helpers
   const handleAddGame = () => setEditGames(prev => [...prev, { name: '', howToPlay: '', lesson: '' }]);
-  const handleRemoveGame = (idx) => setEditGames(prev => prev.filter((_, i) => i !== idx));
+  const handleRemoveGame = (idx) => {
+    const gameName = editGames[idx]?.name ? `game "${editGames[idx].name}"` : `this game`;
+    if (!window.confirm(`Are you sure you want to remove ${gameName}?`)) return;
+    setEditGames(prev => prev.filter((_, i) => i !== idx));
+  };
   const handleGameChange = (idx, field, val) => setEditGames(prev => prev.map((g, i) => i === idx ? { ...g, [field]: val } : g));
 
   // ─── LEADER ROSTER helpers ────────────────────────────────────────────
@@ -984,7 +992,11 @@ export default function App() {
     setRosterEditMode(true);
   };
   const handleAddRosterEntry = () => setEditRoster(prev => [...prev, { id: `l_${Date.now()}`, name: '', groupLabel: '' }]);
-  const handleRemoveRosterEntry = (idx) => setEditRoster(prev => prev.filter((_, i) => i !== idx));
+  const handleRemoveRosterEntry = (idx) => {
+    const entryName = editRoster[idx]?.name ? `roster entry "${editRoster[idx].name}"` : `this roster entry`;
+    if (!window.confirm(`Are you sure you want to remove ${entryName}?`)) return;
+    setEditRoster(prev => prev.filter((_, i) => i !== idx));
+  };
   const handleRosterEntryChange = (idx, field, val) => setEditRoster(prev => prev.map((e, i) => i === idx ? { ...e, [field]: val } : e));
   const handleSaveRoster = async () => {
     if (!currentEventCode) return;
@@ -6270,6 +6282,8 @@ export default function App() {
               };
               const removeTeam = (idx) => {
                 if (teams.length <= 2) return;
+                const teamName = teams[idx]?.name || `Team ${idx + 1}`;
+                if (!window.confirm(`Are you sure you want to remove "${teamName}"?`)) return;
                 updateTeams(teams.filter((_, i) => i !== idx));
               };
               const updateTeam = (idx, key, value) => {

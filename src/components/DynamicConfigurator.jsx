@@ -460,6 +460,7 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
   }
 
   async function handleDeleteTemplate(id) {
+    if (!window.confirm("Are you sure you want to delete this template? This action cannot be undone.")) return;
     try {
       await deleteTemplate(id);
       await fetchTemplates();
