@@ -1567,50 +1567,103 @@ export default function App() {
 
   const performMagicAutoAssign = (attendingList, currentRoles, teamNamesObj) => {
     const updatedRoles = { ...currentRoles };
-    // Set all to volunteer first except coordinator
+    
+    // Find all roles that are already specifically assigned to attending servants
+    const assignedRoles = new Set();
     attendingList.forEach(sId => {
-      if (updatedRoles[sId] !== 'coordinator') {
-        updatedRoles[sId] = 'volunteer';
+      const role = currentRoles[sId];
+      if (role && role !== 'volunteer' && role !== 'none') {
+        assignedRoles.add(role);
       }
     });
 
-    const stationRoles = ['station_1', 'station_2', 'station_3', 'station_4'];
-    let stationIdx = 0;
-
+    const stationRoles = ['station_1', 'station_2', 'station_3', 'station_4'].filter(r => !assignedRoles.has(r));
     const teamRoles = [
       'team_red_1', 'team_red_2',
       'team_white_1', 'team_white_2',
       'team_black_1', 'team_black_2',
       'team_blue_1', 'team_blue_2'
-    ];
+    ].filter(r => !assignedRoles.has(r));
+    let bigGame1Available = !assignedRoles.has('big_game_1');
+    let bigGame2Available = !assignedRoles.has('big_game_2');
+    let reflectionAvailable = !assignedRoles.has('reflection');
+
+    let stationIdx = 0;
     let teamIdx = 0;
 
-    let bigGame1Assigned = false;
-    let bigGame2Assigned = false;
-    let reflectionAssigned = false;
-
     attendingList.forEach(sId => {
-      if (updatedRoles[sId] === 'coordinator') return;
+      const existingRole = currentRoles[sId];
+      if (existingRole && existingRole !== 'volunteer' && existingRole !== 'none') {
+        // Keep their existing role!
+        updatedRoles[sId] = existingRole;
+        return;
+      }
 
+      // Otherwise, assign to next available role
       if (stationIdx < stationRoles.length) {
         updatedRoles[sId] = stationRoles[stationIdx];
         stationIdx++;
       } else if (teamIdx < teamRoles.length) {
         updatedRoles[sId] = teamRoles[teamIdx];
         teamIdx++;
-      } else if (!bigGame1Assigned) {
+      } else if (bigGame1Available) {
         updatedRoles[sId] = 'big_game_1';
-        bigGame1Assigned = true;
-      } else if (!bigGame2Assigned) {
+        bigGame1Available = false;
+      } else if (bigGame2Available) {
         updatedRoles[sId] = 'big_game_2';
-        bigGame2Assigned = true;
-      } else if (!reflectionAssigned) {
+        bigGame2Available = false;
+      } else if (reflectionAvailable) {
         updatedRoles[sId] = 'reflection';
-        reflectionAssigned = true;
+        reflectionAvailable = false;
+      } else {
+        updatedRoles[sId] = 'volunteer';
       }
     });
 
     return updatedRoles;
+  };
+
+  const didTeamLeadersChange = (oldRoles, newRoles, oldAttending, newAttending) => {
+    const getTeamLeaders = (roles, attending) => {
+      return Object.entries(roles)
+        .filter(([sId, role]) => attending.includes(sId) && role.startsWith('team_'))
+        .map(([sId, role]) => `${sId}:${role}`)
+        .sort()
+        .join(',');
+    };
+    return getTeamLeaders(oldRoles, oldAttending) !== getTeamLeaders(newRoles, newAttending);
+  };
+
+  const handleAutoSaveRosterData = async (newAttending, newRoles) => {
+    if (!currentEventCode || !eventConfig) return;
+    try {
+      const updatedConfig = {
+        ...eventConfig,
+        activeServants: newAttending,
+        servantAssignments: newRoles,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const leadersChanged = didTeamLeadersChange(
+        eventConfig.servantAssignments || {},
+        newRoles,
+        eventConfig.activeServants || [],
+        newAttending
+      );
+      
+      if (leadersChanged && eventConfig.eventType === 'service') {
+        // If team leaders changed, we must regenerate the schedule
+        await generateAndSaveServiceSchedule(currentEventCode, updatedConfig, newAttending, globalServants);
+      } else {
+        // Otherwise, we just save the config
+        await updateEventConfig(currentEventCode, updatedConfig);
+      }
+      
+      // Update local state config so it matches
+      setEventConfig(updatedConfig);
+    } catch (err) {
+      console.error("Auto-save failed:", err);
+    }
   };
 
   const handleWizardAutoAssign = () => {
@@ -1619,10 +1672,11 @@ export default function App() {
     setWizardRoles(updated);
   };
 
-  const handleLiveAutoAssign = () => {
+  const handleLiveAutoAssign = async () => {
     const teamNamesObj = { red: editTeamRed, white: editTeamWhite, black: editTeamBlack, blue: editTeamBlue };
     const updated = performMagicAutoAssign(editAttending, editRoles, teamNamesObj);
     setEditRoles(updated);
+    await handleAutoSaveRosterData(editAttending, updated);
   };
 
   const handleQuickAddServant = async (e) => {
@@ -1656,8 +1710,11 @@ export default function App() {
         setWizardAttending(prev => [...prev, id]);
         setWizardRoles(prev => ({ ...prev, [id]: 'volunteer' }));
       } else {
-        setEditAttending(prev => [...prev, id]);
-        setEditRoles(prev => ({ ...prev, [id]: 'volunteer' }));
+        const newAttending = [...editAttending, id];
+        const newRoles = { ...editRoles, [id]: 'volunteer' };
+        setEditAttending(newAttending);
+        setEditRoles(newRoles);
+        await handleAutoSaveRosterData(newAttending, newRoles);
       }
       
       setQuickServantName('');
@@ -7743,7 +7800,10 @@ export default function App() {
 
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>👥 Leader Roster & Attendance</h4>
+                        <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          👥 Leader Roster & Attendance
+                          <span style={{ fontSize: '0.65rem', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(34,197,94,0.3)', textTransform: 'none', letterSpacing: 'normal' }}>⚡ Autosaved</span>
+                        </h4>
                         <button
                           type="button"
                           onClick={handleLiveAutoAssign}
@@ -7774,11 +7834,12 @@ export default function App() {
                                 <input
                                   type="checkbox"
                                   checked={isAttending}
-                                  onChange={() => {
+                                  onChange={async () => {
                                     const updated = editAttending.includes(s.id)
                                       ? editAttending.filter(id => id !== s.id)
                                       : [...editAttending, s.id];
                                     setEditAttending(updated);
+                                    await handleAutoSaveRosterData(updated, editRoles);
                                   }}
                                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                                 />
@@ -7789,7 +7850,12 @@ export default function App() {
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                   <select
                                     value={editRoles[s.id] || 'volunteer'}
-                                    onChange={(e) => setEditRoles(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                    onChange={async (e) => {
+                                      const newRole = e.target.value;
+                                      const updatedRoles = { ...editRoles, [s.id]: newRole };
+                                      setEditRoles(updatedRoles);
+                                      await handleAutoSaveRosterData(editAttending, updatedRoles);
+                                    }}
                                     style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', width: '100%', maxWidth: '160px', minHeight: '32px' }}
                                   >
                                     <option value="volunteer">Volunteer/Ref</option>
