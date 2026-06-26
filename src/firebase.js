@@ -712,12 +712,33 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
   const reflectionName = configData.reflectionName || "Reflection";
   const reflectionLoc = configData.reflectionLocation || "Main Hall";
 
-  const roundTimes = {
-    1: "03:15 PM",
-    2: "03:35 PM",
-    3: "03:55 PM",
-    4: "04:15 PM"
+  const startTimeStr = configData.startTime || '15:15';
+  const roundDur = Number(configData.roundDurationMinutes) || 20;
+  const breakDur = configData.breakMinutes !== undefined ? Number(configData.breakMinutes) : 0;
+  const [startHours, startMins] = startTimeStr.split(':').map(Number);
+
+  const getShiftedTime = (minsOffset) => {
+    const d = new Date();
+    d.setHours(startHours, startMins + minsOffset, 0, 0);
+    let hours = d.getHours();
+    const minutes = d.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+    const strHours = hours < 10 ? '0' + hours : hours;
+    return `${strHours}:${strMinutes} ${ampm}`;
   };
+
+  const roundTimes = {
+    1: getShiftedTime(0),
+    2: getShiftedTime(1 * (roundDur + breakDur)),
+    3: getShiftedTime(2 * (roundDur + breakDur)),
+    4: getShiftedTime(3 * (roundDur + breakDur))
+  };
+
+  const bigGameTime = getShiftedTime(4 * roundDur + 3 * breakDur);
+  const reflectionTime = getShiftedTime(4 * roundDur + 3 * breakDur + 35);
 
   // ─── Matchup Generator with Same-Color Prevention ──────────────────
   // Helper to extract base color (e.g. "Red 1" -> "Red")
@@ -850,7 +871,7 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
       block: 2,
       round: 1,
       game: bigGameName,
-      time: "04:35 PM",
+      time: bigGameTime,
       teamA: "All Teams",
       teamB: "Referees",
       location: bigGameLoc
@@ -862,7 +883,7 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
       block: 3,
       round: 1,
       game: reflectionName,
-      time: "05:10 PM",
+      time: reflectionTime,
       teamA: "All Teams",
       teamB: "Bible Discussion",
       location: reflectionLoc

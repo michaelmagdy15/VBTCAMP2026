@@ -380,6 +380,19 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
     fetchTemplates();
   }, []);
 
+  // ── Sync local state with parent eventConfig changes ──────────────────
+  useEffect(() => {
+    if (eventConfig) {
+      if (eventConfig.teamCount !== undefined) setTeamCount(eventConfig.teamCount);
+      if (eventConfig.teams && eventConfig.teams.length > 0) setTeams(eventConfig.teams);
+      if (eventConfig.scoreCategories) setCategories(eventConfig.scoreCategories);
+      if (eventConfig.startTime) setStartTime(eventConfig.startTime);
+      if (eventConfig.roundDurationMinutes !== undefined) setRoundDuration(eventConfig.roundDurationMinutes);
+      if (eventConfig.breakMinutes !== undefined) setBreakTime(eventConfig.breakMinutes);
+      if (eventConfig.locationKey) setLocations(eventConfig.locationKey);
+    }
+  }, [eventConfig]);
+
   // ── Sync team count with teams array ────────────────────────
   useEffect(() => {
     Promise.resolve().then(() => {
