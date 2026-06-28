@@ -1351,7 +1351,12 @@ export default function App() {
   // Handle remote cache clear request
   useEffect(() => {
     if (eventConfig && eventConfig.clearCacheVersion) {
-      const localVer = localStorage.getItem('vbt_clear_cache_version');
+      let localVer = null;
+      try {
+        localVer = localStorage.getItem('vbt_clear_cache_version');
+      } catch (err) {
+        console.warn('[CacheClear] localStorage getItem failed:', err);
+      }
       if (localVer !== String(eventConfig.clearCacheVersion)) {
         console.log('[CacheClear] Mismatch detected. Local:', localVer, 'Remote:', eventConfig.clearCacheVersion);
         
@@ -1372,7 +1377,13 @@ export default function App() {
         }
 
         // Save new version to avoid infinite loop
-        localStorage.setItem('vbt_clear_cache_version', String(eventConfig.clearCacheVersion));
+        try {
+          localStorage.setItem('vbt_clear_cache_version', String(eventConfig.clearCacheVersion));
+        } catch (err) {
+          console.warn('[CacheClear] Failed to write clearCacheVersion to localStorage:', err);
+          // If we cannot write to localStorage, abort the reload to prevent infinite loops
+          return;
+        }
 
         // Reload the page forcing fresh fetch
         console.log('[CacheClear] Reloading page to apply updates...');
