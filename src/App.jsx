@@ -44,12 +44,11 @@ import {
   updateEventConfig,
   createEvent,
   checkEventExists,
-  subscribeToEventRegistry,
+  getEventRegistry,
   subscribeToServiceData,
   updateServiceData,
   registerDevicePushToken,
   getServants,
-  subscribeToServants,
   updateServant,
   addServant,
   deleteServant,
@@ -76,7 +75,7 @@ import DynamicConfigurator from './components/DynamicConfigurator';
 import DumbDashboard from './components/DumbDashboard';
 import { generateRoundRobin, calculateTimeSlots, validateSchedule } from './matchupEngine';
 import { saveAsTemplate, loadTemplates, deleteTemplate, PRESET_TEMPLATES } from './templates';
-import { offlineQueue, setupOnlineListener } from './offlineSync';
+
 
 // VBT Phase 3 Operations & Logistics Components
 import LogisticsPanel from './components/LogisticsPanel';
@@ -1256,18 +1255,14 @@ export default function App() {
     };
   }, []);
 
-  // Set up offline sync queue flush on reconnect
+  // Set up online listener
   useEffect(() => {
-    const cleanup = setupOnlineListener(async () => {
-      console.log('[Offline Sync] Device back online, flushing queue...');
-      await offlineQueue.flushQueue(async (collection, docPath, data) => {
-        if (currentEventCode) {
-          await updateCampState(currentEventCode, data);
-        }
-      });
-    });
-    return cleanup;
-  }, [currentEventCode]);
+    const handleOnline = () => {
+      console.log('[Offline Sync] Device back online.');
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   // Synchronize Block filter when Day changes
   useEffect(() => {
@@ -1278,10 +1273,21 @@ export default function App() {
     }
   }, [scheduleDayFilter]);
 
-  // Subscribe to event registry (always, to allow joining events)
+  // Fetch event registry once on mount (to allow joining events)
   useEffect(() => {
-    const unsub = subscribeToEventRegistry((list) => setEventRegistry(list));
-    return () => unsub();
+    let active = true;
+    const fetchRegistry = async () => {
+      try {
+        const list = await getEventRegistry();
+        if (active) setEventRegistry(list);
+      } catch (err) {
+        console.error("Error fetching event registry:", err);
+      }
+    };
+    fetchRegistry();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Fetch global servants directory once on mount
@@ -7329,7 +7335,6 @@ export default function App() {
                   campData={campData}
                   campState={campState}
                   eventConfig={eventConfig}
-                  currentTime={new Date()}
                   getTeamColorHex={getTeamColorHex}
                   isServiceMode={eventConfig.eventType === 'service'}
                   mapConfig={mapConfig}
@@ -7416,7 +7421,7 @@ export default function App() {
                  campData={campData}
                  eventConfig={eventConfig}
                  getTeamColorHex={getTeamColorHex}
-                 currentTime={new Date()}
+                 currentTime={Math.floor(Date.now() / 30000) * 30000}
                  liveLocationStatus={liveLocationStatus}
                />
              )}

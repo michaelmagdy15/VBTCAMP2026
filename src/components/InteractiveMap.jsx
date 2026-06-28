@@ -57,7 +57,6 @@ export default function InteractiveMap({
   campData,
   campState,
   eventConfig,
-  currentTime,
   getTeamColorHex,
   isServiceMode,
   mapConfig,

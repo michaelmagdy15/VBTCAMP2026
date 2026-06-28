@@ -86,6 +86,23 @@ export function subscribeToEventRegistry(callback) {
 }
 
 /**
+ * Fetches the event registry listing all available events once.
+ * @returns {Promise<Array>} Array of event summaries.
+ */
+export async function getEventRegistry() {
+  try {
+    const docRef = doc(db, 'vbt_event_registry/events');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data().list || [];
+    }
+  } catch (error) {
+    console.error("Error fetching event registry:", error);
+  }
+  return [];
+}
+
+/**
  * Checks whether an event with this code already exists in Firestore.
  * Use this before creating OR joining to prevent collisions.
  * @param {string} eventCode

@@ -34,6 +34,21 @@
   --font-body: 'Plus Jakarta Sans', sans-serif;
 }
 
+html, body {
+  /* Prevent pull-to-refresh and elastic bounce behavior */
+  overscroll-behavior-y: none;
+  
+  /* Disable double-tap to zoom (removes 300ms click delay) */
+  touch-action: manipulation;
+  
+  /* Disable text selection globally for a native app feel */
+  -webkit-user-select: none;
+  user-select: none;
+  
+  /* Prevent font size adjustments on orientation change */
+  -webkit-text-size-adjust: 100%;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -52,7 +67,56 @@ body {
     radial-gradient(at 0% 0%, rgba(20, 65, 161, 0.1) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(41, 182, 246, 0.08) 0px, transparent 50%);
   background-attachment: fixed;
-  touch-action: manipulation;
+}
+
+/* Re-enable text selection for input fields and textareas */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Disable callout sheet on long-press */
+img, a {
+  -webkit-touch-callout: none;
+}
+
+/* iOS Momentum Scrolling */
+.scroll-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe Area Utility Offsets */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.mt-safe {
+  margin-top: env(safe-area-inset-top);
+}
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* Interactive element transitions and active-tap shrink feedback */
+.glass-panel,
+button,
+.toggle-btn,
+.mobile-nav-item,
+.location-card,
+.more-drawer-item {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.glass-panel:active,
+button:active,
+.toggle-btn:active,
+.mobile-nav-item:active,
+.location-card:active,
+.more-drawer-item:active {
+  transform: scale(0.975); /* Native press scale down feedback */
 }
 
 /* Typography */
