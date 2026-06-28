@@ -33,10 +33,11 @@ if ('serviceWorker' in navigator) {
       });
   });
 
-  // Force page reload once the new service worker activates
+  // Force page reload once the new service worker activates (only if there was an active controller before)
+  const hasController = !!navigator.serviceWorker.controller;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
+    if (hasController && !refreshing) {
       refreshing = true;
       console.log('[PWA] New service worker activated, reloading page...');
       window.location.reload();
