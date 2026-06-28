@@ -4,8 +4,6 @@ const STATIC_ASSETS = [
   '/index.html',
   '/favicon.svg',
   '/Final VBT Re-Branding 2026-02 (3).png',
-  '/image1.png',
-  '/image2.jpg',
   '/manifest.json',
   '/icons.svg',
   // Sound files (Howler.js pre-loads these — cache for offline use)
@@ -79,27 +77,32 @@ self.addEventListener('fetch', (event) => {
     return; // Let browser handle it normally
   }
 
-  // Network-first strategy for same-origin requests
+  // Stale-While-Revalidate strategy for same-origin requests
   if (url.origin === self.location.origin) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // If response is valid, clone it and save to cache
-          if (response && response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          const fetchPromise = fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                cache.put(event.request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch((error) => {
+              console.log('[Service Worker] Fetch failed, relying on cache/fallback', error);
             });
+
+          // Keep the Service Worker alive for the background fetch
+          if (cachedResponse) {
+            event.waitUntil(fetchPromise);
+            return cachedResponse;
           }
-          return response;
-        })
-        .catch(() => {
-          // Network failed, try to get it from cache
-          return caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // If it's a navigation request, we can fallback to index.html for SPA behavior
+
+          // If no cached response, wait for the network response
+          return fetchPromise.then((response) => {
+            if (response) return response;
+            // Fallback if network also failed and no cache
             if (event.request.mode === 'navigate') {
               return caches.match('/index.html');
             }
@@ -108,7 +111,8 @@ self.addEventListener('fetch', (event) => {
               statusText: 'Service Unavailable'
             });
           });
-        })
+        });
+      })
     );
   }
 });

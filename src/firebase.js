@@ -4,6 +4,7 @@ import {
   enableMultiTabIndexedDbPersistence,
   doc, 
   getDoc,
+  getDocs,
   onSnapshot, 
   setDoc, 
   updateDoc, 
@@ -505,6 +506,25 @@ export async function updateServiceData(eventCode, data) {
 // ─────────────────────────────────────────────
 // SERVANTS DIRECTORY (Global Directory)
 // ─────────────────────────────────────────────
+
+/**
+ * Fetches all servants once from the VBT servants collection.
+ * @returns {Promise<Array>} A promise that resolves to the array of servants.
+ */
+export async function getServants() {
+  try {
+    const colRef = collection(db, 'vbt_servants');
+    const querySnapshot = await getDocs(colRef);
+    const list = [];
+    querySnapshot.forEach((doc) => {
+      list.push({ id: doc.id, ...doc.data() });
+    });
+    return list;
+  } catch (error) {
+    console.error("Error fetching servants:", error);
+    throw error;
+  }
+}
 
 /**
  * Subscribes to all servants in the VBT servants collection.

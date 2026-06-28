@@ -48,6 +48,7 @@ import {
   subscribeToServiceData,
   updateServiceData,
   registerDevicePushToken,
+  getServants,
   subscribeToServants,
   updateServant,
   addServant,
@@ -220,6 +221,313 @@ const triggerRemotePushNotification = async (title, body, targetUrl = '/') => {
     console.error('Error triggering remote push:', err);
   }
 };
+
+// ─── Localized Stopwatch & Timer Components to Optimize Render Performance ───
+function MatchupStopwatch({ actualStart, actualEnd }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (actualStart && !actualEnd) {
+      const interval = setInterval(() => setNow(Date.now()), 1000);
+      return () => clearInterval(interval);
+    }
+  }, [actualStart, actualEnd]);
+
+  if (actualStart && !actualEnd) {
+    const start = new Date(actualStart).getTime();
+    const elapsed = Math.max(0, Math.floor((now - start) / 1000));
+    const elapsedMins = Math.floor(elapsed / 60);
+    const elapsedSecs = elapsed % 60;
+    return (
+      <span style={{ color: '#4ade80', fontWeight: '700', fontFamily: 'monospace' }}>
+        ⏱️ RUNNING: {elapsedMins}m {elapsedSecs < 10 ? '0' : ''}{elapsedSecs}s
+      </span>
+    );
+  } else if (actualStart && actualEnd) {
+    const start = new Date(actualStart).getTime();
+    const end = new Date(actualEnd).getTime();
+    const totalSecs = Math.max(0, Math.floor((end - start) / 1000));
+    const totalMins = Math.floor(totalSecs / 60);
+    const totalSecsPart = totalSecs % 60;
+    return (
+      <span style={{ color: 'var(--text-muted)' }}>
+        ⏱️ TOOK: {totalMins}m {totalSecsPart < 10 ? '0' : ''}{totalSecsPart}s
+      </span>
+    );
+  }
+  return <span style={{ color: 'var(--text-muted)' }}>⏱️ Scheduled: 30m</span>;
+}
+
+function MatchupRunningStopwatch({ actualStart }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const elapsedSeconds = Math.max(0, Math.floor((now - new Date(actualStart).getTime()) / 1000));
+  const elapsedMins = Math.floor(elapsedSeconds / 60);
+  const elapsedSecs = elapsedSeconds % 60;
+  const formattedSecs = elapsedSecs < 10 ? `0${elapsedSecs}` : elapsedSecs;
+  return (
+    <span style={{ 
+      fontSize: '0.62rem', 
+      color: '#fbbf24', 
+      background: 'rgba(251, 191, 36, 0.15)', 
+      padding: '1px 6px', 
+      borderRadius: '4px', 
+      fontWeight: '700',
+      animation: 'pulse-glow 1.5s infinite',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      fontFamily: 'monospace'
+    }}>
+      🏃 RUNNING: {elapsedMins}:{formattedSecs}
+    </span>
+  );
+}
+
+function ScheduleTimelineTrackerCard({ 
+  campData, 
+  eventConfig, 
+  getEffectiveTimeShift, 
+  getShiftedTimeStr, 
+  getEventCurrentDay, 
+  parseTimeToMs, 
+  getEventTimeRange, 
+  getActiveSlotProgress,
+  activeSlot,
+  getTeamColorHex
+}) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const range = getEventTimeRange(now);
+  if (!range) return null;
+  
+  const nowMs = now.getTime();
+  const totalDuration = range.endMs - range.startMs;
+  const currentProgress = Math.max(0, Math.min(100, ((nowMs - range.startMs) / totalDuration) * 100));
+  
+  const todaysMatchups = campData.matchups.filter(m => {
+    const currentDay = getEventCurrentDay(now);
+    const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+    return String(mDay) === String(currentDay);
+  });
+  
+  const timeToMsMap = {};
+  todaysMatchups.forEach(m => {
+    const ms = parseTimeToMs(m.time, now);
+    if (ms > 0) timeToMsMap[m.time] = ms;
+  });
+  
+  const sortedTimeLabels = Object.keys(timeToMsMap).sort((a, b) => timeToMsMap[a] - timeToMsMap[b]);
+  const shift = getEffectiveTimeShift(now) * 60 * 1000;
+  const currentActiveSlot = getActiveSlotProgress(now);
+  
+  let statusText = "";
+  let countdownText = "";
+  let statusColor = "var(--vbt-sky)";
+  
+  if (nowMs < range.startMs) {
+    statusText = "Service Starting Soon";
+    statusColor = "#c4b5fd";
+    const diff = range.startMs - nowMs;
+    const hours = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    countdownText = `${hours > 0 ? hours + 'h ' : ''}${mins}m ${secs}s`;
+  } else if (nowMs >= range.startMs && nowMs < range.endMs) {
+    statusText = "Service is Live";
+    statusColor = "#4ade80";
+    const diff = range.endMs - nowMs;
+    const hours = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    countdownText = `${hours > 0 ? hours + 'h ' : ''}${mins}m ${secs}s left`;
+  } else {
+    statusText = "Service has Completed";
+    statusColor = "var(--text-muted)";
+    countdownText = "Finished";
+  }
+
+  return (
+    <div className="glass-panel animate-fade-in" style={{ padding: '16px', background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.08) 0%, rgba(13, 20, 38, 0.6) 100%)', borderColor: nowMs >= range.startMs && nowMs < range.endMs ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div>
+          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '700' }}>Event Status</span>
+          <h3 style={{ fontSize: '1.05rem', color: '#ffffff', fontWeight: '800', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: statusColor, boxShadow: `0 0 8px ${statusColor}` }} />
+            {statusText}
+          </h3>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '700' }}>Countdown</span>
+          <p style={{ fontSize: '1.05rem', color: statusColor, fontWeight: '800', margin: '2px 0 0 0', fontFamily: 'monospace' }}>
+            {countdownText}
+          </p>
+        </div>
+      </div>
+      
+      <div style={{ position: 'relative', height: '24px', marginTop: '16px', marginBottom: '24px', padding: '0 10px' }}>
+        <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '10px', 
+          left: '10px', 
+          width: `calc(${currentProgress}% - 20px)`, 
+          height: '4px', 
+          background: 'var(--gradient-vbt)', 
+          borderRadius: '2px',
+          boxShadow: '0 0 8px var(--vbt-sky)',
+          transition: 'width 0.5s ease-in-out'
+        }} />
+        
+        {sortedTimeLabels.map((timeLabel, idx) => {
+          const timeMs = timeToMsMap[timeLabel];
+          const pct = ((timeMs + shift - range.startMs) / totalDuration) * 100;
+          
+          const match = todaysMatchups.find(m => m.time === timeLabel);
+          let labelText = `R${idx + 1}`;
+          if (match) {
+            if (match.block === 2) labelText = "BG";
+            else if (match.block === 3) labelText = "Ref";
+          }
+          
+          const isPast = (timeMs + shift) <= nowMs;
+          const isCurrent = activeSlot && activeSlot.timeStr === timeLabel;
+          
+          return (
+            <div 
+              key={timeLabel} 
+              style={{ 
+                position: 'absolute', 
+                left: `${pct}%`, 
+                transform: 'translateX(-50%)',
+                top: '2px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                cursor: 'help'
+              }}
+              title={`${match ? match.game : ''} (${timeLabel})`}
+            >
+              <div style={{ 
+                width: '12px', 
+                height: '12px', 
+                borderRadius: '50%', 
+                background: isCurrent ? '#4ade80' : isPast ? 'var(--vbt-sky)' : '#334155', 
+                border: '2px solid var(--bg-surface)',
+                boxShadow: isCurrent ? '0 0 10px #4ade80' : 'none',
+                transition: 'all 0.3s ease'
+              }} />
+              <span style={{ 
+                fontSize: '0.58rem', 
+                color: isCurrent ? '#4ade80' : isPast ? '#ffffff' : 'var(--text-muted)', 
+                fontWeight: isCurrent || isPast ? '800' : '500',
+                marginTop: '4px' 
+              }}>
+                {labelText}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {activeSlot && (
+        <div style={{ 
+          marginTop: '12px', 
+          background: 'rgba(255,255,255,0.02)', 
+          border: '1px solid rgba(255,255,255,0.05)', 
+          padding: '12px', 
+          borderRadius: '8px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '8px' 
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
+              ⚡ Active Round: <span style={{ color: 'var(--vbt-sky)' }}>{activeSlot.name}</span>
+            </span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+              {Math.floor(activeSlot.remaining / 60000)}m {Math.floor((activeSlot.remaining % 60000) / 1000)}s left
+            </span>
+          </div>
+          
+          <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+            <div style={{ 
+              width: `${activeSlot.percent}%`, 
+              height: '100%', 
+              background: 'linear-gradient(90deg, var(--vbt-sky) 0%, #4ade80 100%)',
+              borderRadius: '4px',
+              transition: 'width 1s linear'
+            }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HeaderCountdownBadge({ 
+  getEventTimeRange, 
+  getEventCurrentDay, 
+  parseTimeToMs, 
+  getEffectiveTimeShift 
+}) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const range = getEventTimeRange(now);
+  if (!range) return null;
+  
+  const nowMs = now.getTime();
+  if (nowMs < range.startMs) {
+    const diff = range.startMs - nowMs;
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return (
+      <span style={{ 
+        fontSize: '0.55rem', 
+        background: 'rgba(167, 139, 250, 0.2)', 
+        border: '1px solid rgba(167, 139, 250, 0.4)', 
+        color: '#c4b5fd', 
+        padding: '1px 4px', 
+        borderRadius: '4px', 
+        fontWeight: '700',
+        animation: 'pulse-glow 2s infinite'
+      }}>
+        {mins}m {secs}s
+      </span>
+    );
+  } else if (nowMs >= range.startMs && nowMs < range.endMs) {
+    const diff = range.endMs - nowMs;
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return (
+      <span style={{ 
+        fontSize: '0.55rem', 
+        background: 'rgba(34, 197, 94, 0.2)', 
+        border: '1px solid rgba(34, 197, 94, 0.4)', 
+        color: '#4ade80', 
+        padding: '1px 4px', 
+        borderRadius: '4px', 
+        fontWeight: '700'
+      }}>
+        {mins}m left
+      </span>
+    );
+  }
+  return null;
+}
 
 export default function App() {
   // ─── EVENT SELECTION STATE ────────────────────────────────────────────────
@@ -442,7 +750,8 @@ export default function App() {
   const [scheduleSortMode, setScheduleSortMode] = useState('block');
   const [announcementText, setAnnouncementText] = useState('');
   const [announcements, setAnnouncements] = useState([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [timeTick, setTimeTick] = useState(0);
+  const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [isWhereIsEveryoneCollapsed, setIsWhereIsEveryoneCollapsed] = useState(true);
   const [rosterSearch, setRosterSearch] = useState('');
   const [isRosterCollapsed, setIsRosterCollapsed] = useState(true);
@@ -517,12 +826,11 @@ export default function App() {
   const [expandedGames, setExpandedGames] = useState({});
   const fileInputRef = useRef(null);
 
-  const getEffectiveTimeShift = () => {
+  const getEffectiveTimeShift = (now = new Date()) => {
     const { timeShiftMinutes = 0, isTimerPaused = false, timerPausedAt = null } = campState;
     if (isTimerPaused && timerPausedAt) {
       const pausedTime = new Date(timerPausedAt).getTime();
-      const now = currentTime.getTime();
-      const elapsedMs = Math.max(0, now - pausedTime);
+      const elapsedMs = Math.max(0, now.getTime() - pausedTime);
       const elapsedMins = Math.floor(elapsedMs / (60 * 1000));
       return timeShiftMinutes + elapsedMins;
     }
@@ -560,7 +868,7 @@ export default function App() {
     }
   };
 
-  const getEventCurrentDay = () => {
+  const getEventCurrentDay = (now = new Date()) => {
     if (eventConfig && eventConfig.activeDayOverride) {
       return parseInt(eventConfig.activeDayOverride, 10) || 1;
     }
@@ -568,7 +876,7 @@ export default function App() {
     try {
       const start = new Date(eventConfig.eventDate);
       if (isNaN(start.getTime())) return 1;
-      const today = new Date(currentTime);
+      const today = new Date(now);
       start.setHours(0, 0, 0, 0);
       today.setHours(0, 0, 0, 0);
       const diffTime = today.getTime() - start.getTime();
@@ -582,14 +890,14 @@ export default function App() {
     }
   };
 
-  const isTimeSlotActive = (timeStr, blockName, matchupDay) => {
+  const isTimeSlotActive = (timeStr, blockName, matchupDay, now = new Date()) => {
     try {
       let timePart = timeStr.trim();
       const match = timePart.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (!match) return false;
       
       if (matchupDay) {
-        const currentDay = getEventCurrentDay();
+        const currentDay = getEventCurrentDay(now);
         if (matchupDay !== currentDay) return false;
       }
       
@@ -602,11 +910,11 @@ export default function App() {
       eventTime.setMinutes(minutes);
       eventTime.setSeconds(0);
 
-      const shift = getEffectiveTimeShift();
+      const shift = getEffectiveTimeShift(now);
       const shiftedEventTime = new Date(eventTime.getTime() + shift * 60 * 1000);
 
       const durationMs = 30 * 60 * 1000;
-      const diff = currentTime.getTime() - shiftedEventTime.getTime();
+      const diff = now.getTime() - shiftedEventTime.getTime();
 
       return diff >= 0 && diff < durationMs;
     } catch (e) {
@@ -614,7 +922,7 @@ export default function App() {
     }
   };
 
-  const parseTimeToMs = (timeStr) => {
+  const parseTimeToMs = (timeStr, now = new Date()) => {
     try {
       const match = timeStr.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (!match) return 0;
@@ -622,7 +930,7 @@ export default function App() {
       const minutes = parseInt(match[2]);
       const isPM = match[3].toUpperCase() === 'PM';
       
-      const date = new Date(currentTime);
+      const date = new Date(now);
       date.setHours(isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours));
       date.setMinutes(minutes);
       date.setSeconds(0);
@@ -633,9 +941,9 @@ export default function App() {
     }
   };
 
-  const getEventTimeRange = () => {
+  const getEventTimeRange = (now = new Date()) => {
     if (!campData.matchups || campData.matchups.length === 0) return null;
-    const currentDay = getEventCurrentDay();
+    const currentDay = getEventCurrentDay(now);
     const todaysMatchups = campData.matchups.filter(m => {
       const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
       return String(mDay) === String(currentDay);
@@ -647,7 +955,7 @@ export default function App() {
     let latest = -Infinity;
     
     todaysMatchups.forEach(m => {
-      const ms = parseTimeToMs(m.time);
+      const ms = parseTimeToMs(m.time, now);
       if (ms > 0) {
         if (ms < earliest) earliest = ms;
         if (ms > latest) latest = ms;
@@ -656,16 +964,16 @@ export default function App() {
     
     if (earliest === Infinity || latest === -Infinity) return null;
     
-    const shift = getEffectiveTimeShift() * 60 * 1000;
+    const shift = getEffectiveTimeShift(now) * 60 * 1000;
     const startMs = earliest + shift;
     const endMs = latest + shift + (30 * 60 * 1000);
     
     return { startMs, endMs };
   };
 
-  const getActiveSlotProgress = () => {
+  const getActiveSlotProgress = (now = new Date()) => {
     if (!campData.matchups || campData.matchups.length === 0) return null;
-    const currentDay = getEventCurrentDay();
+    const currentDay = getEventCurrentDay(now);
     const todaysMatchups = campData.matchups.filter(m => {
       const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
       return String(mDay) === String(currentDay);
@@ -675,15 +983,15 @@ export default function App() {
     
     const timeToMsMap = {};
     todaysMatchups.forEach(m => {
-      const ms = parseTimeToMs(m.time);
+      const ms = parseTimeToMs(m.time, now);
       if (ms > 0) {
         timeToMsMap[m.time] = ms;
       }
     });
     
     const uniqueTimes = Object.keys(timeToMsMap).sort((a, b) => timeToMsMap[a] - timeToMsMap[b]);
-    const shift = getEffectiveTimeShift() * 60 * 1000;
-    const now = currentTime.getTime();
+    const shift = getEffectiveTimeShift(now) * 60 * 1000;
+    const nowMs = now.getTime();
     
     for (let i = 0; i < uniqueTimes.length; i++) {
       const timeStr = uniqueTimes[i];
@@ -696,7 +1004,7 @@ export default function App() {
         endMs = startMs + (30 * 60 * 1000);
       }
       
-      if (now >= startMs && now < endMs) {
+      if (nowMs >= startMs && nowMs < endMs) {
         const sampleMatch = todaysMatchups.find(m => m.time === timeStr);
         let slotName = sampleMatch ? sampleMatch.game : "Round";
         if (sampleMatch) {
@@ -710,8 +1018,8 @@ export default function App() {
         }
         
         const totalDuration = endMs - startMs;
-        const elapsed = now - startMs;
-        const remaining = endMs - now;
+        const elapsed = nowMs - startMs;
+        const remaining = endMs - nowMs;
         const percent = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
         
         return {
@@ -751,7 +1059,7 @@ export default function App() {
         activeMatchup: active || null
       };
     });
-  }, [campData, campState, currentTime, eventConfig]);
+  }, [campData, campState, timeTick, eventConfig]);
 
   // Watch for new announcements → play chime + vibrate + show notification
   useEffect(() => {
@@ -788,9 +1096,9 @@ export default function App() {
     }
   }, [announcements]);
 
-  // Time tracker for Live indicators
+  // Time tracker for Live indicators (ticks every 30 seconds to trigger schedule recalculations)
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const timer = setInterval(() => setTimeTick(prev => prev + 1), 30000);
 
     // Mobile audio context & HTML5 audio autoplay unlocker
     // Uses the shared AudioContext from chimes.js to avoid creating duplicates
@@ -976,10 +1284,23 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Subscribe to global servants directory
+  // Fetch global servants directory once on mount
   useEffect(() => {
-    const unsub = subscribeToServants((list) => setGlobalServants(list));
-    return () => unsub();
+    let active = true;
+    const fetchServantsData = async () => {
+      try {
+        const data = await getServants();
+        if (active) {
+          setGlobalServants(data);
+        }
+      } catch (err) {
+        console.error("Error loading servants directory:", err);
+      }
+    };
+    fetchServantsData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Preloader timer
@@ -2769,7 +3090,7 @@ export default function App() {
       const sDay = slot.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(sBlockNum) ? 1 : 2) : 1);
       return slot.block && isTimeSlotActive(slot.time, slot.block, sDay);
     });
-  }, [myTeamInfo, campState, currentTime, eventConfig.eventType]);
+  }, [myTeamInfo, campState, timeTick, eventConfig.eventType]);
 
   // Find matches scheduled at the selected map location
   const mapLocationMatches = useMemo(() => {
@@ -4126,48 +4447,12 @@ export default function App() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <h2 style={{ fontSize: '0.95rem', color: '#ffffff', lineHeight: 1.1, margin: 0 }}>{eventConfig.eventName || 'VBT CAMP'}</h2>
-                {(() => {
-                  const range = getEventTimeRange();
-                  if (!range) return null;
-                  const now = currentTime.getTime();
-                  if (now < range.startMs) {
-                    const diff = range.startMs - now;
-                    const mins = Math.floor(diff / 60000);
-                    const secs = Math.floor((diff % 60000) / 1000);
-                    return (
-                      <span style={{ 
-                        fontSize: '0.55rem', 
-                        background: 'rgba(167, 139, 250, 0.2)', 
-                        border: '1px solid rgba(167, 139, 250, 0.4)', 
-                        color: '#c4b5fd', 
-                        padding: '1px 4px', 
-                        borderRadius: '4px', 
-                        fontWeight: '700',
-                        animation: 'pulse-glow 2s infinite'
-                      }}>
-                        {mins}m {secs}s
-                      </span>
-                    );
-                  } else if (now >= range.startMs && now < range.endMs) {
-                    const diff = range.endMs - now;
-                    const mins = Math.floor(diff / 60000);
-                    const secs = Math.floor((diff % 60000) / 1000);
-                    return (
-                      <span style={{ 
-                        fontSize: '0.55rem', 
-                        background: 'rgba(34, 197, 94, 0.2)', 
-                        border: '1px solid rgba(34, 197, 94, 0.4)', 
-                        color: '#4ade80', 
-                        padding: '1px 4px', 
-                        borderRadius: '4px', 
-                        fontWeight: '700'
-                      }}>
-                        {mins}m left
-                      </span>
-                    );
-                  }
-                  return null;
-                })()}
+                <HeaderCountdownBadge
+                  getEventTimeRange={getEventTimeRange}
+                  getEventCurrentDay={getEventCurrentDay}
+                  parseTimeToMs={parseTimeToMs}
+                  getEffectiveTimeShift={getEffectiveTimeShift}
+                />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -5201,173 +5486,18 @@ export default function App() {
             />
 
             {/* Live Service Countdown & Timeline Tracker Card */}
-            {(() => {
-              const range = getEventTimeRange();
-              if (!range) return null;
-              
-              const now = currentTime.getTime();
-              const totalDuration = range.endMs - range.startMs;
-              const currentProgress = Math.max(0, Math.min(100, ((now - range.startMs) / totalDuration) * 100));
-              
-              const todaysMatchups = campData.matchups.filter(m => {
-                const currentDay = getEventCurrentDay();
-                const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
-                return String(mDay) === String(currentDay);
-              });
-              
-              const timeToMsMap = {};
-              todaysMatchups.forEach(m => {
-                const ms = parseTimeToMs(m.time);
-                if (ms > 0) timeToMsMap[m.time] = ms;
-              });
-              
-              const sortedTimeLabels = Object.keys(timeToMsMap).sort((a, b) => timeToMsMap[a] - timeToMsMap[b]);
-              const shift = getEffectiveTimeShift() * 60 * 1000;
-              const activeSlot = getActiveSlotProgress();
-              
-              let statusText = "";
-              let countdownText = "";
-              let statusColor = "var(--vbt-sky)";
-              
-              if (now < range.startMs) {
-                statusText = "Service Starting Soon";
-                statusColor = "#c4b5fd";
-                const diff = range.startMs - now;
-                const hours = Math.floor(diff / 3600000);
-                const mins = Math.floor((diff % 3600000) / 60000);
-                const secs = Math.floor((diff % 60000) / 1000);
-                countdownText = `${hours > 0 ? hours + 'h ' : ''}${mins}m ${secs}s`;
-              } else if (now >= range.startMs && now < range.endMs) {
-                statusText = "Service is Live";
-                statusColor = "#4ade80";
-                const diff = range.endMs - now;
-                const hours = Math.floor(diff / 3600000);
-                const mins = Math.floor((diff % 3600000) / 60000);
-                const secs = Math.floor((diff % 60000) / 1000);
-                countdownText = `${hours > 0 ? hours + 'h ' : ''}${mins}m ${secs}s left`;
-              } else {
-                statusText = "Service has Completed";
-                statusColor = "var(--text-muted)";
-                countdownText = "Finished";
-              }
-              
-              return (
-                <div className="glass-panel animate-fade-in" style={{ padding: '16px', background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.08) 0%, rgba(13, 20, 38, 0.6) 100%)', borderColor: now >= range.startMs && now < range.endMs ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255,255,255,0.06)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '700' }}>Event Status</span>
-                      <h3 style={{ fontSize: '1.05rem', color: '#ffffff', fontWeight: '800', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: statusColor, boxShadow: `0 0 8px ${statusColor}` }} />
-                        {statusText}
-                      </h3>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '700' }}>Countdown</span>
-                      <p style={{ fontSize: '1.05rem', color: statusColor, fontWeight: '800', margin: '2px 0 0 0', fontFamily: 'monospace' }}>
-                        {countdownText}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div style={{ position: 'relative', height: '24px', marginTop: '16px', marginBottom: '24px', padding: '0 10px' }}>
-                    <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />
-                    <div style={{ 
-                      position: 'absolute', 
-                      top: '10px', 
-                      left: '10px', 
-                      width: `calc(${currentProgress}% - 20px)`, 
-                      height: '4px', 
-                      background: 'var(--gradient-vbt)', 
-                      borderRadius: '2px',
-                      boxShadow: '0 0 8px var(--vbt-sky)',
-                      transition: 'width 0.5s ease-in-out'
-                    }} />
-                    
-                    {sortedTimeLabels.map((timeLabel, idx) => {
-                      const timeMs = timeToMsMap[timeLabel];
-                      const pct = ((timeMs + shift - range.startMs) / totalDuration) * 100;
-                      
-                      const match = todaysMatchups.find(m => m.time === timeLabel);
-                      let labelText = `R${idx + 1}`;
-                      if (match) {
-                        if (match.block === 2) labelText = "BG";
-                        else if (match.block === 3) labelText = "Ref";
-                      }
-                      
-                      const isPast = (timeMs + shift) <= now;
-                      const isCurrent = activeSlot && activeSlot.timeStr === timeLabel;
-                      
-                      return (
-                        <div 
-                          key={timeLabel} 
-                          style={{ 
-                            position: 'absolute', 
-                            left: `${pct}%`, 
-                            transform: 'translateX(-50%)',
-                            top: '2px', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            alignItems: 'center',
-                            cursor: 'help'
-                          }}
-                          title={`${match ? match.game : ''} (${timeLabel})`}
-                        >
-                          <div style={{ 
-                            width: '12px', 
-                            height: '12px', 
-                            borderRadius: '50%', 
-                            background: isCurrent ? '#4ade80' : isPast ? 'var(--vbt-sky)' : '#334155', 
-                            border: '2px solid var(--bg-surface)',
-                            boxShadow: isCurrent ? '0 0 10px #4ade80' : 'none',
-                            transition: 'all 0.3s ease'
-                          }} />
-                          <span style={{ 
-                            fontSize: '0.58rem', 
-                            color: isCurrent ? '#4ade80' : isPast ? '#ffffff' : 'var(--text-muted)', 
-                            fontWeight: isCurrent || isPast ? '800' : '500',
-                            marginTop: '4px' 
-                          }}>
-                            {labelText}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {activeSlot && (
-                    <div style={{ 
-                      marginTop: '12px', 
-                      background: 'rgba(255,255,255,0.02)', 
-                      border: '1px solid rgba(255,255,255,0.05)', 
-                      padding: '12px', 
-                      borderRadius: '8px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '8px' 
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
-                          ⚡ Active Round: <span style={{ color: 'var(--vbt-sky)' }}>{activeSlot.name}</span>
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                          {Math.floor(activeSlot.remaining / 60000)}m {Math.floor((activeSlot.remaining % 60000) / 1000)}s left
-                        </span>
-                      </div>
-                      
-                      <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
-                        <div style={{ 
-                          width: `${activeSlot.percent}%`, 
-                          height: '100%', 
-                          background: 'linear-gradient(90deg, var(--vbt-sky) 0%, #4ade80 100%)',
-                          borderRadius: '4px',
-                          transition: 'width 1s linear'
-                        }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <ScheduleTimelineTrackerCard
+              campData={campData}
+              eventConfig={eventConfig}
+              getEffectiveTimeShift={getEffectiveTimeShift}
+              getShiftedTimeStr={getShiftedTimeStr}
+              getEventCurrentDay={getEventCurrentDay}
+              parseTimeToMs={parseTimeToMs}
+              getEventTimeRange={getEventTimeRange}
+              getActiveSlotProgress={getActiveSlotProgress}
+              activeSlot={currentActiveSlot}
+              getTeamColorHex={getTeamColorHex}
+            />
             {eventConfig.eventType !== 'normal' ? (
               <div style={{
                 background: 'rgba(41, 182, 246, 0.1)',
@@ -6148,32 +6278,7 @@ export default function App() {
 
                                 {/* Timer / Duration tracker */}
                                 <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                                  {(() => {
-                                    if (m.actualStart && !m.actualEnd) {
-                                      const start = new Date(m.actualStart).getTime();
-                                      const nowMs = currentTime.getTime();
-                                      const elapsed = Math.max(0, Math.floor((nowMs - start) / 1000));
-                                      const elapsedMins = Math.floor(elapsed / 60);
-                                      const elapsedSecs = elapsed % 60;
-                                      return (
-                                        <span style={{ color: '#4ade80', fontWeight: '700', fontFamily: 'monospace' }}>
-                                          ⏱️ RUNNING: {elapsedMins}m {elapsedSecs < 10 ? '0' : ''}{elapsedSecs}s
-                                        </span>
-                                      );
-                                    } else if (m.actualStart && m.actualEnd) {
-                                      const start = new Date(m.actualStart).getTime();
-                                      const end = new Date(m.actualEnd).getTime();
-                                      const totalSecs = Math.max(0, Math.floor((end - start) / 1000));
-                                      const totalMins = Math.floor(totalSecs / 60);
-                                      const totalSecsPart = totalSecs % 60;
-                                      return (
-                                        <span style={{ color: 'var(--text-muted)' }}>
-                                          ⏱️ TOOK: {totalMins}m {totalSecsPart < 10 ? '0' : ''}{totalSecsPart}s
-                                        </span>
-                                      );
-                                    }
-                                    return <span style={{ color: 'var(--text-muted)' }}>⏱️ Scheduled: 30m</span>;
-                                  })()}
+                                  <MatchupStopwatch actualStart={m.actualStart} actualEnd={m.actualEnd} />
                                 </div>
                               </div>
 
@@ -6211,7 +6316,6 @@ export default function App() {
                                         flex: 1,
                                         padding: '6px',
                                         borderRadius: '6px',
-                                        border: 'none',
                                         background: 'rgba(239, 68, 68, 0.15)',
                                         border: '1px solid rgba(239, 68, 68, 0.3)',
                                         color: '#f87171',
@@ -6235,7 +6339,6 @@ export default function App() {
                                         flex: 1,
                                         padding: '6px',
                                         borderRadius: '6px',
-                                        border: 'none',
                                         background: 'rgba(255, 255, 255, 0.05)',
                                         border: '1px solid rgba(255, 255, 255, 0.1)',
                                         color: '#ffffff',
@@ -6308,29 +6411,9 @@ export default function App() {
                           )}
                           
                           {/* Live Running Stopwatch display */}
-                          {m.actualStart && !m.actualEnd && (() => {
-                            const elapsedSeconds = Math.max(0, Math.floor((currentTime.getTime() - new Date(m.actualStart).getTime()) / 1000));
-                            const elapsedMins = Math.floor(elapsedSeconds / 60);
-                            const elapsedSecs = elapsedSeconds % 60;
-                            const formattedSecs = elapsedSecs < 10 ? `0${elapsedSecs}` : elapsedSecs;
-                            return (
-                              <span style={{ 
-                                fontSize: '0.62rem', 
-                                color: '#fbbf24', 
-                                background: 'rgba(251, 191, 36, 0.15)', 
-                                padding: '1px 6px', 
-                                borderRadius: '4px', 
-                                fontWeight: '700',
-                                animation: 'pulse-glow 1.5s infinite',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontFamily: 'monospace'
-                              }}>
-                                🏃 RUNNING: {elapsedMins}:{formattedSecs}
-                              </span>
-                            );
-                          })()}
+                          {m.actualStart && !m.actualEnd && (
+                            <MatchupRunningStopwatch actualStart={m.actualStart} />
+                          )}
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '700' }}>
                           {getEffectiveTimeShift() > 0 ? (
@@ -7246,7 +7329,7 @@ export default function App() {
                   campData={campData}
                   campState={campState}
                   eventConfig={eventConfig}
-                  currentTime={currentTime}
+                  currentTime={new Date()}
                   getTeamColorHex={getTeamColorHex}
                   isServiceMode={eventConfig.eventType === 'service'}
                   mapConfig={mapConfig}
@@ -7333,7 +7416,7 @@ export default function App() {
                  campData={campData}
                  eventConfig={eventConfig}
                  getTeamColorHex={getTeamColorHex}
-                 currentTime={currentTime}
+                 currentTime={new Date()}
                  liveLocationStatus={liveLocationStatus}
                />
              )}
