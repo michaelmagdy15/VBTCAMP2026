@@ -1067,4 +1067,75 @@ export async function updateScheduleMatchupTimes(targetEventCode, startTimeStr, 
   await setDoc(scheduleDocRef, { ...scheduleData, matchups: updatedMatchups }, { merge: true });
 }
 
+// ===============================================================
+// SERVICE REQUESTS FUNCTIONS
+// ===============================================================
+
+/**
+ * Submits a new VBT service request.
+ * Saves to Firestore collection: vbt_events/service_requests/requests
+ */
+export async function submitServiceRequest(requestData) {
+  try {
+    const colRef = collection(db, 'vbt_events/service_requests/requests');
+    const docRef = await addDoc(colRef, {
+      ...requestData,
+      status: 'pending', // 'pending' | 'approved' | 'rejected'
+      createdAt: serverTimestamp()
+    });
+    console.log("[Firebase] Service request submitted with ID:", docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error submitting service request:", error);
+    throw error;
+  }
+}
+
+/**
+ * Subscribes to all VBT service requests.
+ * Reads from Firestore collection: vbt_events/service_requests/requests
+ */
+export function subscribeToServiceRequests(callback) {
+  const colRef = collection(db, 'vbt_events/service_requests/requests');
+  const q = query(colRef, orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const requests = [];
+    snapshot.forEach((doc) => {
+      requests.push({ id: doc.id, ...doc.data() });
+    });
+    callback(requests);
+  }, (error) => {
+    console.error("Error subscribing to service requests:", error);
+  });
+}
+
+/**
+ * Updates the status of a service request.
+ */
+export async function updateServiceRequestStatus(requestId, status) {
+  try {
+    const docRef = doc(db, 'vbt_events/service_requests/requests', requestId);
+    await updateDoc(docRef, { status });
+    console.log(`[Firebase] Service request ${requestId} status updated to ${status}`);
+  } catch (error) {
+    console.error("Error updating service request status:", error);
+    throw error;
+  }
+}
+
+/**
+ * Deletes a service request.
+ */
+export async function deleteServiceRequest(requestId) {
+  try {
+    const docRef = doc(db, 'vbt_events/service_requests/requests', requestId);
+    await deleteDoc(docRef);
+    console.log(`[Firebase] Service request ${requestId} deleted`);
+  } catch (error) {
+    console.error("Error deleting service request:", error);
+    throw error;
+  }
+}
+
+
 

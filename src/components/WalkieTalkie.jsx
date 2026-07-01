@@ -390,16 +390,23 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
   // Auto-play incoming audio — with iOS retry logic
   useEffect(() => {
     audioTracks.forEach((track) => {
-      try {
-        unlockAudioContext();
-        track.play();
-        if (track.setVolume) track.setVolume(100);
-      } catch (e) {
-        console.warn('[WalkieTalkie] Remote track play failed, retrying:', e);
-        setTimeout(() => {
-          try { track.play(); } catch (e2) { console.error('[WalkieTalkie] Remote track retry failed:', e2); }
-        }, 300);
-      }
+      unlockAudioContext();
+      track.play()
+        .then(() => {
+          if (track.setVolume) track.setVolume(100);
+        })
+        .catch((e) => {
+          console.warn('[WalkieTalkie] Remote audio track play rejected, retrying:', e);
+          setTimeout(() => {
+            track.play()
+              .then(() => {
+                if (track.setVolume) track.setVolume(100);
+              })
+              .catch((e2) => {
+                console.warn('[WalkieTalkie] Remote audio track retry rejected:', e2);
+              });
+          }, 300);
+        });
     });
   }, [audioTracks]);
 

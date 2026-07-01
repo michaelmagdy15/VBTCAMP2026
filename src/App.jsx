@@ -47,6 +47,10 @@ import {
   getEventRegistry,
   subscribeToServiceData,
   updateServiceData,
+  submitServiceRequest,
+  subscribeToServiceRequests,
+  updateServiceRequestStatus,
+  deleteServiceRequest,
   registerDevicePushToken,
   getServants,
   updateServant,
@@ -766,6 +770,38 @@ export default function App() {
   const [editGroups, setEditGroups] = useState([]);
   const [editGames, setEditGames] = useState([]);
   const [serviceEditMode, setServiceEditMode] = useState(false);
+
+  // Service Requests States
+  const [serviceRequests, setServiceRequests] = useState([]);
+  const [showServiceRequestModal, setShowServiceRequestModal] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
+  const [serviceRequestStep, setServiceRequestStep] = useState(1);
+
+  // Service Request Form State (16 fields)
+  const [serviceRequestForm, setServiceRequestForm] = useState({
+    serviceLocation: '',
+    serviceDate: '',
+    serviceStartTime: '',
+    serviceEndTime: '',
+    serviceTopic: '',
+    targetGender: 'Mix', // 'Girls' | 'Boys' | 'Mix'
+    targetAgeGrade: '',
+    participantsCount: '',
+    alreadySplitTeams: 'no', // 'yes' | 'no'
+    teamsCount: '',
+    needSpecificServantsCount: 'no', // 'yes' | 'no'
+    servantsCount: '',
+    servantsAvailableHelping: 'yes', // 'yes' | 'no'
+    contactName: '',
+    contactNumber: '',
+    churchName: ''
+  });
+
+  // Coordinator management subtab inside settings
+  const [settingsRequestFilter, setSettingsRequestFilter] = useState('All'); // 'All' | 'pending' | 'approved' | 'rejected'
+  const [settingsRequestSearch, setSettingsRequestSearch] = useState('');
+  const [expandedRequests, setExpandedRequests] = useState({});
   const [savingService, setSavingService] = useState(false);
   const [expandedServiceGame, setExpandedServiceGame] = useState({});
 
@@ -1416,6 +1452,18 @@ export default function App() {
     });
     return () => unsub();
   }, [currentEventCode]);
+
+  // Subscribe to service requests (only if admin)
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      setServiceRequests([]);
+      return;
+    }
+    const unsub = subscribeToServiceRequests((requests) => {
+      setServiceRequests(requests);
+    });
+    return () => unsub();
+  }, [currentUser]);
 
   // Initialize wizard servants when modal opens
   useEffect(() => {
@@ -3297,7 +3345,7 @@ export default function App() {
             Coordinate match schedules, manage sub-teams, and submit real-time scores effortlessly.
           </p>
           
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => {
                 const el = document.getElementById('events-section');
@@ -3321,6 +3369,39 @@ export default function App() {
               }}
             >
               + Create Service Day
+            </button>
+            <button
+              onClick={() => {
+                setShowServiceRequestModal(true);
+                setRequestSuccess(false);
+                setServiceRequestStep(1);
+                setServiceRequestForm({
+                  serviceLocation: '',
+                  serviceDate: '',
+                  serviceStartTime: '',
+                  serviceEndTime: '',
+                  serviceTopic: '',
+                  targetGender: 'Mix',
+                  targetAgeGrade: '',
+                  participantsCount: '',
+                  alreadySplitTeams: 'no',
+                  teamsCount: '',
+                  needSpecificServantsCount: 'no',
+                  servantsCount: '',
+                  servantsAvailableHelping: 'yes',
+                  contactName: '',
+                  contactNumber: '',
+                  churchName: ''
+                });
+              }}
+              className="btn-glow"
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: '1px solid rgba(167, 139, 250, 0.4)',
+                background: 'rgba(167, 139, 250, 0.08)', color: '#c4b5fd', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              ⛪ Request VBT Service
             </button>
           </div>
         </section>
@@ -4068,6 +4149,493 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {/* VBT SERVICE REQUEST PUBLIC MODAL */}
+        {showServiceRequestModal && (
+          <div
+            className="more-drawer-overlay"
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(5, 7, 20, 0.85)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              zIndex: 1500,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+          >
+            <div
+              className="glass-panel"
+              style={{
+                width: '100%',
+                maxWidth: '560px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '28px',
+                position: 'relative',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                borderRadius: '24px',
+                background: 'rgba(15, 23, 42, 0.95)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setShowServiceRequestModal(false)}
+                style={{
+                  position: 'absolute', top: '16px', right: '16px',
+                  background: 'rgba(255,255,255,0.05)', border: 'none',
+                  color: '#94a3b8', width: '32px', height: '32px',
+                  borderRadius: '50%', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+
+              {requestSuccess ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                  <div style={{
+                    width: '64px', height: '64px', borderRadius: '50%',
+                    background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '2rem', color: '#4ade80', marginBottom: '8px'
+                  }}>
+                    ✓
+                  </div>
+                  <h2 style={{ fontSize: '1.4rem', color: '#ffffff', fontWeight: '800', margin: 0, fontFamily: 'var(--font-title)' }}>
+                    Request Submitted!
+                  </h2>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0, maxWidth: '420px' }}>
+                    Please Fill in all the details About your Service and after reviewing our availability a contact person from our team will Contact you Shortly. Looking Forward to serving with you.
+                  </p>
+                  <button
+                    onClick={() => setShowServiceRequestModal(false)}
+                    className="btn-glow"
+                    style={{
+                      marginTop: '16px', padding: '12px 32px', borderRadius: '12px', border: 'none',
+                      background: 'var(--gradient-vbt)', color: '#ffffff', fontWeight: '800',
+                      fontSize: '0.9rem', cursor: 'pointer'
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Header */}
+                  <div>
+                    <h2 style={{ fontSize: '1.3rem', color: '#ffffff', fontWeight: '800', margin: 0, fontFamily: 'var(--font-title)' }}>
+                      ⛪ VBT Service Request
+                    </h2>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+                      Submit your service details to the VBT Camp Outreach Team.
+                    </p>
+                  </div>
+
+                  {/* Progress Steps */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', gap: '8px', padding: '4px 0' }}>
+                    {[1, 2, 3, 4].map(s => (
+                      <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{
+                          height: '4px', borderRadius: '2px',
+                          background: s <= serviceRequestStep ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.08)'
+                        }} />
+                        <span style={{
+                          fontSize: '0.65rem', fontWeight: '700',
+                          color: s === serviceRequestStep ? '#c4b5fd' : 'var(--text-muted)',
+                          textAlign: 'center'
+                        }}>
+                          Step {s}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Form Container */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '8px' }}>
+                    {/* STEP 1: Church & Contact */}
+                    {serviceRequestStep === 1 && (
+                      <>
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            SERVICE NAME & CHURCH
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. St. Mark Youth Service"
+                            value={serviceRequestForm.churchName}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, churchName: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            CONTACT PERSON NAME
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Michael Mitry"
+                            value={serviceRequestForm.contactName}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, contactName: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            CONTACT PERSON NUMBER
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="e.g. +20 123 456 7890"
+                            value={serviceRequestForm.contactNumber}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, contactNumber: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* STEP 2: Timing & Location */}
+                    {serviceRequestStep === 2 && (
+                      <>
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            SERVICE LOCATION
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Church Playground / Sports Field"
+                            value={serviceRequestForm.serviceLocation}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, serviceLocation: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            SERVICE DATE
+                          </label>
+                          <input
+                            type="date"
+                            value={serviceRequestForm.serviceDate}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, serviceDate: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                              colorScheme: 'dark'
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                              START TIME
+                            </label>
+                            <input
+                              type="time"
+                              value={serviceRequestForm.serviceStartTime}
+                              onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, serviceStartTime: e.target.value })}
+                              style={{
+                                padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                                border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                                colorScheme: 'dark'
+                              }}
+                            />
+                          </div>
+
+                          <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                              END TIME
+                            </label>
+                            <input
+                              type="time"
+                              value={serviceRequestForm.serviceEndTime}
+                              onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, serviceEndTime: e.target.value })}
+                              style={{
+                                padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                                border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                                colorScheme: 'dark'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* STEP 3: Target Group & Topic */}
+                    {serviceRequestStep === 3 && (
+                      <>
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            TOPIC OR THEME (MAIN MESSAGE)
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder="Describe the main spiritual message or spiritual target of the service..."
+                            value={serviceRequestForm.serviceTopic}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, serviceTopic: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                              resize: 'vertical', fontFamily: 'inherit'
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                              GENDER GRP
+                            </label>
+                            <select
+                              value={serviceRequestForm.targetGender}
+                              onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, targetGender: e.target.value })}
+                              style={{
+                                padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.95)',
+                                border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value="Mix">Mix</option>
+                              <option value="Girls">Girls</option>
+                              <option value="Boys">Boys</option>
+                            </select>
+                          </div>
+
+                          <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                              AGE OR GRADE
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Grades 3-6 / Age 8-12"
+                              value={serviceRequestForm.targetAgeGrade}
+                              onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, targetAgeGrade: e.target.value })}
+                              style={{
+                                padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                                border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            ESTIMATED NUMBER OF PARTICIPANTS
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 50 kids"
+                            value={serviceRequestForm.participantsCount}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, participantsCount: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* STEP 4: Teams & Servants */}
+                    {serviceRequestStep === 4 && (
+                      <>
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                          <div className="form-group" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                              ALREADY SPLIT IN TEAMS?
+                            </label>
+                            <select
+                              value={serviceRequestForm.alreadySplitTeams}
+                              onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, alreadySplitTeams: e.target.value })}
+                              style={{
+                                padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.95)',
+                                border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value="no">No</option>
+                              <option value="yes">Yes</option>
+                            </select>
+                          </div>
+
+                          {serviceRequestForm.alreadySplitTeams === 'yes' && (
+                            <div className="form-group" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                                HOW MANY TEAMS?
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 4 teams"
+                                value={serviceRequestForm.teamsCount}
+                                onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, teamsCount: e.target.value })}
+                                style={{
+                                  padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                                  border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                          <div className="form-group" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                              NEED SPECIFIC NUMBER OF SERVANTS?
+                            </label>
+                            <select
+                              value={serviceRequestForm.needSpecificServantsCount}
+                              onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, needSpecificServantsCount: e.target.value })}
+                              style={{
+                                padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.95)',
+                                border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value="no">No</option>
+                              <option value="yes">Yes</option>
+                            </select>
+                          </div>
+
+                          {serviceRequestForm.needSpecificServantsCount === 'yes' && (
+                            <div className="form-group" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                                SPECIFY NUMBER OF SERVANTS
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 10 servants"
+                                value={serviceRequestForm.servantsCount}
+                                onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, servantsCount: e.target.value })}
+                                style={{
+                                  padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                                  border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                            WILL YOUR SERVANTS BE AVAILABLE TO HELP OUR TEAM?
+                          </label>
+                          <select
+                            value={serviceRequestForm.servantsAvailableHelping}
+                            onChange={(e) => setServiceRequestForm({ ...serviceRequestForm, servantsAvailableHelping: e.target.value })}
+                            style={{
+                              padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '16px' }}>
+                    {serviceRequestStep > 1 ? (
+                      <button
+                        onClick={() => setServiceRequestStep(s => s - 1)}
+                        style={{
+                          padding: '10px 20px', borderRadius: '10px',
+                          border: '1px solid var(--border-light)', background: 'transparent',
+                          color: 'var(--text-secondary)', fontSize: '0.85rem', cursor: 'pointer'
+                        }}
+                      >
+                        Back
+                      </button>
+                    ) : (
+                      <div />
+                    )}
+
+                    {serviceRequestStep < 4 ? (
+                      <button
+                        onClick={() => {
+                          // Basic validation
+                          if (serviceRequestStep === 1) {
+                            if (!serviceRequestForm.churchName || !serviceRequestForm.contactName || !serviceRequestForm.contactNumber) {
+                              alert("Please fill in all contact details.");
+                              return;
+                            }
+                          } else if (serviceRequestStep === 2) {
+                            if (!serviceRequestForm.serviceLocation || !serviceRequestForm.serviceDate || !serviceRequestForm.serviceStartTime || !serviceRequestForm.serviceEndTime) {
+                              alert("Please fill in location and schedule details.");
+                              return;
+                            }
+                          }
+                          setServiceRequestStep(s => s + 1);
+                        }}
+                        className="btn-glow"
+                        style={{
+                          padding: '10px 24px', borderRadius: '10px', border: 'none',
+                          background: 'var(--gradient-vbt)', color: '#ffffff', fontWeight: '800',
+                          fontSize: '0.85rem', cursor: 'pointer'
+                        }}
+                      >
+                        Next
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          setRequestSubmitting(true);
+                          try {
+                            await submitServiceRequest(serviceRequestForm);
+                            setRequestSuccess(true);
+                            // Play sound if possible
+                            try {
+                              playChime('announcement');
+                            } catch (e) {}
+                          } catch (err) {
+                            alert("Failed to submit request. Please try again.");
+                          } finally {
+                            setRequestSubmitting(false);
+                          }
+                        }}
+                        disabled={requestSubmitting}
+                        className="btn-glow"
+                        style={{
+                          padding: '10px 24px', borderRadius: '10px', border: 'none',
+                          background: 'rgba(34,197,94,0.85)', color: '#ffffff', fontWeight: '800',
+                          fontSize: '0.85rem', cursor: requestSubmitting ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {requestSubmitting ? 'Submitting...' : 'Submit Request'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -7532,6 +8100,13 @@ export default function App() {
               >
                 📜 Audit Logs
               </button>
+              <button 
+                className={`toggle-btn ${settingsSubTab === 'requests' ? 'active' : ''}`}
+                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+                onClick={() => setSettingsSubTab('requests')}
+              >
+                ⛪ Service Requests {serviceRequests.filter(r => r.status === 'pending').length > 0 && `(${serviceRequests.filter(r => r.status === 'pending').length})`}
+              </button>
             </div>
 
             {settingsSubTab === 'config' && (
@@ -8907,6 +9482,255 @@ export default function App() {
                       });
                     })()}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {settingsSubTab === 'requests' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{
+                  background: 'rgba(167, 139, 250, 0.1)',
+                  border: '1px solid rgba(167, 139, 250, 0.3)',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  color: '#e2e8f0',
+                  fontSize: '0.85rem',
+                  lineHeight: '1.5'
+                }}>
+                  <h3 style={{ color: '#c4b5fd', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ⛪ Service Requests Manager
+                  </h3>
+                  <p style={{ margin: 0 }}>
+                    View and manage service outreach requests submitted by churches. You can approve or reject requests, and instantly generate/pre-fill a new event from any request!
+                  </p>
+                </div>
+
+                {/* Filter and Search controls */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Status filter toggle */}
+                  <div className="toggle-group" style={{ 
+                    display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-light)'
+                  }}>
+                    {['All', 'pending', 'approved', 'rejected'].map(filterVal => (
+                      <button
+                        key={filterVal}
+                        className={`toggle-btn ${settingsRequestFilter === filterVal ? 'active' : ''}`}
+                        onClick={() => setSettingsRequestFilter(filterVal)}
+                        style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer', textTransform: 'capitalize' }}
+                      >
+                        {filterVal}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search input */}
+                  <input
+                    type="text"
+                    placeholder="Search by Church or Contact..."
+                    value={settingsRequestSearch}
+                    onChange={(e) => setSettingsRequestSearch(e.target.value)}
+                    style={{
+                      flex: 1, minWidth: '180px', padding: '8px 12px', borderRadius: '8px',
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                      color: '#ffffff', fontSize: '0.8rem', outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Requests list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {(() => {
+                    const filtered = serviceRequests.filter(req => {
+                      // Filter by status
+                      if (settingsRequestFilter !== 'All' && req.status !== settingsRequestFilter) return false;
+                      // Filter by search
+                      if (settingsRequestSearch.trim()) {
+                        const searchLower = settingsRequestSearch.toLowerCase();
+                        const matchChurch = (req.churchName || '').toLowerCase().includes(searchLower);
+                        const matchContact = (req.contactName || '').toLowerCase().includes(searchLower);
+                        return matchChurch || matchContact;
+                      }
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border-light)' }}>
+                          <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '8px' }}>📭</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No service requests found.</span>
+                        </div>
+                      );
+                    }
+
+                    return filtered.map(req => {
+                      const isExpanded = !!expandedRequests[req.id];
+                      const statusColors = {
+                        pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', label: 'Pending' },
+                        approved: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', text: '#4ade80', label: 'Approved' },
+                        rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', text: '#f87171', label: 'Rejected' }
+                      };
+                      const statusStyle = statusColors[req.status] || statusColors.pending;
+
+                      return (
+                        <div
+                          key={req.id}
+                          className="glass-panel"
+                          style={{
+                            padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px',
+                            transition: 'all 0.2s', border: isExpanded ? '1px solid rgba(167, 139, 250, 0.3)' : '1px solid var(--border-light)',
+                            position: 'relative'
+                          }}
+                        >
+                          {/* Card Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <h4 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>
+                                {req.churchName || 'Unnamed Request'}
+                              </h4>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                👤 {req.contactName || 'No contact'} | 📞 {req.contactNumber || 'No phone'}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{
+                                padding: '3px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
+                                background: statusStyle.bg, border: `1px solid ${statusStyle.border}`, color: statusStyle.text
+                              }}>
+                                {statusStyle.label}
+                              </span>
+                              <button
+                                onClick={() => setExpandedRequests(prev => ({ ...prev, [req.id]: !isExpanded }))}
+                                style={{
+                                  background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer',
+                                  fontSize: '0.9rem', display: 'flex', alignItems: 'center', padding: '4px'
+                                }}
+                              >
+                                {isExpanded ? '▲' : '▼'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Preview Details */}
+                          {!isExpanded && (
+                            <div style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              <span>📅 Date: <strong>{req.serviceDate || 'Not set'}</strong></span>
+                              <span>⛪ Location: <strong>{req.serviceLocation || 'Not set'}</strong></span>
+                            </div>
+                          )}
+
+                          {/* Expanded Details */}
+                          {isExpanded && (
+                            <div style={{
+                              display: 'flex', flexDirection: 'column', gap: '12px',
+                              padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px',
+                              fontSize: '0.8rem', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.03)'
+                            }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                                <div>📅 <strong>Date & Time:</strong> {req.serviceDate || 'Pending'} ({req.serviceStartTime || '?'}-{req.serviceEndTime || '?'})</div>
+                                <div>📍 <strong>Location:</strong> {req.serviceLocation || 'Pending'}</div>
+                                <div>👥 <strong>Gender Grp:</strong> {req.targetGender || 'Mix'}</div>
+                                <div>🎂 <strong>Age/Grade:</strong> {req.targetAgeGrade || 'Not specified'}</div>
+                                <div>🔢 <strong>Est. Kids:</strong> {req.participantsCount || 'Not specified'}</div>
+                                <div>🛡️ <strong>Teams Split:</strong> {req.alreadySplitTeams === 'yes' ? `Yes (${req.teamsCount || '?'} teams)` : 'No'}</div>
+                                <div>👨‍🏫 <strong>Servants Need:</strong> {req.needSpecificServantsCount === 'yes' ? `Yes (${req.servantsCount || '?'} servants)` : 'No'}</div>
+                                <div>🤝 <strong>Servants Helping VBT:</strong> {req.servantsAvailableHelping || 'yes'}</div>
+                              </div>
+                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
+                                📖 <strong>Topic or Theme:</strong>
+                                <p style={{ margin: '4px 0 0 0', lineHeight: '1.5', color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
+                                  {req.serviceTopic || 'None specified.'}
+                                </p>
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                                Submitted: {req.createdAt ? new Date(req.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action Bar */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                            <button
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this service request?")) {
+                                  deleteServiceRequest(req.id);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.4)',
+                                background: 'transparent', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer'
+                              }}
+                            >
+                              🗑️ Delete
+                            </button>
+
+                            {req.status !== 'rejected' && (
+                              <button
+                                onClick={() => updateServiceRequestStatus(req.id, 'rejected')}
+                                style={{
+                                  padding: '6px 12px', borderRadius: '8px', border: 'none',
+                                  background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer'
+                                }}
+                              >
+                                ✕ Reject
+                              </button>
+                            )}
+
+                            {req.status !== 'approved' && (
+                              <button
+                                onClick={() => updateServiceRequestStatus(req.id, 'approved')}
+                                style={{
+                                  padding: '6px 12px', borderRadius: '8px', border: 'none',
+                                  background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontSize: '0.75rem', cursor: 'pointer'
+                                }}
+                              >
+                                ✓ Approve
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                // Approve if not already approved
+                                if (req.status !== 'approved') {
+                                  updateServiceRequestStatus(req.id, 'approved');
+                                }
+                                // Pre-fill create event wizard
+                                setNewEventName(req.churchName || '');
+                                const suggestedCode = (req.churchName || '')
+                                  .toLowerCase()
+                                  .replace(/[^a-z0-9]+/g, '_')
+                                  .substring(0, 15) + '_' + Math.floor(Math.random() * 1000);
+                                setNewEventCode(suggestedCode);
+                                setNewEventDate(req.serviceDate || '');
+                                setNewEventType('service');
+                                
+                                const countInt = parseInt(req.participantsCount) || 100;
+                                setNewKidCount(countInt);
+
+                                setNewServiceBrief(`Location: ${req.serviceLocation || ''}\nTime: ${req.serviceStartTime || ''} - ${req.serviceEndTime || ''}\nTopic: ${req.serviceTopic || ''}\nTarget Group: ${req.targetGender || ''} | ${req.targetAgeGrade || ''} | ${req.participantsCount || ''} kids\nContact: ${req.contactName || ''} (${req.contactNumber || ''})`);
+                                
+                                setShowCreateEvent(true);
+                                setCreationStep(1); // Step 1 of the wizard
+                                
+                                // Close more drawer and deselect event code to trigger landing page
+                                setShowMoreDrawer(false);
+                                setCurrentEventCode(null);
+                                localStorage.removeItem('vbt_current_event');
+                              }}
+                              className="btn-glow"
+                              style={{
+                                padding: '6px 14px', borderRadius: '8px', border: 'none',
+                                background: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)', color: '#ffffff',
+                                fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer'
+                              }}
+                            >
+                              ⚡ Create Event
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             )}
