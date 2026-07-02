@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, memo } from 'react';
 import { Camera, X, Send, Image } from 'lucide-react';
 import { uploadPhoto } from '../storage';
 
@@ -116,7 +116,7 @@ function ReactionButton({ emoji, label, users, isActive, onToggle }) {
 }
 
 // ─── Announcement Card ──────────────────────────────────────────────────────
-function AnnouncementCard({ announcement, currentUser, onUpdateReactions, eventCode }) {
+const AnnouncementCard = memo(function AnnouncementCard({ announcement, currentUser, onUpdateReactions, eventCode }) {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const { id, text, sender, image, reactions, timestamp } = announcement;
 
@@ -332,7 +332,26 @@ function AnnouncementCard({ announcement, currentUser, onUpdateReactions, eventC
       `}</style>
     </>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom equality check for AnnouncementCard since Firebase snapshots recreate objects
+  if (prevProps.announcement.id !== nextProps.announcement.id) return false;
+  // Check reactions (they change frequently). Instead of JSON.stringify, do a manual shallow compare of the known arrays
+  const prevR = prevProps.announcement.reactions || {};
+  const nextR = nextProps.announcement.reactions || {};
+  if (
+    (prevR.thumbsup || []).join(',') !== (nextR.thumbsup || []).join(',') ||
+    (prevR.congrats || []).join(',') !== (nextR.congrats || []).join(',') ||
+    (prevR.fire || []).join(',') !== (nextR.fire || []).join(',')
+  ) return false;
+  // We don't expect the other fields of announcement to change after it's posted,
+  // but just in case check standard props
+  if (prevProps.eventCode !== nextProps.eventCode) return false;
+
+  // Since currentUser only changes on login/logout, a shallow reference check is usually fine here
+  if (prevProps.currentUser?.uid !== nextProps.currentUser?.uid || prevProps.currentUser?.name !== nextProps.currentUser?.name) return false;
+
+  return true;
+});
 
 // ─── Photo Upload Area ──────────────────────────────────────────────────────
 function PhotoUploadArea({ eventCode, currentUser, onAddAnnouncement }) {
@@ -599,15 +618,17 @@ export default function PhotoFeed({
   onUpdateReactions,
 }) {
   // Sort announcements newest first
-  const sortedAnnouncements = [...(announcements || [])].sort((a, b) => {
-    const getTime = (ts) => {
-      if (!ts) return 0;
-      if (ts.toDate) return ts.toDate().getTime();
-      if (ts.seconds) return ts.seconds * 1000;
-      return new Date(ts).getTime();
-    };
-    return getTime(b.timestamp) - getTime(a.timestamp);
-  });
+  const sortedAnnouncements = useMemo(() => {
+    return [...(announcements || [])].sort((a, b) => {
+      const getTime = (ts) => {
+        if (!ts) return 0;
+        if (ts.toDate) return ts.toDate().getTime();
+        if (ts.seconds) return ts.seconds * 1000;
+        return new Date(ts).getTime();
+      };
+      return getTime(b.timestamp) - getTime(a.timestamp);
+    });
+  }, [announcements]);
 
   return (
     <div
