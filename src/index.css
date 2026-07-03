@@ -32,6 +32,20 @@
   
   --font-title: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
+
+  /* Safe area inset shorthand variables — updated dynamically by the env() function.
+     Use these anywhere you need to offset for notch / Dynamic Island / home bar. */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html {
+  /* Fill the full visual viewport including area under notch/home-bar.
+     dvh (dynamic viewport height) collapses with the browser chrome on iOS. */
+  height: -webkit-fill-available;
+  height: 100dvh;
 }
 
 html, body {
@@ -60,7 +74,9 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-primary);
   font-family: var(--font-body);
-  min-height: 100vh;
+  /* Use dvh so the body never goes behind the browser chrome */
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   overflow-x: hidden;
   line-height: 1.5;
   background-image: 
@@ -86,18 +102,26 @@ img, a {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Safe Area Utility Offsets */
-.pt-safe {
-  padding-top: env(safe-area-inset-top);
-}
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.mt-safe {
-  margin-top: env(safe-area-inset-top);
-}
-.mb-safe {
-  margin-bottom: env(safe-area-inset-bottom);
+/* ─── Safe Area Utility Classes ─────────────────────────────────────────────
+   Use these on any element that needs to clear the notch / Dynamic Island
+   (top) or the home indicator bar (bottom).                                 */
+
+/* Top: clears Dynamic Island on iPhone 14 Pro+ (59px), notch on older iPhones
+   (44–47px), Android punch-hole cameras, and status bar on notchless devices. */
+.pt-safe  { padding-top:    env(safe-area-inset-top, 0px); }
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pl-safe  { padding-left:   env(safe-area-inset-left, 0px); }
+.pr-safe  { padding-right:  env(safe-area-inset-right, 0px); }
+.mt-safe  { margin-top:    env(safe-area-inset-top, 0px); }
+.mb-safe  { margin-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Transparent spacer that pushes content below the notch/island */
+.safe-area-top-spacer {
+  display: block;
+  height: env(safe-area-inset-top, 0px);
+  width: 100%;
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 /* Interactive element transitions and active-tap shrink feedback */
@@ -326,16 +350,21 @@ h1, h2, h3, h4, h5, h6 {
   bottom: 0;
   left: 0;
   right: 0;
+  /* Height: 68px tabs + home indicator bar (iPhone X+ = ~34px, Android = varies) */
   height: calc(68px + env(safe-area-inset-bottom, 0px));
-  background: rgba(13, 20, 38, 0.85);
+  background: rgba(13, 20, 38, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-light);
   display: flex;
   justify-content: space-around;
-  align-items: center;
+  align-items: flex-start;    /* tabs sit at top; padding-bottom pushes them up from home bar */
   z-index: 1010;
+  padding-top: 4px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Left/right for notchless landscape Android */
+  padding-left:  env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 .mobile-nav-item {
@@ -365,7 +394,12 @@ h1, h2, h3, h4, h5, h6 {
 
 .content-area {
   padding: 16px;
-  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); /* offset for bottom navbar + safe area */
+  padding-top: 12px;
+  /* Bottom clears nav bar (68px) + home indicator + a little breathing room */
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  /* Left/right for landscape notches */
+  padding-left:  max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
   max-width: 600px;
   margin: 0 auto;
   width: 100%;

@@ -3277,343 +3277,137 @@ export default function App() {
     );
   }
 
-  // ─── EVENT SELECTION / HOMEPAGE SCREEN ───────────────────────────────────
+  // ─── EVENT SELECTION / HOMEPAGE SCREEN ─────────────────────────────────────────────
   if (!currentEventCode) {
     return (
       <div style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: 'radial-gradient(circle at center, #0c1530 0%, #05070f 100%)',
-        padding: '24px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden'
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        position: 'relative', overflow: 'hidden'
       }}>
-        {/* Glow Orbs */}
         <div className="glow-orb glow-orb-1" />
         <div className="glow-orb glow-orb-2" />
 
-        {/* Top Header */}
-        <header style={{
-          position: 'sticky',
-          top: 'calc(12px + env(safe-area-inset-top, 0px))',
-          width: '100%',
-          maxWidth: '850px',
-          background: 'rgba(13, 20, 38, 0.45)',
-          backdropFilter: 'blur(16px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '24px',
-          padding: '12px 24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '40px',
-          zIndex: 50,
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)'
-        }}>
+        {/* Safe area spacer */}
+        <div style={{ height: 'env(safe-area-inset-top, 0px)', width: '100%', flexShrink: 0 }} />
+
+        {/* Header */}
+        <header style={{ width: '100%', maxWidth: '480px', padding: '10px 16px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img
-              src="/Final VBT Re-Branding 2026-02 (3).png"
-              alt="VBT Logo"
-              style={{ width: '40px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }}
-            />
-            <span style={{ fontSize: '1.2rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em' }}>
-              VBT SERVICE
-            </span>
+            <img src="/Final VBT Re-Branding 2026-02 (3).png" alt="VBT Logo"
+              style={{ width: '36px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }} />
+            <div>
+              <span style={{ fontSize: '1rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em', display: 'block', lineHeight: 1 }}>VBT SERVICE</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--vbt-sky)', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Church Sports Outreach</span>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              const el = document.getElementById('events-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="btn-glow"
-            style={{
-              padding: '8px 18px',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              background: 'rgba(255, 255, 255, 0.05)',
-              color: '#ffffff',
-              fontSize: '0.78rem',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
-          >
-            Launch Portal
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(41,182,246,0.08)', border: '1px solid rgba(41,182,246,0.18)', padding: '4px 10px', borderRadius: '20px' }}>
+            <span className="live-dot" style={{ width: '5px', height: '5px' }} />
+            <span style={{ fontSize: '0.62rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>
+          </div>
         </header>
 
-        {/* Hero Section */}
-        <section style={{ width: '100%', maxWidth: '850px', textAlign: 'center', marginBottom: '48px', marginTop: '20px', zIndex: 10 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(41,182,246,0.1)', border: '1px solid rgba(41,182,246,0.2)', padding: '5px 12px', borderRadius: '20px', marginBottom: '16px' }}>
-            <span className="live-dot" style={{ width: '6px', height: '6px' }} />
-            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Service Platform Active</span>
-          </div>
-          
-          <h1 style={{ fontSize: '2.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1.15', marginBottom: '16px', letterSpacing: '-0.03em' }}>
-            Church Sports Outreach <br />
-            <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 2px 10px rgba(41,182,246,0.15))' }}>
-              Reimagined for Kids
-            </span>
-          </h1>
-          
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', lineHeight: '1.6', maxWidth: '620px', margin: '0 auto 28px auto', fontFamily: 'var(--font-body)' }}>
-            VBT Service provides dynamic sports games and Bible reflections for children of all ages. 
-            Coordinate match schedules, manage sub-teams, and submit real-time scores effortlessly.
-          </p>
-          
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => {
-                const el = document.getElementById('events-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="btn-glow"
-              style={{
-                padding: '12px 24px', borderRadius: '12px', border: 'none',
-                background: 'var(--gradient-vbt)', color: '#ffffff', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(20,65,161,0.4)'
-              }}
-            >
-              🎯 Explore Services
-            </button>
-            <button
-              onClick={() => setShowCreateEvent(true)}
-              className="btn-glow"
-              style={{
-                padding: '12px 24px', borderRadius: '12px', border: '1px solid var(--border-light)',
-                background: 'rgba(255,255,255,0.04)', color: '#ffffff', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer'
-              }}
-            >
-              + Create Service Day
-            </button>
-            <button
-              onClick={() => {
-                setShowServiceRequestModal(true);
-                setRequestSuccess(false);
-                setServiceRequestStep(1);
-                setServiceRequestForm({
-                  serviceLocation: '',
-                  serviceDate: '',
-                  serviceStartTime: '',
-                  serviceEndTime: '',
-                  serviceTopic: '',
-                  targetGender: 'Mix',
-                  targetAgeGrade: '',
-                  participantsCount: '',
-                  alreadySplitTeams: 'no',
-                  teamsCount: '',
-                  needSpecificServantsCount: 'no',
-                  servantsCount: '',
-                  servantsAvailableHelping: 'yes',
-                  contactName: '',
-                  contactNumber: '',
-                  churchName: ''
-                });
-              }}
-              className="btn-glow"
-              style={{
-                padding: '12px 24px', borderRadius: '12px', border: '1px solid rgba(167, 139, 250, 0.4)',
-                background: 'rgba(167, 139, 250, 0.08)', color: '#c4b5fd', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px'
-              }}
-            >
-              ⛪ Request VBT Service
-            </button>
-          </div>
-        </section>
-
-        {/* Stats Bento Grid */}
-        <section style={{ width: '100%', maxWidth: '850px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '56px', zIndex: 10 }}>
-          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(0, 176, 255, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
-            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>👥</span>
-            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--vbt-sky)', margin: 0 }}>100+ Kids</h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Grade 3/4 Players</p>
-          </div>
-          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
-            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>🏆</span>
-            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#c4b5fd', margin: 0 }}>16 Servants</h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Assigned Roles & Leaders</p>
-          </div>
-          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(0, 176, 255, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
-            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>🎮</span>
-            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--vbt-sky)', margin: 0 }}>5 Stations</h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Water & Rotational Games</p>
-          </div>
-          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
-            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>📖</span>
-            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#c4b5fd', margin: 0 }}>1 Target</h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Bible Insight Reflection</p>
-          </div>
-        </section>
-
-        {/* Portal Section */}
-        <section id="events-section" style={{ width: '100%', maxWidth: '850px', display: 'flex', flexDirection: 'column', gap: '24px', scrollMarginTop: '40px', zIndex: 10 }}>
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
-            <h2 style={{ fontSize: '1.4rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Active Services & Camps</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Launch an event below to manage scheduling, rosters, and scoring.</p>
-          </div>
+        {/* Scrollable body */}
+        <div style={{ flex: 1, width: '100%', maxWidth: '480px', overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch', padding: '8px 16px 32px 16px',
+          display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
           {!showCreateEvent ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-              {/* Seeded Events cards list */}
-              {eventRegistry.map(ev => {
-                const isCamp = ev.eventType === 'camp';
-                return (
-                  <div 
-                    key={ev.code} 
-                    className="glass-ticket hover-lift" 
-                    style={{ 
-                      padding: '28px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between',
-                      minHeight: '210px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {/* Accent glow behind active ticket */}
-                    <div style={{ 
-                      position: 'absolute', 
-                      top: '-20px', 
-                      left: '-20px', 
-                      width: '120px', 
-                      height: '120px', 
-                      background: isCamp 
-                        ? 'radial-gradient(circle, rgba(0, 176, 255, 0.12) 0%, transparent 70%)'
-                        : 'radial-gradient(circle, rgba(167, 139, 250, 0.12) 0%, transparent 70%)',
-                      borderRadius: '50%',
-                      pointerEvents: 'none'
-                    }} />
-                    
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                        <span style={{ 
-                          fontSize: '0.68rem', 
-                          fontWeight: '800', 
-                          textTransform: 'uppercase', 
-                          padding: '4px 10px', 
-                          borderRadius: '20px',
-                          background: isCamp ? 'rgba(0,176,255,0.12)' : 'rgba(167,139,250,0.12)',
-                          color: isCamp ? 'var(--vbt-sky)' : '#c4b5fd',
-                          border: isCamp ? '1px solid rgba(0,176,255,0.2)' : '1px solid rgba(167,139,250,0.2)',
-                          display: 'inline-block',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {isCamp ? 'Camp Mode (Legacy)' : 'Service Mode (Dynamic)'}
-                        </span>
-                        
-                        {!isCamp && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <span className="live-dot" style={{ width: '6px', height: '6px' }} />
-                            <span style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>LIVE</span>
-                          </div>
-                        )}
-                      </div>
-                      <h3 style={{ fontSize: '1.3rem', color: '#ffffff', margin: 0, fontWeight: '800', letterSpacing: '-0.01em' }}>{ev.name}</h3>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        📅 {ev.date || 'Pending'}
-                      </p>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                        {isCamp 
-                          ? 'Traditional two-team scoring and stationary camp scheduling.'
-                          : 'Real-time multi-color scoreboard, automated servant grouping & rotations.'
-                        }
-                      </p>
-                    </div>
+            <>
+              {/* Hero */}
+              <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
+                <h1 style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff',
+                  fontFamily: 'var(--font-title)', lineHeight: '1.1', marginBottom: '10px', letterSpacing: '-0.02em' }}>
+                  Games That{' '}
+                  <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Inspire</span>
+                </h1>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 auto', maxWidth: '320px' }}>
+                  Dynamic sports &amp; Bible reflections for kids &mdash; coordinated in real-time.
+                </p>
+              </section>
 
-                    <button
-                      onClick={() => {
-                        setCurrentEventCode(ev.code);
-                        localStorage.setItem('vbt_current_event', ev.code);
-                      }}
-                      className="btn-glow"
-                      style={{
-                        marginTop: '20px',
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        background: isCamp ? 'var(--gradient-vbt)' : 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
-                        color: '#ffffff',
-                        fontWeight: '800',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'transform 0.2s ease',
-                        boxShadow: isCamp 
-                          ? '0 4px 15px rgba(20,65,161,0.3)' 
-                          : '0 4px 15px rgba(124,58,237,0.3)'
-                      }}
-                    >
-                      Launch Event ➔
-                    </button>
-                  </div>
-                );
-              })}
-
-              {/* Join Code Panel */}
-              <div className="glass-ticket hover-lift" style={{ padding: '28px', display: 'flex', flexDirection: 'column', justify: 'space-between', minHeight: '210px' }}>
-                <form onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '1.2rem' }}>🔑</span>
-                      <h3 style={{ fontSize: '1.1rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Enter Your Event Code</h3>
+              {/* JOIN CODE CARD */}
+              <div style={{ background: 'linear-gradient(135deg, rgba(20,65,161,0.3) 0%, rgba(41,182,246,0.1) 100%)',
+                border: '1px solid rgba(41,182,246,0.25)', borderRadius: '20px', padding: '24px 20px',
+                boxShadow: '0 8px 32px rgba(20,65,161,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '1.4rem' }}>&#128273;</span>
+                  <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>Join Your Service</h2>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px 0', lineHeight: '1.4' }}>
+                  Enter the code your coordinator shared with you.
+                </p>
+                <form onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input type="text" value={eventJoinInput} onChange={(e) => setEventJoinInput(e.target.value)}
+                    placeholder="e.g. july6" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px',
+                      background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(41,182,246,0.2)',
+                      color: '#ffffff', fontSize: '1rem', outline: 'none',
+                      fontFamily: 'monospace', letterSpacing: '0.08em', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                    onFocus={(e) => { e.target.style.borderColor = 'var(--vbt-sky)'; e.target.style.boxShadow = '0 0 12px rgba(41,182,246,0.25)'; }}
+                    onBlur={(e)  => { e.target.style.borderColor = 'rgba(41,182,246,0.2)'; e.target.style.boxShadow = 'none'; }}
+                  />
+                  {eventJoinError && (
+                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '10px 14px' }}>
+                      <p style={{ color: '#f87171', fontSize: '0.82rem', margin: 0 }}>&#9888; {eventJoinError}</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
                     </div>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.4' }}>Your coordinator will share this code with you before the service starts.</p>
-                    <input
-                      type="text"
-                      value={eventJoinInput}
-                      onChange={(e) => setEventJoinInput(e.target.value)}
-                      placeholder="e.g. june26"
-                      autoCapitalize="none"
-                      style={{
-                        width: '100%', padding: '11px 14px', borderRadius: '10px',
-                        background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                        color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'monospace',
-                        transition: 'border-color 0.2s, box-shadow 0.2s'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--vbt-sky)';
-                        e.target.style.boxShadow = '0 0 10px rgba(41,182,246,0.2)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--border-light)';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                    {eventJoinError && (
-                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
-                        <p style={{ color: '#f87171', fontSize: '0.8rem', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          ⚠️ {eventJoinError}
-                        </p>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={eventJoinLoading}
-                    className="btn-glow"
-                    style={{
-                      width: '100%',
-                      padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
-                      background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontWeight: '800', fontSize: '0.85rem',
-                      cursor: 'pointer', marginTop: '12px'
-                    }}
-                  >
-                    {eventJoinLoading ? 'Joining...' : 'Submit Code'}
+                  )}
+                  <button type="submit" disabled={eventJoinLoading}
+                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
+                      background: eventJoinLoading ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
+                      color: '#ffffff', fontWeight: '800', fontSize: '1rem',
+                      cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 20px rgba(20,65,161,0.4)', letterSpacing: '0.03em' }}>
+                    {eventJoinLoading ? 'Joining...' : 'Enter Service'}
                   </button>
                 </form>
               </div>
-            </div>
+
+              {/* Quick stats */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {[
+                  { icon: '&#128101;', value: '100+', label: 'Kids' },
+                  { icon: '&#127918;', value: '6', label: 'Stations' },
+                  { icon: '&#9889;', value: 'Live', label: 'Sync' }
+                ].map(s => (
+                  <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-light)', borderRadius: '14px',
+                    padding: '12px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.2rem', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: s.icon }} />
+                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--vbt-sky)', lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Coordinator actions */}
+              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
+                <button onClick={() => setShowCreateEvent(true)}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
+                    background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  + Create New Service Day
+                </button>
+                <button onClick={() => { setShowServiceRequestModal(true); setRequestSuccess(false); setServiceRequestStep(1);
+                    setServiceRequestForm({ serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
+                      serviceTopic: '', targetGender: 'Mix', targetAgeGrade: '', participantsCount: '',
+                      alreadySplitTeams: 'no', teamsCount: '', needSpecificServantsCount: 'no',
+                      servantsCount: '', servantsAvailableHelping: 'yes',
+                      contactName: '', contactNumber: '', churchName: '' }); }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px',
+                    border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.06)', color: '#c4b5fd',
+                    fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  &#9962; Request VBT Service
+                </button>
+              </div>
+
+              {/* Bottom safe area spacer */}
+              <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
+            </>
           ) : (
             /* Create New Event Form */
             <div className="glass-ticket animate-fade" style={{ padding: '28px', width: '100%', maxWidth: '750px' }}>
@@ -4169,9 +3963,8 @@ export default function App() {
               </form>
             </div>
           )}
-        </section>
+        </div>
 
-        {/* VBT SERVICE REQUEST PUBLIC MODAL */}
         {showServiceRequestModal && (
           <div
             className="more-drawer-overlay"
