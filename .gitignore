@@ -26,6 +26,7 @@ dist-ssr
 # Private Keys / Credentials
 *.p8
 *.plist
+!ios/App/App/Info.plist
 credentials.json
 
 # Graphify
