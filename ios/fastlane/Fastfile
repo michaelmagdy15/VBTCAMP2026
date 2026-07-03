@@ -23,7 +23,8 @@ platform :ios do
     build_app(
       project: "App/App.xcodeproj",
       scheme: "App",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "DEVELOPMENT_TEAM=5NBF6H2RRL"
     )
 
     upload_to_testflight
@@ -49,7 +50,8 @@ platform :ios do
     build_app(
       project: "App/App.xcodeproj",
       scheme: "App",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "DEVELOPMENT_TEAM=5NBF6H2RRL"
     )
 
     upload_to_app_store(
