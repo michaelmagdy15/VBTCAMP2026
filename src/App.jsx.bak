@@ -53,20 +53,6 @@ import {
   deleteServiceRequest,
   registerDevicePushToken,
   getServants,
-  subscribeToServants,
-  upsertServantOnLogin,
-  subscribeToGames,
-  upsertGame,
-  deleteGame,
-  subscribeToTimer,
-  setTimerState,
-  saveDebrief,
-  getDebrief,
-  submitFeedback,
-  getFeedback,
-  scheduleNotification,
-  subscribeToScheduledNotifications,
-  cancelScheduledNotification,
   updateServant,
   addServant,
   deleteServant,
@@ -562,7 +548,6 @@ export default function App() {
 
   // New event creation state
   const [showCreateEvent, setShowCreateEvent] = useState(false);
-  const [showManualJoin, setShowManualJoin] = useState(false);
   const [newEventCode, setNewEventCode] = useState('');
   const [newEventName, setNewEventName] = useState('');
   const [newEventSide1, setNewEventSide1] = useState('Team A');
@@ -775,39 +760,6 @@ export default function App() {
     return localStorage.getItem('vbt_onboarded') !== 'true';
   });
   const [timeTick, setTimeTick] = useState(0);
-
-  // ── Feature state ─────────────────────────────────────────────────
-  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('vbt-theme') !== 'light');
-  const [gamesLibrary, setGamesLibrary] = useState([]);
-  const [rotationTimer, setRotationTimer] = useState(null);
-  const [rotationSecondsLeft, setRotationSecondsLeft] = useState(null);
-  const [showRotateNow, setShowRotateNow] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [offlineQueueLen, setOfflineQueueLen] = useState(0);
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [showRulesOverlay, setShowRulesOverlay] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  const [showDebriefModal, setShowDebriefModal] = useState(false);
-  const [debriefData, setDebriefData] = useState({ kidsCount: '', highlights: '', challenges: '', notes: '' });
-  const [debriefSaved, setDebriefSaved] = useState(false);
-  const [showServantDirectoryModal, setShowServantDirectoryModal] = useState(false);
-  const [showGamesLibraryModal, setShowGamesLibraryModal] = useState(false);
-  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
-  const [servantDirectorySearch, setServantDirectorySearch] = useState('');
-  const [gamesLibrarySearch, setGamesLibrarySearch] = useState('');
-  const [gamesLibraryFilter, setGamesLibraryFilter] = useState('all');
-  const [expandedServant, setExpandedServant] = useState(null);
-  const [expandedGame, setExpandedGame] = useState(null);
-  const [timerDurationMin, setTimerDurationMin] = useState(15);
-  const lastScoreSnapshot = React.useRef(null);
-  const [showUndoScore, setShowUndoScore] = useState(false);
-  const undoTimerRef = React.useRef(null);
-  const [pickGameTarget, setPickGameTarget] = useState(null);
-  const [showNotifScheduler, setShowNotifScheduler] = useState(false);
-  const [notifScheduleForm, setNotifScheduleForm] = useState({ title: '', body: '', sendAt: '' });
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [isWhereIsEveryoneCollapsed, setIsWhereIsEveryoneCollapsed] = useState(true);
   const [rosterSearch, setRosterSearch] = useState('');
@@ -1380,73 +1332,24 @@ export default function App() {
     };
   }, []);
 
-  // Real-time servants directory
+  // Fetch global servants directory once on mount
   useEffect(() => {
-    const unsub = subscribeToServants(setGlobalServants);
-    return unsub;
-  }, []);
-
-  // Games library subscription
-  useEffect(() => {
-    const unsub = subscribeToGames(setGamesLibrary);
-    return unsub;
-  }, []);
-
-  // Dark mode
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
-    localStorage.setItem('vbt-theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
-
-  // Online/offline + SW message handler
-  useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
-    const onSWMsg = (e) => {
-      if (e.data?.type === 'SYNC_DONE') setOfflineQueueLen(0);
-      if (e.data?.type === 'SYNC_START') setOfflineQueueLen(e.data.count || 0);
+    let active = true;
+    const fetchServantsData = async () => {
+      try {
+        const data = await getServants();
+        if (active) {
+          setGlobalServants(data);
+        }
+      } catch (err) {
+        console.error("Error loading servants directory:", err);
+      }
     };
-    navigator.serviceWorker?.addEventListener('message', onSWMsg);
+    fetchServantsData();
     return () => {
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
-      navigator.serviceWorker?.removeEventListener('message', onSWMsg);
+      active = false;
     };
   }, []);
-
-  // Rotation timer Firestore subscription
-  useEffect(() => {
-    if (!currentEventCode) return;
-    const unsub = subscribeToTimer(currentEventCode, setRotationTimer);
-    return unsub;
-  }, [currentEventCode]);
-
-  // Rotation timer countdown tick
-  useEffect(() => {
-    if (!rotationTimer) { setRotationSecondsLeft(null); return; }
-    const tick = () => {
-      const { durationMin = 15, startedAt, isPaused, pausedAt, totalPausedMs = 0 } = rotationTimer;
-      if (!startedAt) { setRotationSecondsLeft(null); return; }
-      const pauseOffset = isPaused && pausedAt
-        ? (new Date(pausedAt) - new Date(startedAt) - totalPausedMs) / 1000
-        : (Date.now() - new Date(startedAt) - totalPausedMs) / 1000;
-      const sLeft = Math.max(0, durationMin * 60 - (isPaused ? (new Date(pausedAt) - new Date(startedAt) - totalPausedMs) / 1000 : (Date.now() - new Date(startedAt) - totalPausedMs) / 1000));
-      setRotationSecondsLeft(Math.round(sLeft));
-      if (sLeft <= 0 && !isPaused) setShowRotateNow(true);
-    };
-    tick();
-    const iv = setInterval(tick, 1000);
-    return () => clearInterval(iv);
-  }, [rotationTimer]);
-
-  // Load debrief when modal opens
-  useEffect(() => {
-    if (showDebriefModal && currentEventCode) {
-      getDebrief(currentEventCode).then(d => { if (d) setDebriefData(p => ({ ...p, ...d })); });
-    }
-  }, [showDebriefModal, currentEventCode]);
 
   // Preloader timer
   useEffect(() => {
@@ -2056,26 +1959,6 @@ export default function App() {
     }
   };
 
-  // Direct join by event code (used by Quick Join button — skips form dispatch)
-  const handleQuickJoin = async (code) => {
-    const normalised = code.trim().toLowerCase().replace(/\s+/g, '_');
-    if (!normalised) return;
-    setEventJoinLoading(true);
-    setEventJoinError('');
-    try {
-      const exists = await checkEventExists(normalised);
-      if (!exists) {
-        setEventJoinError('Event not found. Double-check the code with your coordinator.');
-        return;
-      }
-      setCurrentEventCode(normalised);
-      localStorage.setItem('vbt_current_event', normalised);
-    } catch (err) {
-      setEventJoinError('Could not verify event. Check your connection and try again.');
-    } finally {
-      setEventJoinLoading(false);
-    }
-  };
   const handleNewStationChange = (key, field, value) => {
     setNewStations(prev => ({
       ...prev,
@@ -2248,79 +2131,6 @@ export default function App() {
     }
   };
 
-  // Undo last score change
-  const triggerUndoSnapshot = (prev) => {
-    lastScoreSnapshot.current = prev;
-    setShowUndoScore(true);
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    undoTimerRef.current = setTimeout(() => setShowUndoScore(false), 8000);
-  };
-  const handleUndoScore = async () => {
-    if (!lastScoreSnapshot.current || !currentEventCode) return;
-    try {
-      await updateCampState(currentEventCode, lastScoreSnapshot.current);
-      lastScoreSnapshot.current = null;
-      setShowUndoScore(false);
-    } catch (e) { console.error('Undo failed:', e); }
-  };
-
-  // Rotation timer controls
-  const handleTimerStart = async () => {
-    await setTimerState(currentEventCode, { durationMin: timerDurationMin, startedAt: new Date().toISOString(), isPaused: false, pausedAt: null, totalPausedMs: 0 });
-    setShowRotateNow(false);
-  };
-  const handleTimerPause = async () => {
-    if (!rotationTimer?.startedAt) return;
-    await setTimerState(currentEventCode, { isPaused: true, pausedAt: new Date().toISOString() });
-  };
-  const handleTimerResume = async () => {
-    if (!rotationTimer?.pausedAt) return;
-    const extra = Date.now() - new Date(rotationTimer.pausedAt);
-    await setTimerState(currentEventCode, { isPaused: false, pausedAt: null, totalPausedMs: (rotationTimer.totalPausedMs || 0) + extra });
-  };
-  const handleTimerReset = async () => {
-    await setTimerState(currentEventCode, { startedAt: null, isPaused: false, pausedAt: null, totalPausedMs: 0 });
-    setRotationSecondsLeft(null); setShowRotateNow(false);
-  };
-
-  // WhatsApp deep link
-  const getWhatsAppLink = (servant, roleLabel) => {
-    const eName = eventConfig?.eventName || 'the next service';
-    const eDate = eventConfig?.eventDate || '';
-    const msg = encodeURIComponent('Hey ' + servant.name + '! You are assigned to ' + roleLabel + ' for ' + eName + (eDate ? ' on ' + eDate : '') + '. Join at ' + window.location.origin + ' code: ' + currentEventCode);
-    return 'https://wa.me/?text=' + msg;
-  };
-
-  // Feedback submit
-  const handleSubmitFeedback = async () => {
-    if (!feedbackRating) return;
-    try {
-      await submitFeedback(currentEventCode, { rating: feedbackRating, comment: feedbackText });
-      setFeedbackSubmitted(true);
-      setTimeout(() => { setShowFeedbackModal(false); setFeedbackSubmitted(false); setFeedbackRating(0); setFeedbackText(''); }, 2000);
-    } catch (e) { alert('Failed to submit feedback'); }
-  };
-
-  // Debrief save
-  const handleSaveDebrief = async () => {
-    try {
-      await saveDebrief(currentEventCode, { ...debriefData, eventName: eventConfig?.eventName, eventDate: eventConfig?.eventDate });
-      setDebriefSaved(true); setTimeout(() => setDebriefSaved(false), 3000);
-    } catch (e) { alert('Failed to save debrief'); }
-  };
-
-  // Auto-save games to global library
-  const autoSaveGamesToLibrary = async (stationsObj, eCode, eName) => {
-    if (!stationsObj) return;
-    const types = [['station_1','station'],['station_2','station'],['station_3','station'],['station_4','station'],['big_game','big_game'],['reflection','reflection']];
-    for (const [key, type] of types) {
-      const s = stationsObj[key];
-      if (!s?.name?.trim()) continue;
-      const gId = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      if (gId) upsertGame(gId, { name: s.name, type, location: s.location || '', howToPlay: s.howToPlay || '', lesson: s.lesson || '', eventCode: eCode, eventName: eName }).catch(() => {});
-    }
-  };
-
   // Create New Event Handler
   const handleCreateEvent = async (e) => {
     if (e) e.preventDefault();
@@ -2383,7 +2193,6 @@ export default function App() {
         
         // Run scheduling engine
         await generateAndSaveServiceSchedule(code, configData, wizardAttending, globalServants);
-        autoSaveGamesToLibrary(configData.stations, code, configData.eventName).catch(() => {});
       } else {
         // Camp Mode (Legacy)
         await createEvent(code, {
@@ -3468,247 +3277,343 @@ export default function App() {
     );
   }
 
-  // ─── EVENT SELECTION / HOMEPAGE SCREEN ─────────────────────────────────────────────
+  // ─── EVENT SELECTION / HOMEPAGE SCREEN ───────────────────────────────────
   if (!currentEventCode) {
     return (
       <div style={{
-        minHeight: '100dvh',
+        minHeight: '100vh',
         background: 'radial-gradient(circle at center, #0c1530 0%, #05070f 100%)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        position: 'relative', overflow: 'hidden'
+        padding: '24px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
+        {/* Glow Orbs */}
         <div className="glow-orb glow-orb-1" />
         <div className="glow-orb glow-orb-2" />
 
-        {/* Safe area spacer */}
-        <div style={{ height: 'env(safe-area-inset-top, 0px)', width: '100%', flexShrink: 0 }} />
-
-        {/* Header */}
-        <header style={{ width: '100%', maxWidth: '480px', padding: '10px 16px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, flexShrink: 0 }}>
+        {/* Top Header */}
+        <header style={{
+          position: 'sticky',
+          top: 'calc(12px + env(safe-area-inset-top, 0px))',
+          width: '100%',
+          maxWidth: '850px',
+          background: 'rgba(13, 20, 38, 0.45)',
+          backdropFilter: 'blur(16px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '24px',
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '40px',
+          zIndex: 50,
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)'
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/Final VBT Re-Branding 2026-02 (3).png" alt="VBT Logo"
-              style={{ width: '36px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }} />
-            <div>
-              <span style={{ fontSize: '1rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em', display: 'block', lineHeight: 1 }}>VBT SERVICE</span>
-              <span style={{ fontSize: '0.65rem', color: 'var(--vbt-sky)', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Church Sports Outreach</span>
-            </div>
+            <img
+              src="/Final VBT Re-Branding 2026-02 (3).png"
+              alt="VBT Logo"
+              style={{ width: '40px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }}
+            />
+            <span style={{ fontSize: '1.2rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em' }}>
+              VBT SERVICE
+            </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(41,182,246,0.08)', border: '1px solid rgba(41,182,246,0.18)', padding: '4px 10px', borderRadius: '20px' }}>
-            <span className="live-dot" style={{ width: '5px', height: '5px' }} />
-            <span style={{ fontSize: '0.62rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>
-          </div>
+          <button
+            onClick={() => {
+              const el = document.getElementById('events-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="btn-glow"
+            style={{
+              padding: '8px 18px',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Launch Portal
+          </button>
         </header>
 
-        {/* Scrollable body */}
-        <div style={{ flex: 1, width: '100%', maxWidth: '480px', overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch', padding: '8px 16px 32px 16px',
-          display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Hero Section */}
+        <section style={{ width: '100%', maxWidth: '850px', textAlign: 'center', marginBottom: '48px', marginTop: '20px', zIndex: 10 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(41,182,246,0.1)', border: '1px solid rgba(41,182,246,0.2)', padding: '5px 12px', borderRadius: '20px', marginBottom: '16px' }}>
+            <span className="live-dot" style={{ width: '6px', height: '6px' }} />
+            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Service Platform Active</span>
+          </div>
+          
+          <h1 style={{ fontSize: '2.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1.15', marginBottom: '16px', letterSpacing: '-0.03em' }}>
+            Church Sports Outreach <br />
+            <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 2px 10px rgba(41,182,246,0.15))' }}>
+              Reimagined for Kids
+            </span>
+          </h1>
+          
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', lineHeight: '1.6', maxWidth: '620px', margin: '0 auto 28px auto', fontFamily: 'var(--font-body)' }}>
+            VBT Service provides dynamic sports games and Bible reflections for children of all ages. 
+            Coordinate match schedules, manage sub-teams, and submit real-time scores effortlessly.
+          </p>
+          
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                const el = document.getElementById('events-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="btn-glow"
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: 'none',
+                background: 'var(--gradient-vbt)', color: '#ffffff', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(20,65,161,0.4)'
+              }}
+            >
+              🎯 Explore Services
+            </button>
+            <button
+              onClick={() => setShowCreateEvent(true)}
+              className="btn-glow"
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: '1px solid var(--border-light)',
+                background: 'rgba(255,255,255,0.04)', color: '#ffffff', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer'
+              }}
+            >
+              + Create Service Day
+            </button>
+            <button
+              onClick={() => {
+                setShowServiceRequestModal(true);
+                setRequestSuccess(false);
+                setServiceRequestStep(1);
+                setServiceRequestForm({
+                  serviceLocation: '',
+                  serviceDate: '',
+                  serviceStartTime: '',
+                  serviceEndTime: '',
+                  serviceTopic: '',
+                  targetGender: 'Mix',
+                  targetAgeGrade: '',
+                  participantsCount: '',
+                  alreadySplitTeams: 'no',
+                  teamsCount: '',
+                  needSpecificServantsCount: 'no',
+                  servantsCount: '',
+                  servantsAvailableHelping: 'yes',
+                  contactName: '',
+                  contactNumber: '',
+                  churchName: ''
+                });
+              }}
+              className="btn-glow"
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: '1px solid rgba(167, 139, 250, 0.4)',
+                background: 'rgba(167, 139, 250, 0.08)', color: '#c4b5fd', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              ⛪ Request VBT Service
+            </button>
+          </div>
+        </section>
+
+        {/* Stats Bento Grid */}
+        <section style={{ width: '100%', maxWidth: '850px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '56px', zIndex: 10 }}>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(0, 176, 255, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>👥</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--vbt-sky)', margin: 0 }}>100+ Kids</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Grade 3/4 Players</p>
+          </div>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>🏆</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#c4b5fd', margin: 0 }}>16 Servants</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Assigned Roles & Leaders</p>
+          </div>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(0, 176, 255, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>🎮</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--vbt-sky)', margin: 0 }}>5 Stations</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Water & Rotational Games</p>
+          </div>
+          <div className="glass-panel hover-lift" style={{ padding: '24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', background: 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%)', borderRadius: '50%' }} />
+            <span style={{ fontSize: '2.2rem', display: 'block', marginBottom: '10px' }}>📖</span>
+            <h3 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#c4b5fd', margin: 0 }}>1 Target</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Bible Insight Reflection</p>
+          </div>
+        </section>
+
+        {/* Portal Section */}
+        <section id="events-section" style={{ width: '100%', maxWidth: '850px', display: 'flex', flexDirection: 'column', gap: '24px', scrollMarginTop: '40px', zIndex: 10 }}>
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Active Services & Camps</h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>Launch an event below to manage scheduling, rosters, and scoring.</p>
+          </div>
 
           {!showCreateEvent ? (
-            <>
-              {/* Hero */}
-              <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
-                <h1 style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff',
-                  fontFamily: 'var(--font-title)', lineHeight: '1.1', marginBottom: '10px', letterSpacing: '-0.02em' }}>
-                  Games That{' '}
-                  <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Inspire</span>
-                </h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 auto', maxWidth: '320px' }}>
-                  Dynamic sports &amp; Bible reflections for kids &mdash; coordinated in real-time.
-                </p>
-              </section>
-
-              {/* ── QUICK JOIN (active events from registry) ── */}
-              {(() => {
-                const activeEvents = eventRegistry.filter(e => e.active !== false && !e.expired);
-                if (activeEvents.length === 0) return null;
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+              {/* Seeded Events cards list */}
+              {eventRegistry.map(ev => {
+                const isCamp = ev.eventType === 'camp';
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {activeEvents.map(ev => {
-                      const isToday = ev.date && (() => {
-                        try {
-                          const d = new Date(ev.date);
-                          const now = new Date();
-                          return d.toDateString() === now.toDateString();
-                        } catch { return false; }
-                      })();
-                      return (
-                        <div key={ev.code} style={{
-                          background: 'linear-gradient(135deg, rgba(20,65,161,0.45) 0%, rgba(41,182,246,0.18) 100%)',
-                          border: `1px solid ${isToday ? 'rgba(74,222,128,0.5)' : 'rgba(41,182,246,0.35)'}`,
-                          borderRadius: '20px', padding: '20px',
-                          boxShadow: isToday ? '0 0 24px rgba(74,222,128,0.15), 0 8px 32px rgba(20,65,161,0.25)' : '0 8px 32px rgba(20,65,161,0.2)',
-                          position: 'relative', overflow: 'hidden',
+                  <div 
+                    key={ev.code} 
+                    className="glass-ticket hover-lift" 
+                    style={{ 
+                      padding: '28px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between',
+                      minHeight: '210px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Accent glow behind active ticket */}
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: '-20px', 
+                      left: '-20px', 
+                      width: '120px', 
+                      height: '120px', 
+                      background: isCamp 
+                        ? 'radial-gradient(circle, rgba(0, 176, 255, 0.12) 0%, transparent 70%)'
+                        : 'radial-gradient(circle, rgba(167, 139, 250, 0.12) 0%, transparent 70%)',
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <span style={{ 
+                          fontSize: '0.68rem', 
+                          fontWeight: '800', 
+                          textTransform: 'uppercase', 
+                          padding: '4px 10px', 
+                          borderRadius: '20px',
+                          background: isCamp ? 'rgba(0,176,255,0.12)' : 'rgba(167,139,250,0.12)',
+                          color: isCamp ? 'var(--vbt-sky)' : '#c4b5fd',
+                          border: isCamp ? '1px solid rgba(0,176,255,0.2)' : '1px solid rgba(167,139,250,0.2)',
+                          display: 'inline-block',
+                          letterSpacing: '0.05em'
                         }}>
-                          {/* Glow accent */}
-                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-                            background: isToday ? 'linear-gradient(90deg, #4ade80, #60a5fa)' : 'linear-gradient(90deg, #1441a1, #60a5fa)' }} />
-
-                          {/* Live badge */}
-                          {isToday && (
-                            <div style={{ position: 'absolute', top: '14px', right: '16px',
-                              display: 'flex', alignItems: 'center', gap: '5px',
-                              background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)',
-                              borderRadius: '20px', padding: '3px 10px' }}>
-                              <span className="live-dot" style={{ width: '5px', height: '5px', background: '#4ade80' }} />
-                              <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Today</span>
-                            </div>
-                          )}
-
-                          <div style={{ marginBottom: '14px', paddingRight: isToday ? '60px' : '0' }}>
-                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700',
-                              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>
-                              {ev.eventType === 'camp' ? '⛺ Camp' : '⚡ Service'} · {ev.code.toUpperCase()}
-                            </div>
-                            <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-0.01em' }}>
-                              {ev.name || ev.code}
-                            </div>
-                            {ev.date && (
-                              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px' }}>
-                                📅 {new Date(ev.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-                              </div>
-                            )}
+                          {isCamp ? 'Camp Mode (Legacy)' : 'Service Mode (Dynamic)'}
+                        </span>
+                        
+                        {!isCamp && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span className="live-dot" style={{ width: '6px', height: '6px' }} />
+                            <span style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>LIVE</span>
                           </div>
+                        )}
+                      </div>
+                      <h3 style={{ fontSize: '1.3rem', color: '#ffffff', margin: 0, fontWeight: '800', letterSpacing: '-0.01em' }}>{ev.name}</h3>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        📅 {ev.date || 'Pending'}
+                      </p>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        {isCamp 
+                          ? 'Traditional two-team scoring and stationary camp scheduling.'
+                          : 'Real-time multi-color scoreboard, automated servant grouping & rotations.'
+                        }
+                      </p>
+                    </div>
 
-                          <button
-                            onClick={() => handleQuickJoin(ev.code)}
-                            disabled={eventJoinLoading}
-                            style={{
-                              width: '100%', padding: '15px', borderRadius: '14px', border: 'none',
-                              background: isToday
-                                ? 'linear-gradient(135deg, #166534 0%, #4ade80 100%)'
-                                : 'linear-gradient(135deg, #1441a1 0%, #60a5fa 100%)',
-                              color: '#ffffff', fontWeight: '800', fontSize: '1.05rem',
-                              cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
-                              boxShadow: isToday ? '0 4px 20px rgba(74,222,128,0.35)' : '0 4px 20px rgba(20,65,161,0.4)',
-                              letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
-                              justifyContent: 'center', gap: '8px',
-                              transition: 'opacity 0.2s, transform 0.15s',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                          >
-                            {eventJoinLoading ? (
-                              <span>Joining…</span>
-                            ) : (
-                              <>
-                                <span style={{ fontSize: '1.1rem' }}>▶</span>
-                                <span>Join Now</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })}
+                    <button
+                      onClick={() => {
+                        setCurrentEventCode(ev.code);
+                        localStorage.setItem('vbt_current_event', ev.code);
+                      }}
+                      className="btn-glow"
+                      style={{
+                        marginTop: '20px',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: isCamp ? 'var(--gradient-vbt)' : 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
+                        color: '#ffffff',
+                        fontWeight: '800',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'transform 0.2s ease',
+                        boxShadow: isCamp 
+                          ? '0 4px 15px rgba(20,65,161,0.3)' 
+                          : '0 4px 15px rgba(124,58,237,0.3)'
+                      }}
+                    >
+                      Launch Event ➔
+                    </button>
                   </div>
                 );
-              })()}
+              })}
 
-              {/* ── MANUAL CODE ENTRY (collapsible) ── */}
-              {(() => {
-                const hasActive = eventRegistry.some(e => e.active !== false && !e.expired);
-                const open = hasActive ? showManualJoin : true;
-                return (
+              {/* Join Code Panel */}
+              <div className="glass-ticket hover-lift" style={{ padding: '28px', display: 'flex', flexDirection: 'column', justify: 'space-between', minHeight: '210px' }}>
+                <form onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', justifyContent: 'space-between' }}>
                   <div>
-                    {hasActive && (
-                      <button
-                        onClick={() => setShowManualJoin(o => !o)}
-                        style={{
-                          width: '100%', padding: '11px 16px', borderRadius: '12px',
-                          border: '1px solid rgba(255,255,255,0.09)',
-                          background: 'rgba(255,255,255,0.03)',
-                          color: 'rgba(255,255,255,0.45)', fontWeight: '600', fontSize: '0.82rem',
-                          cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          justifyContent: 'center', gap: '8px',
-                        }}
-                      >
-                        <span>🔑 Enter a code manually</span>
-                        <span style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', fontSize: '0.7rem' }}>▼</span>
-                      </button>
-                    )}
-                    {open && (
-                      <div style={{
-                        marginTop: hasActive ? '10px' : '0',
-                        background: 'linear-gradient(135deg, rgba(20,65,161,0.2) 0%, rgba(41,182,246,0.07) 100%)',
-                        border: '1px solid rgba(41,182,246,0.18)', borderRadius: '16px', padding: '18px 16px',
-                      }}>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                          Enter the event code your coordinator shared with you.
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>🔑</span>
+                      <h3 style={{ fontSize: '1.1rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Enter Your Event Code</h3>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.4' }}>Your coordinator will share this code with you before the service starts.</p>
+                    <input
+                      type="text"
+                      value={eventJoinInput}
+                      onChange={(e) => setEventJoinInput(e.target.value)}
+                      placeholder="e.g. june26"
+                      autoCapitalize="none"
+                      style={{
+                        width: '100%', padding: '11px 14px', borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
+                        color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'monospace',
+                        transition: 'border-color 0.2s, box-shadow 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = 'var(--vbt-sky)';
+                        e.target.style.boxShadow = '0 0 10px rgba(41,182,246,0.2)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'var(--border-light)';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                    {eventJoinError && (
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
+                        <p style={{ color: '#f87171', fontSize: '0.8rem', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          ⚠️ {eventJoinError}
                         </p>
-                        <form id="vbt-join-form" onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <input type="text" value={eventJoinInput} onChange={(e) => setEventJoinInput(e.target.value)}
-                            placeholder="e.g. july6" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                            style={{ width: '100%', padding: '13px 16px', borderRadius: '12px',
-                              background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(41,182,246,0.2)',
-                              color: '#ffffff', fontSize: '1rem', outline: 'none',
-                              fontFamily: 'monospace', letterSpacing: '0.08em', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                            onFocus={(e) => { e.target.style.borderColor = 'var(--vbt-sky)'; e.target.style.boxShadow = '0 0 12px rgba(41,182,246,0.25)'; }}
-                            onBlur={(e)  => { e.target.style.borderColor = 'rgba(41,182,246,0.2)'; e.target.style.boxShadow = 'none'; }}
-                          />
-                          {eventJoinError && (
-                            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '10px 14px' }}>
-                              <p style={{ color: '#f87171', fontSize: '0.82rem', margin: 0 }}>&#9888; {eventJoinError}</p>
-                              <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
-                            </div>
-                          )}
-                          <button type="submit" disabled={eventJoinLoading}
-                            style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-                              background: eventJoinLoading ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
-                              color: '#ffffff', fontWeight: '800', fontSize: '0.95rem',
-                              cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
-                              boxShadow: '0 4px 20px rgba(20,65,161,0.4)', letterSpacing: '0.03em' }}>
-                            {eventJoinLoading ? 'Joining...' : 'Enter Service'}
-                          </button>
-                        </form>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
                       </div>
                     )}
                   </div>
-                );
-              })()}
-
-              {/* Quick stats */}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {[
-                  { icon: '&#128101;', value: '100+', label: 'Kids' },
-                  { icon: '&#127918;', value: '6', label: 'Stations' },
-                  { icon: '&#9889;', value: 'Live', label: 'Sync' }
-                ].map(s => (
-                  <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid var(--border-light)', borderRadius: '14px',
-                    padding: '12px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.2rem', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: s.icon }} />
-                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--vbt-sky)', lineHeight: 1 }}>{s.value}</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-                  </div>
-                ))}
+                  <button
+                    type="submit"
+                    disabled={eventJoinLoading}
+                    className="btn-glow"
+                    style={{
+                      width: '100%',
+                      padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontWeight: '800', fontSize: '0.85rem',
+                      cursor: 'pointer', marginTop: '12px'
+                    }}
+                  >
+                    {eventJoinLoading ? 'Joining...' : 'Submit Code'}
+                  </button>
+                </form>
               </div>
-
-              {/* Coordinator actions */}
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
-                <button onClick={() => setShowCreateEvent(true)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
-                    background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  + Create New Service Day
-                </button>
-                <button onClick={() => { setShowServiceRequestModal(true); setRequestSuccess(false); setServiceRequestStep(1);
-                    setServiceRequestForm({ serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
-                      serviceTopic: '', targetGender: 'Mix', targetAgeGrade: '', participantsCount: '',
-                      alreadySplitTeams: 'no', teamsCount: '', needSpecificServantsCount: 'no',
-                      servantsCount: '', servantsAvailableHelping: 'yes',
-                      contactName: '', contactNumber: '', churchName: '' }); }}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px',
-                    border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.06)', color: '#c4b5fd',
-                    fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  &#9962; Request VBT Service
-                </button>
-              </div>
-
-              {/* Bottom safe area spacer */}
-              <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
-            </>
+            </div>
           ) : (
             /* Create New Event Form */
             <div className="glass-ticket animate-fade" style={{ padding: '28px', width: '100%', maxWidth: '750px' }}>
@@ -4264,8 +4169,9 @@ export default function App() {
               </form>
             </div>
           )}
-        </div>
+        </section>
 
+        {/* VBT SERVICE REQUEST PUBLIC MODAL */}
         {showServiceRequestModal && (
           <div
             className="more-drawer-overlay"
@@ -5034,49 +4940,27 @@ export default function App() {
 
   const getActiveTabs = () => {
     if (!currentUser) return [];
-    const role = currentUser.role || 'volunteer';
-    const isAdmin = role === 'admin' || role === 'coordinator';
-    const isLeader = role === 'leader';
-    const isReferee = role === 'referee';
-    const unread = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
+    
     if (eventConfig?.eventType === 'service') {
-      if (isReferee) return [
-        { id: 'service', label: 'My Games', icon: BookOpen },
-        { id: 'scoreboard', label: 'Scores', icon: Trophy },
-        { id: 'walkie', label: 'Radio', icon: Radio },
-        { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
-      ];
-      if (!isAdmin && !isLeader) return [
-        { id: 'schedule', label: 'Schedule', icon: Calendar },
-        { id: 'service', label: 'My Games', icon: BookOpen },
-        { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
-      ];
+      const unreadCount = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
       return [
         { id: 'schedule', label: 'Schedule', icon: Calendar },
         { id: 'service', label: 'My Games', icon: BookOpen },
         { id: 'walkie', label: 'Radio', icon: Radio },
         { id: 'scoreboard', label: 'Scores', icon: Trophy },
-        { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
-        { id: 'more', label: 'More', icon: MoreHorizontal },
+        { id: 'timeline', label: 'Feed', icon: Bell, badge: unreadCount },
+        { id: 'more', label: 'More', icon: MoreHorizontal }
       ];
     }
-    if (isReferee) return [
-      { id: 'schedule', label: 'Schedule', icon: Calendar },
-      { id: 'scoreboard', label: 'Scores', icon: Trophy },
-      { id: 'walkie', label: 'Radio', icon: Radio },
-    ];
-    if (!isAdmin && !isLeader) return [
-      { id: 'schedule', label: 'Schedule', icon: Calendar },
-      { id: 'scoreboard', label: 'Scores', icon: Trophy },
-      { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
-    ];
+    
+    const unreadCount = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
     return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
       { id: 'info', label: 'Map', icon: MapIcon },
       { id: 'walkie', label: 'Radio', icon: Radio },
-      { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
-      { id: 'more', label: 'More', icon: MoreHorizontal },
+      { id: 'timeline', label: 'Feed', icon: Bell, badge: unreadCount },
+      { id: 'more', label: 'More', icon: MoreHorizontal }
     ];
   };
 
@@ -7534,12 +7418,6 @@ export default function App() {
         {/* Tab 4: Live Timeline / Notifications */}
         {currentTab === 'timeline' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Feedback button */}
-            <button onClick={()=>setShowFeedbackModal(true)} style={{
-              padding:'10px 16px',borderRadius:'12px',border:'1px solid rgba(74,222,128,0.3)',
-              background:'rgba(74,222,128,0.08)',color:'#4ade80',fontWeight:'600',fontSize:'0.85rem',
-              cursor:'pointer',alignSelf:'flex-start',
-            }}>Rate Today's Service</button>
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff' }}>Live Camp Feed</h2>
             
             <form onSubmit={handlePostAnnouncement} className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -8303,22 +8181,6 @@ export default function App() {
         {/* Tab 7: Settings */}
         {currentTab === 'settings' && currentUser && currentUser.role === 'admin' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* ── Admin Quick Tools ─────────────────────────────── */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'4px'}}>
-              {[
-                ['&#128101; Servants','Directory',()=>setShowServantDirectoryModal(true),'#60a5fa'],
-                ['&#127918; Games','Library',()=>setShowGamesLibraryModal(true),'#a78bfa'],
-                ['&#128247; QR Check-in','Self check-in',()=>setShowQRModal(true),'#4ade80'],
-                ['&#128203; Debrief','Post-service',()=>setShowDebriefModal(true),'#fbbf24'],
-                ['&#9200; Timer','Rotation clock',()=>handleTimerStart(),'#f97316'],
-                [isDarkMode?'&#9728; Light':'&#9790; Dark',isDarkMode?'Switch to light':'Switch to dark',()=>setIsDarkMode(!isDarkMode),'#94a3b8'],
-              ].map(([title,sub,action,color])=>(
-                <button key={title} onClick={action} style={{padding:'14px 10px',borderRadius:'14px',border:`1px solid ${color}33`,background:`${color}0f`,color:'#fff',cursor:'pointer',textAlign:'left'}}>
-                  <div style={{fontWeight:'700',fontSize:'0.85rem',color}} dangerouslySetInnerHTML={{__html:title}} />
-                  <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',marginTop:'2px'}}>{sub}</div>
-                </button>
-              ))}
-            </div>
             <h2 style={{ fontSize: '1.25rem', color: '#ffffff' }}>Control Panel</h2>
 
             {/* Sub-tab selection for Settings */}
@@ -10879,261 +10741,6 @@ export default function App() {
               </button>
             </div>
           </div>
-        </div>
-
-      )}
-      )}
-
-      {/* ═══ ROTATE NOW OVERLAY ══════════════════════════════ */}
-      {showRotateNow && (
-        <div onClick={() => setShowRotateNow(false)} style={{
-          position:'fixed',inset:0,zIndex:9999,display:'flex',flexDirection:'column',
-          alignItems:'center',justifyContent:'center',
-          background:'rgba(5,7,20,0.97)',backdropFilter:'blur(20px)',cursor:'pointer',
-        }}>
-          <div style={{fontSize:'5rem',marginBottom:'16px',animation:'pulse 1s infinite'}}>&#128260;</div>
-          <h1 style={{fontSize:'2.8rem',fontWeight:'900',color:'#fff',letterSpacing:'-0.03em',margin:'0 0 8px'}}>ROTATE NOW</h1>
-          <p style={{color:'rgba(255,255,255,0.5)',fontSize:'1rem',marginBottom:'24px'}}>Tap anywhere to dismiss</p>
-          {(currentUser?.role === 'admin' || currentUser?.role === 'coordinator') && (
-            <button onClick={(e)=>{e.stopPropagation();handleTimerStart();setShowRotateNow(false);}} style={{
-              padding:'14px 32px',borderRadius:'16px',border:'none',
-              background:'linear-gradient(135deg,#1441a1,#60a5fa)',
-              color:'#fff',fontWeight:'800',fontSize:'1.1rem',cursor:'pointer',
-            }}>Start Next Round</button>
-          )}
-        </div>
-      )}
-
-      {/* ═══ UNDO SCORE FAB ═══════════════════════════════════ */}
-      {showUndoScore && (
-        <button onClick={handleUndoScore} style={{
-          position:'fixed',bottom:`calc(80px + env(safe-area-inset-bottom))`,right:'16px',
-          zIndex:8888,padding:'10px 18px',borderRadius:'24px',
-          border:'1px solid rgba(251,191,36,0.4)',
-          background:'rgba(251,191,36,0.15)',backdropFilter:'blur(12px)',
-          color:'#fbbf24',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer',
-          display:'flex',alignItems:'center',gap:'6px',
-          boxShadow:'0 4px 20px rgba(251,191,36,0.25)',
-        }}>
-          &#8617; Undo Score
-        </button>
-      )}
-
-      {/* ═══ GAME RULES QUICK-REF OVERLAY ═══════════════════ */}
-      {showRulesOverlay && (() => {
-        const roleCode = eventConfig?.servantAssignments?.[currentUser?.id];
-        const station = roleCode && eventConfig?.stations?.[roleCode];
-        return station ? (
-          <div style={{position:'fixed',inset:0,zIndex:8500,display:'flex',alignItems:'flex-end',background:'rgba(5,7,20,0.75)',backdropFilter:'blur(8px)'}} onClick={()=>setShowRulesOverlay(false)}>
-            <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'75vh',overflowY:'auto',background:'#0d1426',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'24px 24px 0 0',padding:'24px',paddingBottom:`calc(24px + env(safe-area-inset-bottom))`}}>
-              <div style={{width:'40px',height:'4px',borderRadius:'2px',background:'rgba(255,255,255,0.2)',margin:'0 auto 20px'}} />
-              <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'4px'}}>{station.name}</h2>
-              {station.location && <p style={{fontSize:'0.8rem',color:'#60a5fa',marginBottom:'16px'}}>{station.location}</p>}
-              {station.howToPlay && (<div style={{marginBottom:'16px'}}><p style={{fontSize:'0.75rem',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>How to Play</p><p style={{fontSize:'0.9rem',color:'#fff',lineHeight:1.65,whiteSpace:'pre-wrap'}}>{station.howToPlay}</p></div>)}
-              {station.lesson && (<div><p style={{fontSize:'0.75rem',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Lesson</p><p style={{fontSize:'0.9rem',color:'#4ade80',lineHeight:1.65}}>{station.lesson}</p></div>)}
-              <button onClick={()=>setShowRulesOverlay(false)} style={{marginTop:'24px',width:'100%',padding:'14px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#1441a1,#60a5fa)',color:'#fff',fontWeight:'700',cursor:'pointer'}}>Got it</button>
-            </div>
-          </div>
-        ) : null;
-      })()}
-
-      {/* ═══ FEEDBACK MODAL ════════════════════════════════════ */}
-      {showFeedbackModal && (
-        <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',alignItems:'flex-end',background:'rgba(5,7,20,0.75)',backdropFilter:'blur(8px)'}} onClick={()=>setShowFeedbackModal(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{width:'100%',background:'#0d1426',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'24px 24px 0 0',padding:'24px',paddingBottom:`calc(24px + env(safe-area-inset-bottom))`}}>
-            <div style={{width:'40px',height:'4px',borderRadius:'2px',background:'rgba(255,255,255,0.2)',margin:'0 auto 16px'}} />
-            <h2 style={{fontSize:'1.1rem',fontWeight:'800',color:'#fff',textAlign:'center',marginBottom:'20px'}}>Rate Today&apos;s Service</h2>
-            {feedbackSubmitted ? (
-              <div style={{textAlign:'center',padding:'24px 0',fontSize:'2rem',color:'#4ade80'}}>Thanks! &#128591;</div>
-            ) : (<>
-              <div style={{display:'flex',justifyContent:'center',gap:'12px',marginBottom:'20px'}}>
-                {[1,2,3,4,5].map(n=>(
-                  <button key={n} onClick={()=>setFeedbackRating(n)} style={{fontSize:'2rem',background:'none',border:'none',cursor:'pointer',opacity:feedbackRating>=n?1:0.25,transform:feedbackRating>=n?'scale(1.25)':'scale(1)',transition:'all 0.15s'}}>&#11088;</button>
-                ))}
-              </div>
-              <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder='Any suggestions? (optional)' rows={3} style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'0.9rem',resize:'none',boxSizing:'border-box',marginBottom:'12px'}} />
-              <button onClick={handleSubmitFeedback} disabled={!feedbackRating} style={{width:'100%',padding:'14px',borderRadius:'12px',border:'none',background:feedbackRating?'linear-gradient(135deg,#1441a1,#60a5fa)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:'700',cursor:feedbackRating?'pointer':'not-allowed',opacity:feedbackRating?1:0.5}}>Submit Feedback</button>
-            </>)}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ POST-SERVICE DEBRIEF MODAL ═══════════════════════ */}
-      {showDebriefModal && (currentUser?.role === 'admin' || currentUser?.role === 'coordinator') && (
-        <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',alignItems:'flex-end',background:'rgba(5,7,20,0.8)',backdropFilter:'blur(10px)'}} onClick={()=>setShowDebriefModal(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'90vh',overflowY:'auto',background:'#0d1426',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'24px 24px 0 0',padding:'24px',paddingBottom:`calc(24px + env(safe-area-inset-bottom))`}}>
-            <div style={{width:'40px',height:'4px',borderRadius:'2px',background:'rgba(255,255,255,0.2)',margin:'0 auto 20px'}} />
-            <h2 style={{fontSize:'1.2rem',fontWeight:'800',color:'#fff',marginBottom:'20px'}}>Post-Service Debrief</h2>
-            {[['kidsCount','Kids who showed up','e.g. 118','number'],['highlights','Highlights','Best moments...','textarea'],['challenges','Challenges','Any issues...','textarea'],['notes','Notes for next time','Lessons learned...','textarea']].map(([key,label,ph,type])=>(
-              <div key={key} style={{marginBottom:'16px'}}>
-                <label style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>{label}</label>
-                {type==='textarea'?<textarea value={debriefData[key]||''} onChange={e=>setDebriefData(p=>({...p,[key]:e.target.value}))} placeholder={ph} rows={3} style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.9rem',resize:'none',boxSizing:'border-box'}}/>:<input type={type} value={debriefData[key]||''} onChange={e=>setDebriefData(p=>({...p,[key]:e.target.value}))} placeholder={ph} style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box'}}/>}
-              </div>
-            ))}
-            <button onClick={handleSaveDebrief} style={{width:'100%',padding:'14px',borderRadius:'12px',border:'none',background:debriefSaved?'rgba(74,222,128,0.15)':'linear-gradient(135deg,#1441a1,#60a5fa)',color:debriefSaved?'#4ade80':'#fff',fontWeight:'700',cursor:'pointer',transition:'all 0.3s'}}>{debriefSaved?'Saved! &#10003;':'Save Debrief'}</button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ QR CODE CHECK-IN MODAL ════════════════════════════ */}
-      {showQRModal && (
-        <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(5,7,20,0.9)',backdropFilter:'blur(14px)',padding:'24px'}} onClick={()=>setShowQRModal(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#0d1426',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'24px',padding:'32px',width:'100%',maxWidth:'320px',textAlign:'center'}}>
-            <h2 style={{fontSize:'1.1rem',fontWeight:'800',color:'#fff',marginBottom:'6px'}}>Self Check-in QR</h2>
-            <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.4)',marginBottom:'24px'}}>{eventConfig?.eventName || 'Event'}</p>
-            <div style={{background:'#fff',borderRadius:'16px',padding:'16px',display:'inline-block',marginBottom:'16px'}}>
-              <QRCodeSVG value={window.location.origin + '/?event=' + currentEventCode + '&checkin=1'} size={190} level='M' />
-            </div>
-            <p style={{fontSize:'0.9rem',color:'rgba(255,255,255,0.4)',fontFamily:'monospace',letterSpacing:'0.15em',marginBottom:'16px'}}>{currentEventCode}</p>
-            <button onClick={()=>setShowQRModal(false)} style={{width:'100%',padding:'12px',borderRadius:'12px',border:'none',background:'rgba(255,255,255,0.08)',color:'#fff',fontWeight:'600',cursor:'pointer'}}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ SERVANTS DIRECTORY MODAL ════════════════════════ */}
-      {showServantDirectoryModal && (
-        <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',flexDirection:'column',background:'#080b18'}}>
-          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)'}}>
-            <button onClick={()=>setShowServantDirectoryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
-            <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>Servants Directory</h2>
-            <span style={{marginLeft:'auto',fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{globalServants.length}</span>
-          </div>
-          <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-            <input value={servantDirectorySearch} onChange={e=>setServantDirectorySearch(e.target.value)} placeholder='Search servants...' style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 14px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}} />
-          </div>
-          {globalServants.length > 0 && (
-            <div style={{padding:'12px 16px 8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-              <p style={{fontSize:'0.7rem',color:'#f59e0b',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'10px'}}>Top Servants</p>
-              <div style={{display:'flex',gap:'8px',overflowX:'auto',paddingBottom:'4px'}}>
-                {[...globalServants].sort((a,b)=>(b.servicesAttended?.length||0)-(a.servicesAttended?.length||0)).slice(0,5).map((s,i)=>(
-                  <div key={s.id} style={{minWidth:'76px',textAlign:'center',background:'rgba(255,255,255,0.04)',borderRadius:'12px',padding:'10px 6px',flexShrink:0}}>
-                    <div style={{fontSize:'1.1rem',marginBottom:'4px'}}>{['&#127945;','&#129352;','&#129353;','&#127885;','&#127885;'][i]}</div>
-                    <div style={{fontSize:'0.7rem',fontWeight:'700',color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'68px'}}>{s.name?.split(' ')[0]||'?'}</div>
-                    <div style={{fontSize:'0.6rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0}x</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <div style={{flex:1,overflowY:'auto',padding:'8px 16px',paddingBottom:`calc(16px + env(safe-area-inset-bottom))`}}>
-            {globalServants.filter(s=>!servantDirectorySearch||s.name?.toLowerCase().includes(servantDirectorySearch.toLowerCase())).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(s=>(
-              <div key={s.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}} onClick={()=>setExpandedServant(expandedServant===s.id?null:s.id)}>
-                  <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#1441a1,#60a5fa)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'800',color:'#fff',fontSize:'1rem',flexShrink:0}}>{s.name?.[0]?.toUpperCase()||'?'}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:'700',color:'#fff',fontSize:'0.9rem'}}>{s.name}</div>
-                    <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0} services &nbsp;&#183;&nbsp; {s.defaultRole||'volunteer'}</div>
-                  </div>
-                  <a href={getWhatsAppLink(s,'your assigned role')} target='_blank' rel='noopener noreferrer' onClick={e=>e.stopPropagation()} style={{fontSize:'1.4rem',textDecoration:'none',flexShrink:0}} title='Message on WhatsApp'>&#128172;</a>
-                </div>
-                {expandedServant===s.id && (
-                  <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                    <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'4px'}}>Passcode: <span style={{color:'#fff',fontFamily:'monospace'}}>{s.passcode||'—'}</span></div>
-                    <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'10px'}}>Last seen: <span style={{color:'#fff'}}>{s.lastSeen?new Date(s.lastSeen).toLocaleDateString():'Never'}</span></div>
-                    {(s.servicesAttended||[]).length > 0 && (
-                      <div>{(s.servicesAttended||[]).slice(-5).reverse().map((e,i)=>(
-                        <div key={i} style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginBottom:'2px'}}>&#183; {e.code} &mdash; {new Date(e.date).toLocaleDateString()}</div>
-                      ))}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-            {globalServants.length===0 && <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>No servants yet. They appear here when they log in.</div>}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ GAMES LIBRARY MODAL ═══════════════════════════════ */}
-      {showGamesLibraryModal && (
-        <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',flexDirection:'column',background:'#080b18'}}>
-          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)'}}>
-            <button onClick={()=>setShowGamesLibraryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
-            <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>Games Library</h2>
-            <span style={{marginLeft:'auto',fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{gamesLibrary.length}</span>
-          </div>
-          <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',flexDirection:'column',gap:'10px'}}>
-            <input value={gamesLibrarySearch} onChange={e=>setGamesLibrarySearch(e.target.value)} placeholder='Search games...' style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 14px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}} />
-            <div style={{display:'flex',gap:'6px'}}>
-              {['all','station','big_game','reflection'].map(f=>(
-                <button key={f} onClick={()=>setGamesLibraryFilter(f)} style={{padding:'6px 12px',borderRadius:'20px',border:'none',background:gamesLibraryFilter===f?'linear-gradient(135deg,#1441a1,#60a5fa)':'rgba(255,255,255,0.07)',color:'#fff',fontWeight:'600',fontSize:'0.75rem',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>{f==='all'?'All':f==='big_game'?'Big Game':f.charAt(0).toUpperCase()+f.slice(1)}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{flex:1,overflowY:'auto',padding:'8px 16px',paddingBottom:`calc(16px + env(safe-area-inset-bottom))`}}>
-            {gamesLibrary.filter(g=>(gamesLibraryFilter==='all'||g.type===gamesLibraryFilter)&&(!gamesLibrarySearch||g.name?.toLowerCase().includes(gamesLibrarySearch.toLowerCase()))).map(g=>(
-              <div key={g.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{display:'flex',alignItems:'flex-start',gap:'10px',cursor:'pointer'}} onClick={()=>setExpandedGame(expandedGame===g.id?null:g.id)}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px',flexWrap:'wrap'}}>
-                      <span style={{fontWeight:'800',color:'#fff',fontSize:'0.95rem'}}>{g.name}</span>
-                      <span style={{fontSize:'0.65rem',padding:'2px 8px',borderRadius:'10px',background:g.type==='big_game'?'rgba(245,158,11,0.2)':g.type==='reflection'?'rgba(139,92,246,0.2)':'rgba(59,130,246,0.2)',color:g.type==='big_game'?'#f59e0b':g.type==='reflection'?'#a78bfa':'#60a5fa',fontWeight:'700'}}>{g.type==='big_game'?'Big Game':g.type?.charAt(0).toUpperCase()+(g.type?.slice(1)||'')}</span>
-                    </div>
-                    {g.location && <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.35)',marginBottom:'4px'}}>{g.location}</div>}
-                    <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.25)'}}>Used {g.timesUsed||1}x &nbsp;&#183;&nbsp; Last: {g.lastUsedEvent||'—'}</div>
-                  </div>
-                  <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.75rem',flexShrink:0,marginTop:'2px'}}>{expandedGame===g.id?'&#9650;':'&#9660;'}</span>
-                </div>
-                {expandedGame===g.id && (
-                  <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                    {g.howToPlay && <><p style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>How to Play</p><p style={{fontSize:'0.85rem',color:'#fff',lineHeight:1.65,marginBottom:'12px',whiteSpace:'pre-wrap'}}>{g.howToPlay}</p></>}
-                    {g.lesson && <><p style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Lesson</p><p style={{fontSize:'0.85rem',color:'#4ade80',lineHeight:1.65}}>{g.lesson}</p></>}
-                  </div>
-                )}
-              </div>
-            ))}
-            {gamesLibrary.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>No games saved yet. Create an event to start building the library.</div>}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ ROTATION TIMER WIDGET (Coordinator only, floats in header) ════ */}
-      {rotationTimer?.startedAt && (currentUser?.role === 'admin' || currentUser?.role === 'coordinator') && (
-        <div style={{
-          position:'fixed',top:`calc(env(safe-area-inset-top) + 8px)`,right:'8px',
-          zIndex:700,background:'rgba(13,20,38,0.92)',backdropFilter:'blur(10px)',
-          border:'1px solid rgba(255,255,255,0.12)',borderRadius:'12px',
-          padding:'6px 12px',display:'flex',alignItems:'center',gap:'8px',
-        }}>
-          <span style={{fontSize:'0.7rem',color:rotationSecondsLeft<=60?'#f87171':'#4ade80',fontFamily:'monospace',fontWeight:'800'}}>
-            {rotationSecondsLeft!=null ? (Math.floor(rotationSecondsLeft/60)+':'+(rotationSecondsLeft%60<10?'0':'')+(rotationSecondsLeft%60)) : '--:--'}
-          </span>
-          {!rotationTimer.isPaused ? (
-            <button onClick={handleTimerPause} title='Pause' style={{background:'none',border:'none',cursor:'pointer',color:'#fbbf24',fontSize:'0.9rem',padding:'2px'}}>&#9646;&#9646;</button>
-          ) : (
-            <button onClick={handleTimerResume} title='Resume' style={{background:'none',border:'none',cursor:'pointer',color:'#4ade80',fontSize:'0.9rem',padding:'2px'}}>&#9654;</button>
-          )}
-          <button onClick={handleTimerReset} title='Reset' style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',padding:'2px'}}>&#8635;</button>
-        </div>
-      )}
-
-      {/* ═══ GAME RULES FAB ═══════════════════════════════════ */}
-      {currentTab === 'service' && (() => {
-        const roleCode = eventConfig?.servantAssignments?.[currentUser?.id];
-        return roleCode && eventConfig?.stations?.[roleCode] ? (
-          <button onClick={() => setShowRulesOverlay(true)} title='Game Rules' style={{
-            position:'fixed',bottom:`calc(72px + env(safe-area-inset-bottom))`,
-            left:'16px',zIndex:600,width:'44px',height:'44px',borderRadius:'50%',
-            border:'1px solid rgba(255,255,255,0.15)',
-            background:'rgba(13,20,38,0.9)',backdropFilter:'blur(8px)',
-            color:'rgba(255,255,255,0.7)',fontSize:'1.3rem',cursor:'pointer',
-            display:'flex',alignItems:'center',justifyContent:'center',
-            boxShadow:'0 4px 16px rgba(0,0,0,0.4)',
-          }}>?</button>
-        ) : null;
-      })()}
-      {/* ═══ OFFLINE STATUS BADGE ══════════════════════════════ */}
-      {!isOnline && (
-        <div style={{
-          position:'fixed',top:`calc(env(safe-area-inset-top) + 8px)`,
-          left:'50%',transform:'translateX(-50%)',zIndex:9000,
-          background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.4)',
-          color:'#f87171',borderRadius:'20px',padding:'4px 14px',
-          fontSize:'0.75rem',fontWeight:'700',backdropFilter:'blur(8px)',
-          display:'flex',alignItems:'center',gap:'6px',
-        }}>
-          <span style={{width:'6px',height:'6px',borderRadius:'50%',background:'#f87171',display:'inline-block'}} />
-          Offline{offlineQueueLen > 0 ? ` — ${offlineQueueLen} queued` : ''}
         </div>
       )}
     </>

@@ -1138,4 +1138,301 @@ export async function deleteServiceRequest(requestId) {
 }
 
 
+// ─────────────────────────────────────────────────────────────────
+// GAMES LIBRARY  (vbt_games — global cross-event game database)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Real-time subscription to the global games library, ordered by timesUsed desc.
+ */
+export function subscribeToGames(callback) {
+  const colRef = collection(db, 'vbt_games');
+  const q = query(colRef, orderBy('timesUsed', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const games = [];
+    snapshot.forEach((d) => games.push({ id: d.id, ...d.data() }));
+    callback(games);
+  }, (err) => {
+    console.error('[Firebase] subscribeToGames error:', err);
+    callback([]);
+  });
+}
+
+/**
+ * Create or update a game in the global library.
+ * Automatically increments timesUsed and appends to eventHistory.
+ * @param {string} gameId  - slugified game name
+ * @param {object} data    - { name, type, location, howToPlay, lesson, tags, eventCode, eventName }
+ */
+export async function upsertGame(gameId, data) {
+  if (!gameId) return;
+  const docRef = doc(db, 'vbt_games', gameId);
+  try {
+    const snap = await getDoc(docRef);
+    const now = new Date().toISOString();
+    if (snap.exists()) {
+      const existing = snap.data();
+      const history = existing.eventHistory || [];
+      if (data.eventCode && !history.find(h => h.eventCode === data.eventCode)) {
+        history.push({ eventCode: data.eventCode, eventName: data.eventName || data.eventCode, date: now });
+        if (history.length > 20) history.splice(0, history.length - 20);
+      }
+      await setDoc(docRef, {
+        ...existing,
+        name: data.name || existing.name,
+        type: data.type || existing.type,
+        location: data.location || existing.location,
+        howToPlay: data.howToPlay || existing.howToPlay,
+        lesson: data.lesson || existing.lesson,
+        tags: data.tags || existing.tags || [],
+        timesUsed: (existing.timesUsed || 0) + 1,
+        lastUsedAt: now,
+        lastUsedEvent: data.eventCode || existing.lastUsedEvent,
+        eventHistory: history,
+      }, { merge: true });
+    } else {
+      await setDoc(docRef, {
+        id: gameId,
+        name: data.name,
+        type: data.type || 'station',
+        location: data.location || '',
+        howToPlay: data.howToPlay || '',
+        lesson: data.lesson || '',
+        tags: data.tags || [],
+        timesUsed: 1,
+        lastUsedAt: now,
+        lastUsedEvent: data.eventCode || '',
+        eventHistory: data.eventCode ? [{ eventCode: data.eventCode, eventName: data.eventName || data.eventCode, date: now }] : [],
+        createdAt: now,
+      });
+    }
+  } catch (err) {
+    console.error('[Firebase] upsertGame error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Delete a game from the library.
+ */
+export async function deleteGame(gameId) {
+  try {
+    await deleteDoc(doc(db, 'vbt_games', gameId));
+  } catch (err) {
+    console.error('[Firebase] deleteGame error:', err);
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ROTATION TIMER  (vbt_timer/{eventCode} — shared countdown)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Subscribe to the shared rotation timer for an event.
+ * Timer doc shape: { durationMin, startedAt, isPaused, pausedAt, totalPausedMs }
+ */
+export function subscribeToTimer(eventCode, callback) {
+  if (!eventCode) return () => {};
+  const docRef = doc(db, 'vbt_timer', eventCode);
+  return onSnapshot(docRef, (snap) => {
+    callback(snap.exists() ? snap.data() : null);
+  }, (err) => {
+    console.error('[Firebase] subscribeToTimer error:', err);
+    callback(null);
+  });
+}
+
+/**
+ * Write/update the shared rotation timer state.
+ */
+export async function setTimerState(eventCode, data) {
+  if (!eventCode) return;
+  try {
+    await setDoc(doc(db, 'vbt_timer', eventCode), data, { merge: true });
+  } catch (err) {
+    console.error('[Firebase] setTimerState error:', err);
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// EVENT DEBRIEFS  (vbt_debriefs/{eventCode})
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Save (or overwrite) the debrief report for an event.
+ */
+export async function saveDebrief(eventCode, data) {
+  try {
+    await setDoc(doc(db, 'vbt_debriefs', eventCode), {
+      ...data,
+      savedAt: new Date().toISOString(),
+      eventCode,
+    }, { merge: true });
+  } catch (err) {
+    console.error('[Firebase] saveDebrief error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Fetch the debrief report for an event.
+ */
+export async function getDebrief(eventCode) {
+  try {
+    const snap = await getDoc(doc(db, 'vbt_debriefs', eventCode));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('[Firebase] getDebrief error:', err);
+    return null;
+  }
+}
+
+/**
+ * Get all debriefs (for analytics).
+ */
+export async function getAllDebriefs() {
+  try {
+    const snap = await getDocs(collection(db, 'vbt_debriefs'));
+    const list = [];
+    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    return list;
+  } catch (err) {
+    console.error('[Firebase] getAllDebriefs error:', err);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SERVANT FEEDBACK  (vbt_feedback/{eventCode}/responses)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Submit anonymous feedback for an event.
+ */
+export async function submitFeedback(eventCode, data) {
+  try {
+    const colRef = collection(db, 'vbt_feedback', eventCode, 'responses');
+    await addDoc(colRef, {
+      ...data,
+      submittedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[Firebase] submitFeedback error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Get all feedback responses for an event.
+ */
+export async function getFeedback(eventCode) {
+  try {
+    const colRef = collection(db, 'vbt_feedback', eventCode, 'responses');
+    const q = query(colRef, orderBy('submittedAt', 'desc'));
+    const snap = await getDocs(q);
+    const list = [];
+    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    return list;
+  } catch (err) {
+    console.error('[Firebase] getFeedback error:', err);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NOTIFICATION SCHEDULING  (vbt_notifications_scheduled)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Schedule a push notification.
+ */
+export async function scheduleNotification(data) {
+  try {
+    await addDoc(collection(db, 'vbt_notifications_scheduled'), {
+      ...data,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[Firebase] scheduleNotification error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Get all scheduled notifications.
+ */
+export function subscribeToScheduledNotifications(callback) {
+  const q = query(collection(db, 'vbt_notifications_scheduled'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    const list = [];
+    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    callback(list);
+  }, (err) => {
+    console.error('[Firebase] subscribeToScheduledNotifications error:', err);
+    callback([]);
+  });
+}
+
+/**
+ * Cancel / delete a scheduled notification.
+ */
+export async function cancelScheduledNotification(notifId) {
+  try {
+    await deleteDoc(doc(db, 'vbt_notifications_scheduled', notifId));
+  } catch (err) {
+    console.error('[Firebase] cancelScheduledNotification error:', err);
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SERVANT — Auto-upsert on login + attendance history
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Called when a servant successfully logs into any event.
+ * Creates the servant in vbt_servants if they don't exist,
+ * updates lastSeen, and appends the event to their servicesAttended array.
+ */
+export async function upsertServantOnLogin(servantId, servantName, eventCode) {
+  if (!servantId) return;
+  try {
+    const docRef = doc(db, 'vbt_servants', servantId);
+    const snap = await getDoc(docRef);
+    const now = new Date().toISOString();
+
+    if (snap.exists()) {
+      const existing = snap.data();
+      const attended = existing.servicesAttended || [];
+      // Only add this eventCode once per session
+      if (eventCode && !attended.find(e => e.code === eventCode && e.date?.startsWith(now.slice(0, 10)))) {
+        attended.push({ code: eventCode, date: now });
+        if (attended.length > 50) attended.splice(0, attended.length - 50);
+      }
+      await setDoc(docRef, {
+        ...existing,
+        name: servantName || existing.name,
+        lastSeen: now,
+        servicesAttended: attended,
+      }, { merge: true });
+    } else {
+      // New servant — auto-create them in the directory
+      await setDoc(docRef, {
+        id: servantId,
+        name: servantName || servantId,
+        passcode: '1234',
+        defaultRole: 'volunteer',
+        lastSeen: now,
+        servicesAttended: eventCode ? [{ code: eventCode, date: now }] : [],
+        createdAt: now,
+      });
+    }
+  } catch (err) {
+    console.error('[Firebase] upsertServantOnLogin error:', err);
+    // Non-blocking — don't throw
+  }
+}
 

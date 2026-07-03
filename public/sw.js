@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vbt-sports-camp-v5';
+const CACHE_NAME = 'vbt-app-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -19,33 +19,69 @@ const STATIC_ASSETS = [
   '/sounds/countdown.mp3',
 ];
 
+// IndexedDB helpers (duplicated from offlineQueue.js — SW can't import ES modules)
+const IDB_NAME = 'vbt-offline-db';
+const IDB_STORE = 'sync-queue';
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function idbGetAll() {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbDelete(id) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(id);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 // Install Event
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching static assets');
+      console.log('[SW] Caching static assets');
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  // Do NOT call self.skipWaiting() here.
-  // Skipping waiting immediately causes a controllerchange event in the page,
-  // which triggers window.location.reload() and breaks the user's session.
-  // The SW will only take over when explicitly requested via postMessage({ type: 'SKIP_WAITING' }).
+  // Do NOT call self.skipWaiting() here — causes unwanted reload mid-session.
+  // Will be triggered explicitly via postMessage({ type: 'SKIP_WAITING' }).
 });
 
-// Activate Event
+// Activate Event — clear old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Clearing old cache');
+            console.log('[SW] Clearing old cache:', cache);
             return caches.delete(cache);
           }
         })
-      );
-    })
+      )
+    )
   );
   self.clients.claim();
 });
@@ -54,8 +90,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Range request passthrough for audio files (required for iOS audio buffering)
-  // Pattern from: github.com/daffinm/audio-cache-test
+  // Audio files: cache-first with put on miss
   if (/\.(mp3|wav|webm|ogg|m4a|aac)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then(async (cached) => {
@@ -71,20 +106,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Bypass Firebase / Firestore / WebSockets / non-HTTP requests
-  const isFirebase = url.hostname.includes('firebase') || url.hostname.includes('googleapis') || url.pathname.includes('firestore');
+  // Bypass Firebase / Firestore / WebSockets / non-HTTP / non-GET
+  const isFirebase =
+    url.hostname.includes('firebase') ||
+    url.hostname.includes('googleapis') ||
+    url.pathname.includes('firestore');
   const isWebSocket = event.request.headers.get('Upgrade') === 'websocket';
   const isHttp = url.protocol === 'http:' || url.protocol === 'https:';
 
   if (!isHttp || isFirebase || isWebSocket || event.request.method !== 'GET') {
-    return; // Let browser handle it normally
+    return;
   }
 
-  // Stale-While-Revalidate strategy for same-origin requests
+  // Stale-While-Revalidate for same-origin assets
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cachedResponse) => {
           const fetchPromise = fetch(event.request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -92,116 +130,131 @@ self.addEventListener('fetch', (event) => {
               }
               return networkResponse;
             })
-            .catch((error) => {
-              console.log('[Service Worker] Fetch failed, relying on cache/fallback', error);
+            .catch(() => {
+              console.log('[SW] Network fetch failed, using cache');
             });
 
-          // Keep the Service Worker alive for the background fetch
           if (cachedResponse) {
             event.waitUntil(fetchPromise);
             return cachedResponse;
           }
 
-          // If no cached response, wait for the network response
           return fetchPromise.then((response) => {
             if (response) return response;
-            // Fallback if network also failed and no cache
             if (event.request.mode === 'navigate') {
               return caches.match('/index.html');
             }
-            return new Response('Offline and not cached', {
-              status: 503,
-              statusText: 'Service Unavailable'
-            });
+            return new Response('Offline — not cached', { status: 503 });
           });
-        });
-      })
+        })
+      )
     );
   }
 });
 
-// Push Event
+// Push Notification
 self.addEventListener('push', (event) => {
   let data = {};
   if (event.data) {
-    try {
-      data = event.data.json();
-    } catch (e) {
-      data = { title: event.data.text() };
-    }
+    try { data = event.data.json(); } catch (e) { data = { title: event.data.text() }; }
   }
 
-  // Extract fields supporting custom Web Push formats, Firebase Cloud Messaging notification, or FCM data payloads
-  const title = data.title || 
-                (data.notification && data.notification.title) || 
-                (data.data && data.data.title) || 
-                'VBT Sports Camp';
-                
+  const title = data.title ||
+    (data.notification && data.notification.title) ||
+    (data.data && data.data.title) ||
+    'VBT Service';
+
   const options = {
-    body: data.body || 
-          (data.notification && data.notification.body) || 
-          (data.data && data.data.body) || 
-          'New update from VBT Sports Camp!',
+    body: data.body ||
+      (data.notification && data.notification.body) ||
+      (data.data && data.data.body) ||
+      'New update from VBT!',
     icon: '/Final%20VBT%20Re-Branding%202026-02%20(3).png',
     badge: '/favicon.svg',
     vibrate: [200, 100, 200, 100, 300],
     tag: 'vbt-notification-' + Date.now(),
     renotify: true,
     requireInteraction: false,
-    data: data.url || 
-          (data.data && data.data.url) || 
-          (data.notification && data.notification.click_action) || 
-          '/'
+    data: data.url ||
+      (data.data && data.data.url) ||
+      (data.notification && data.notification.click_action) ||
+      '/',
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
-      .catch((err) => {
-        console.error('[Service Worker] showNotification failed, trying basic fallback:', err);
-        return self.registration.showNotification(title, {
-          body: options.body,
-          vibrate: [200, 100, 200],
-          tag: 'vbt-fallback-' + Date.now(),
-          renotify: true
-        });
-      })
+    self.registration.showNotification(title, options).catch((err) => {
+      console.error('[SW] showNotification failed:', err);
+      return self.registration.showNotification(title, {
+        body: options.body,
+        vibrate: [200, 100, 200],
+        tag: 'vbt-fallback-' + Date.now(),
+        renotify: true,
+      });
+    })
   );
 });
 
-// Notification Click Event
+// Notification Click
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       const targetUrl = event.notification.data || '/';
       for (const client of clientList) {
-        if (client.url === targetUrl && 'focus' in client) {
-          return client.focus();
-        }
+        if (client.url === targetUrl && 'focus' in client) return client.focus();
       }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
     })
   );
 });
 
-// Message Event (to skip waiting)
+// Message — skip waiting
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// Background Sync Event
+// ─── Background Sync — replay queued offline writes ───
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'vbt-offline-sync') {
-    event.waitUntil(
-      self.clients.matchAll().then((allClients) => {
-        allClients.forEach((client) => {
-          client.postMessage({ type: 'SYNC_READY' });
-        });
-      })
-    );
+  if (event.tag === 'vbt-sync-queue') {
+    event.waitUntil(replayQueue());
   }
 });
+
+async function replayQueue() {
+  const items = await idbGetAll();
+  if (!items.length) return;
+
+  console.log('[SW] Replaying', items.length, 'queued writes');
+
+  // Notify clients that sync is starting
+  const allClients = await self.clients.matchAll();
+  allClients.forEach(c => c.postMessage({ type: 'SYNC_START', count: items.length }));
+
+  let synced = 0;
+  for (const item of items) {
+    try {
+      // Notify the open app tab to perform the Firestore write
+      // (The SW can't import Firestore SDK, so it delegates back to the page)
+      const appClients = await self.clients.matchAll({ type: 'window' });
+      if (appClients.length > 0) {
+        appClients[0].postMessage({ type: 'REPLAY_WRITE', payload: item });
+        // Wait a moment for the write to complete before moving on
+        await new Promise(r => setTimeout(r, 300));
+        await idbDelete(item.id);
+        synced++;
+      } else {
+        // No open client — leave in queue for next time
+        break;
+      }
+    } catch (err) {
+      console.error('[SW] Failed to replay item', item.id, err);
+    }
+  }
+
+  // Notify clients sync is done
+  const doneClients = await self.clients.matchAll();
+  doneClients.forEach(c => c.postMessage({ type: 'SYNC_DONE', synced }));
+  console.log('[SW] Sync complete —', synced, 'writes replayed');
+}
