@@ -1,0 +1,3 @@
+## 2024-05-14 - Prevent Unnecessary Re-Renders in PhotoFeed
+**Learning:** Found that `AnnouncementCard`s in `PhotoFeed` re-rendered unnecessarily whenever the parent component updated state. In the first iteration, `React.memo` missed capturing functions and eventCodes which could lead to stale closures. Second iteration used length which was unsafe for arrays.
+**Action:** Added `React.memo` to `AnnouncementCard` with a custom `areEqual` function checking specific props (id, text, image, timestamp, user id, eventCode, functions, and JSON.stringify for reactions) to safely reduce re-renders, similar to how it was done for `FeedMessage.jsx` but safely including all important props and checking deep equality for arrays.
