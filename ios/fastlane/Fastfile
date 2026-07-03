@@ -3,6 +3,13 @@ default_platform(:ios)
 platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+      key_filepath: "fastlane/AuthKey/api_key.p8",
+      in_house: false
+    )
+
     # Automatically generate/fetch certificates and provisioning profiles
     # This is perfect for Windows users since the GitHub macOS runner handles it!
     get_certificates(
@@ -24,6 +31,13 @@ platform :ios do
 
   desc "Push a new release build to the App Store"
   lane :release do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+      key_filepath: "fastlane/AuthKey/api_key.p8",
+      in_house: false
+    )
+
     get_certificates(
       development: false
     )
