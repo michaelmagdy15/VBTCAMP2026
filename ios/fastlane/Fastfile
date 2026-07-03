@@ -19,7 +19,8 @@ platform :ios do
     build_app(
       project: "App/App.xcodeproj",
       scheme: "App",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates"
     )
 
     upload_to_testflight
@@ -43,7 +44,8 @@ platform :ios do
     build_app(
       project: "App/App.xcodeproj",
       scheme: "App",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates"
     )
 
     upload_to_app_store(
