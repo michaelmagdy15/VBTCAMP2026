@@ -1,0 +1,51 @@
+name: iOS Deployment
+
+on:
+  push:
+    branches:
+      - main # Or any branch you use for releases
+  workflow_dispatch: # Allows manual triggering from the GitHub UI
+
+jobs:
+  build-and-deploy-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Sync Capacitor for iOS
+        run: npx cap sync ios
+
+      - name: Setup Ruby and Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Decode API Key
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ios/fastlane/AuthKey
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ios/fastlane/AuthKey/api_key.p8
+
+      - name: Fastlane Build & Deploy to TestFlight
+        working-directory: ios
+        env:
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+        run: bundle exec fastlane beta

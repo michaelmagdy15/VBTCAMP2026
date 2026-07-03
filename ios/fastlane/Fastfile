@@ -1,0 +1,46 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Push a new beta build to TestFlight"
+  lane :beta do
+    # Automatically generate/fetch certificates and provisioning profiles
+    # This is perfect for Windows users since the GitHub macOS runner handles it!
+    get_certificates(
+      development: false
+    )
+    get_provisioning_profile(
+      app_identifier: "com.mitrixo.vbtsportscamp",
+      readonly: false
+    )
+
+    build_app(
+      workspace: "App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+
+    upload_to_testflight
+  end
+
+  desc "Push a new release build to the App Store"
+  lane :release do
+    get_certificates(
+      development: false
+    )
+    get_provisioning_profile(
+      app_identifier: "com.mitrixo.vbtsportscamp",
+      readonly: false
+    )
+    
+    build_app(
+      workspace: "App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+
+    upload_to_app_store(
+      submit_for_review: true,
+      automatic_release: true
+    )
+  end
+end
