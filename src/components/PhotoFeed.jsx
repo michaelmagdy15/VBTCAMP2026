@@ -334,6 +334,29 @@ function AnnouncementCard({ announcement, currentUser, onUpdateReactions, eventC
   );
 }
 
+
+const MemoizedAnnouncementCard = React.memo(AnnouncementCard, (prevProps, nextProps) => {
+  const prevMsg = prevProps.announcement || {};
+  const nextMsg = nextProps.announcement || {};
+
+  // Safe comparison that checks all necessary fields including eventCode
+  // Deep equality check on reactions array is necessary to ensure UI updates if specific users toggle reactions.
+  // Using JSON.stringify for reactions array is fine as they are usually small string arrays of user IDs.
+
+  return (
+    prevMsg.id === nextMsg.id &&
+    prevMsg.text === nextMsg.text &&
+    prevMsg.image === nextMsg.image &&
+    prevMsg.timestamp === nextMsg.timestamp &&
+    prevProps.eventCode === nextProps.eventCode &&
+    prevProps.currentUser?.uid === nextProps.currentUser?.uid &&
+    prevProps.currentUser?.email === nextProps.currentUser?.email &&
+    prevProps.currentUser?.displayName === nextProps.currentUser?.displayName &&
+    JSON.stringify(prevMsg.reactions) === JSON.stringify(nextMsg.reactions) &&
+    prevProps.onUpdateReactions === nextProps.onUpdateReactions
+  );
+});
+
 // ─── Photo Upload Area ──────────────────────────────────────────────────────
 function PhotoUploadArea({ eventCode, currentUser, onAddAnnouncement }) {
   const [preview, setPreview] = useState(null);
@@ -669,7 +692,7 @@ export default function PhotoFeed({
       {/* Announcement cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {sortedAnnouncements.map((announcement) => (
-          <AnnouncementCard
+          <MemoizedAnnouncementCard
             key={announcement.id}
             announcement={announcement}
             currentUser={currentUser}
