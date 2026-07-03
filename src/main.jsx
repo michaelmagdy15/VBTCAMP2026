@@ -14,26 +14,19 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        
-        // Listen for new service worker installation
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Force immediate takeover
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-          }
-        });
+
+        // NOTE: We intentionally do NOT send SKIP_WAITING here.
+        // Sending it mid-session causes a controllerchange event which triggers a page reload,
+        // breaking whatever the user is currently doing (e.g. joining a service, submitting a score).
+        // The new SW will take over naturally when the user closes and reopens the tab.
       })
       .catch((error) => {
         console.error('ServiceWorker registration failed: ', error);
       });
   });
 
-  // Force page reload once the new service worker activates (only if there was an active controller before)
+  // Reload once if the SW controller changes (i.e. an intentional admin-triggered clear or first SW activation).
+  // The refreshing flag ensures we only reload once per session, not in a loop.
   const hasController = !!navigator.serviceWorker.controller;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -44,6 +37,7 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
+
 
 // Disable pinch zoom on iOS Safari
 document.addEventListener('gesturestart', (e) => {

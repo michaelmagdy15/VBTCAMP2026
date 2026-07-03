@@ -302,6 +302,7 @@ export default function RoleLogin({
   const [name, setName] = useState('');
   const [passcode, setPasscode] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   // Servants filtered by role prefix
   const refereeServants = useMemo(
@@ -429,7 +430,7 @@ export default function RoleLogin({
 
       {/* ── Role selector cards ── */}
       <div style={S.grid}>
-        {ROLE_META.map((rm) => {
+        {ROLE_META.filter(rm => rm.key !== 'admin' || showAdmin).map((rm) => {
           const Icon = rm.icon;
           const selected = selectedRole === rm.key;
           return (
@@ -448,6 +449,27 @@ export default function RoleLogin({
           );
         })}
       </div>
+      {/* Coordinator login reveal */}
+      {!showAdmin && (
+        <button
+          type="button"
+          onClick={() => setShowAdmin(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#475569',
+            fontSize: '0.72rem',
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            marginTop: '6px',
+            padding: '4px 0',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            display: 'block',
+          }}
+        >
+          Coordinator login
+        </button>
+      )}
 
       {/* ── Login form (only when a role needing auth is selected) ── */}
       {selectedRole && (

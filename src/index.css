@@ -589,6 +589,38 @@ button {
   }
 }
 
+/* Active nav tab pill underline indicator */
+.mobile-nav-item {
+  position: relative;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.mobile-nav-item.active {
+  color: var(--vbt-sky) !important;
+}
+
+.mobile-nav-item::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 20px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--gradient-vbt);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mobile-nav-item.active::after {
+  transform: translateX(-50%) scaleX(1);
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.92);
+}
+
 /* Permanent visible thin scrollbar for mobile navigation bar */
 .mobile-nav-bar::-webkit-scrollbar {
   height: 4px !important;

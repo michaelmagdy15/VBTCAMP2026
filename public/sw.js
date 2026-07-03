@@ -27,7 +27,10 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
+  // Do NOT call self.skipWaiting() here.
+  // Skipping waiting immediately causes a controllerchange event in the page,
+  // which triggers window.location.reload() and breaks the user's session.
+  // The SW will only take over when explicitly requested via postMessage({ type: 'SKIP_WAITING' }).
 });
 
 // Activate Event

@@ -753,6 +753,12 @@ export default function App() {
   const [scheduleSortMode, setScheduleSortMode] = useState('block');
   const [announcementText, setAnnouncementText] = useState('');
   const [announcements, setAnnouncements] = useState([]);
+  const [lastSeenFeedTimestamp, setLastSeenFeedTimestamp] = useState(() => {
+    return localStorage.getItem('vbt_last_seen_feed') || '';
+  });
+  const [showOnboardingTip, setShowOnboardingTip] = useState(() => {
+    return localStorage.getItem('vbt_onboarded') !== 'true';
+  });
   const [timeTick, setTimeTick] = useState(0);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [isWhereIsEveryoneCollapsed, setIsWhereIsEveryoneCollapsed] = useState(true);
@@ -1393,6 +1399,18 @@ export default function App() {
       } catch (err) {
         console.warn('[CacheClear] localStorage getItem failed:', err);
       }
+
+      if (localVer === null) {
+        // First-time user: no local version stored yet.
+        // Silently record the current version so we don't reload them on first join.
+        try {
+          localStorage.setItem('vbt_clear_cache_version', String(eventConfig.clearCacheVersion));
+        } catch (err) {
+          console.warn('[CacheClear] Failed to write initial clearCacheVersion:', err);
+        }
+        return; // Do NOT reload — user is new to this event
+      }
+
       if (localVer !== String(eventConfig.clearCacheVersion)) {
         console.log('[CacheClear] Mismatch detected. Local:', localVer, 'Remote:', eventConfig.clearCacheVersion);
         
@@ -3547,9 +3565,9 @@ export default function App() {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <span style={{ fontSize: '1.2rem' }}>🔑</span>
-                      <h3 style={{ fontSize: '1.1rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Join Code Manually</h3>
+                      <h3 style={{ fontSize: '1.1rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>Enter Your Event Code</h3>
                     </div>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.4' }}>Access a custom service day code provided by coordinator.</p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.4' }}>Your coordinator will share this code with you before the service starts.</p>
                     <input
                       type="text"
                       value={eventJoinInput}
@@ -3572,9 +3590,12 @@ export default function App() {
                       }}
                     />
                     {eventJoinError && (
-                      <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '6px 0 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        ⚠️ {eventJoinError}
-                      </p>
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
+                        <p style={{ color: '#f87171', fontSize: '0.8rem', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          ⚠️ {eventJoinError}
+                        </p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
+                      </div>
                     )}
                   </div>
                   <button
@@ -4921,22 +4942,24 @@ export default function App() {
     if (!currentUser) return [];
     
     if (eventConfig?.eventType === 'service') {
+      const unreadCount = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
       return [
         { id: 'schedule', label: 'Schedule', icon: Calendar },
-        { id: 'service', label: 'Service', icon: BookOpen },
-        { id: 'walkie', label: 'Walkie', icon: Radio },
+        { id: 'service', label: 'My Games', icon: BookOpen },
+        { id: 'walkie', label: 'Radio', icon: Radio },
         { id: 'scoreboard', label: 'Scores', icon: Trophy },
-        { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+        { id: 'timeline', label: 'Feed', icon: Bell, badge: unreadCount },
         { id: 'more', label: 'More', icon: MoreHorizontal }
       ];
     }
     
+    const unreadCount = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
     return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
       { id: 'info', label: 'Map', icon: MapIcon },
-      { id: 'walkie', label: 'Walkie', icon: Radio },
-      { id: 'timeline', label: 'Feed', icon: Bell, badge: announcements.length > 0 },
+      { id: 'walkie', label: 'Radio', icon: Radio },
+      { id: 'timeline', label: 'Feed', icon: Bell, badge: unreadCount },
       { id: 'more', label: 'More', icon: MoreHorizontal }
     ];
   };
@@ -6035,6 +6058,95 @@ export default function App() {
         {/* Tab 3: Full Schedule filterable */}
         {currentTab === 'schedule' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* ── MY ASSIGNMENT HERO CARD (referee / leader roles) ── */}
+            {currentUser && (currentUser.role === 'referee' || currentUser.role === 'leader') && (() => {
+              const roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[currentUser.id];
+              let assignmentTitle = '';
+              let assignmentDetail = '';
+              let assignmentIcon = '📍';
+
+              if (currentUser.role === 'referee') {
+                if (roleCode) {
+                  if (roleCode.startsWith('station_')) {
+                    const stationNum = roleCode.replace('station_', '');
+                    const station = eventConfig.stations?.[roleCode];
+                    assignmentTitle = station?.name || `Station ${stationNum}`;
+                    assignmentDetail = station?.location ? `📌 ${station.location}` : `Station ${stationNum}`;
+                    assignmentIcon = '🎯';
+                  } else if (roleCode.startsWith('big_game_')) {
+                    assignmentTitle = eventConfig.bigGameName || 'Big Game';
+                    assignmentDetail = '📌 Main Area';
+                    assignmentIcon = '🏆';
+                  } else if (roleCode === 'reflection') {
+                    assignmentTitle = eventConfig.reflectionName || 'Reflection';
+                    assignmentDetail = '📌 Reflection Area';
+                    assignmentIcon = '🙏';
+                  } else {
+                    assignmentTitle = 'Assigned by coordinator';
+                    assignmentDetail = 'Check with your coordinator for your station';
+                    assignmentIcon = '🎯';
+                  }
+                } else if (currentUser.assignedGames?.length > 0) {
+                  assignmentTitle = currentUser.assignedGames.join(', ');
+                  assignmentDetail = 'Your assigned game(s) — find them in the schedule below';
+                  assignmentIcon = '🎯';
+                } else {
+                  assignmentTitle = 'Check your assignment below';
+                  assignmentDetail = 'Find your game station in the schedule below';
+                  assignmentIcon = '🎯';
+                }
+              } else if (currentUser.role === 'leader') {
+                const teams = currentUser.assignedTeams || [];
+                if (teams.length > 0) {
+                  assignmentTitle = teams.map(t => {
+                    const name = eventConfig.teamNames?.[t.toLowerCase()] || t;
+                    return name.charAt(0).toUpperCase() + name.slice(1);
+                  }).join(' & ');
+                  assignmentDetail = 'Your team(s) to lead today';
+                  assignmentIcon = '👥';
+                } else {
+                  assignmentTitle = 'Team Leader';
+                  assignmentDetail = 'Your team assignment will appear here';
+                  assignmentIcon = '👥';
+                }
+              }
+
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.25) 0%, rgba(41, 182, 246, 0.1) 100%)',
+                  border: '1px solid rgba(41, 182, 246, 0.35)',
+                  borderRadius: '16px',
+                  padding: '16px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  boxShadow: '0 4px 20px rgba(41, 182, 246, 0.12)'
+                }}>
+                  <div style={{
+                    width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0,
+                    background: 'rgba(41, 182, 246, 0.15)',
+                    border: '1px solid rgba(41, 182, 246, 0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '1.5rem'
+                  }}>
+                    {assignmentIcon}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#29b6f6', margin: '0 0 3px 0' }}>
+                      Your Assignment Today
+                    </p>
+                    <p style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', margin: '0 0 3px 0', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {assignmentTitle}
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                      {assignmentDetail}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
             {isReferee && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
                 <button
@@ -9987,10 +10099,14 @@ export default function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {serviceData.games.map((game, idx) => {
                       const isOpen = !!expandedServiceGame[idx];
+                      const isLiveStation = currentActiveSlot && game.name &&
+                        (currentActiveSlot.name || '').toLowerCase().includes((game.name || '').toLowerCase());
                       return (
                         <div key={idx} style={{
-                          borderRadius: '12px', border: '1px solid var(--border-light)',
-                          overflow: 'hidden', background: isOpen ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'
+                          borderRadius: '12px',
+                          border: isLiveStation ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border-light)',
+                          overflow: 'hidden',
+                          background: isLiveStation ? 'rgba(34,197,94,0.05)' : isOpen ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'
                         }}>
                           {/* Accordion header */}
                           <button
@@ -10002,18 +10118,35 @@ export default function App() {
                               cursor: 'pointer', color: '#ffffff'
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
                               <span style={{
                                 width: '26px', height: '26px', borderRadius: '8px',
                                 background: `linear-gradient(135deg, hsl(${(idx * 60 + 200) % 360}, 70%, 50%), hsl(${(idx * 60 + 240) % 360}, 60%, 40%))`,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 fontSize: '0.7rem', fontWeight: '800', flexShrink: 0
                               }}>{idx + 1}</span>
-                              <span style={{ fontSize: '0.9rem', fontWeight: '700', textAlign: 'left' }}>
-                                {game.name || `Game ${idx + 1}`}
-                              </span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.9rem', fontWeight: '700' }}>
+                                    {game.name || `Game ${idx + 1}`}
+                                  </span>
+                                  {isLiveStation && (
+                                    <span style={{
+                                      fontSize: '0.6rem', fontWeight: '800', textTransform: 'uppercase',
+                                      letterSpacing: '0.06em', color: '#22c55e',
+                                      background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)',
+                                      borderRadius: '4px', padding: '1px 5px'
+                                    }}>LIVE</span>
+                                  )}
+                                </div>
+                                {game.location && (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                    📌 {game.location}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }}>▾</span>
+                            <span style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
                           </button>
 
                           {/* Accordion body */}
@@ -10152,6 +10285,63 @@ export default function App() {
       </main>
     </div>
 
+      {/* First-run onboarding tooltip */}
+      {showOnboardingTip && currentUser && (() => {
+        const role = currentUser.role;
+        let tipTab = 'schedule';
+        let tipMsg = '';
+        if (role === 'referee') { tipTab = 'schedule'; tipMsg = 'Your station & game assignments are here'; }
+        else if (role === 'leader') { tipTab = 'scoreboard'; tipMsg = 'Your team score is tracked here'; }
+        else { tipTab = 'timeline'; tipMsg = 'Announcements from coordinators appear here'; }
+
+        const tabs = getActiveTabs();
+        const tipIdx = tabs.findIndex(t => t.id === tipTab);
+        const totalTabs = tabs.length;
+        const leftPct = tipIdx >= 0 ? (tipIdx + 0.5) / totalTabs * 100 : 50;
+
+        return (
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1200, pointerEvents: 'none' }}>
+            <div style={{
+              position: 'absolute',
+              bottom: '72px',
+              left: `clamp(8px, calc(${leftPct}% - 90px), calc(100vw - 196px))`,
+              width: '180px',
+              background: 'rgba(20, 65, 161, 0.97)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(41, 182, 246, 0.5)',
+              borderRadius: '12px',
+              padding: '10px 12px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              pointerEvents: 'auto'
+            }}>
+              <p style={{ fontSize: '0.75rem', color: '#ffffff', margin: '0 0 6px 0', fontWeight: '700', lineHeight: 1.3 }}>
+                👆 {tipMsg}
+              </p>
+              <button
+                onClick={() => {
+                  setShowOnboardingTip(false);
+                  try { localStorage.setItem('vbt_onboarded', 'true'); } catch(_) {}
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: '6px',
+                  color: '#ffffff', fontSize: '0.7rem', padding: '4px 10px',
+                  cursor: 'pointer', fontWeight: '700'
+                }}
+              >
+                Got it ✓
+              </button>
+              <div style={{
+                position: 'absolute', bottom: '-8px', left: '20px',
+                width: 0, height: 0,
+                borderLeft: '8px solid transparent',
+                borderRight: '8px solid transparent',
+                borderTop: '8px solid rgba(20, 65, 161, 0.97)'
+              }} />
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Navigation bar */}
       <nav 
         className="mobile-nav-bar" 
@@ -10181,6 +10371,15 @@ export default function App() {
                   setShowMoreDrawer(true);
                 } else {
                   setCurrentTab(t.id);
+                  if (t.id === 'timeline') {
+                    const now = new Date().toISOString();
+                    setLastSeenFeedTimestamp(now);
+                    try { localStorage.setItem('vbt_last_seen_feed', now); } catch(_) {}
+                  }
+                  if (showOnboardingTip) {
+                    setShowOnboardingTip(false);
+                    try { localStorage.setItem('vbt_onboarded', 'true'); } catch(_) {}
+                  }
                 }
               }}
               style={{
@@ -10203,8 +10402,17 @@ export default function App() {
             >
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon size={22} style={{ marginBottom: '2px' }} />
-                {t.badge && (
-                  <span style={{ position: 'absolute', top: '-2px', right: '-2px', width: '6px', height: '6px', background: '#ef4444', borderRadius: '50%' }} />
+                {t.badge > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '-4px', right: '-6px',
+                    minWidth: '16px', height: '16px', padding: '0 4px',
+                    background: '#ef4444', borderRadius: '8px',
+                    fontSize: '0.6rem', fontWeight: '800', color: '#ffffff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.4)'
+                  }}>
+                    {t.badge > 9 ? '9+' : t.badge}
+                  </span>
                 )}
               </div>
               <span>{t.label}</span>
