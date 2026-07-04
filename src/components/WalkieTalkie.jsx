@@ -321,7 +321,7 @@ function Spinner({ size = 22, color = '#fff' }) {
 
 // ── Main component Inner ───────────────────────────────────────────────
 
-function WalkieTalkieInner({ eventCode, currentUser }) {
+function WalkieTalkieInner({ eventCode, currentUser, onSpeakingChange }) {
   const allowed = getAllowedChannels(currentUser?.role);
   const [activeChannel, setActiveChannel] = useState(allowed[0] || CHANNELS.GLOBAL);
   
@@ -457,6 +457,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
     if (success) {
       playChime('walkie');
       setAmISpeaking(true);
+      if (onSpeakingChange) onSpeakingChange(true);
       
       // Auto-stop after 30 seconds to prevent getting stuck
       if (talkTimeoutRef.current) clearTimeout(talkTimeoutRef.current);
@@ -479,6 +480,7 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
     if (talkTimeoutRef.current) clearTimeout(talkTimeoutRef.current);
     if (amISpeaking) {
       setAmISpeaking(false);
+      if (onSpeakingChange) onSpeakingChange(false);
       await releaseChannelLock(`${eventCode}_${activeChannel}`, mySessionId);
       
       // Stop recording and upload for replay history
@@ -843,35 +845,43 @@ function WalkieTalkieInner({ eventCode, currentUser }) {
           gap: 10,
         }}
       >
-        <button
-          onMouseDown={handleStartTalk}
-          onTouchStart={handleStartTalk}
-          style={{
-            width: 70,
-            height: 70,
-            borderRadius: '50%',
-            border: amISpeaking ? '3px solid #ef4444' : `3px solid ${channelColor}`,
-            background: amISpeaking
-              ? 'radial-gradient(circle, #ef4444 0%, #b91c1c 100%)'
-              : (isSomeoneElseSpeaking ? '#333' : T.gradientVbt),
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: isSomeoneElseSpeaking || uploading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.15s',
-            animation: amISpeaking ? 'wt-pulse 1.4s ease-in-out infinite' : 'none',
-            boxShadow: amISpeaking
-              ? '0 0 24px rgba(239,68,68,0.4)'
-              : (isSomeoneElseSpeaking ? 'none' : `0 0 20px ${channelColor}33`),
-            opacity: isSomeoneElseSpeaking || uploading ? 0.5 : 1,
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-          }}
-          aria-label="Push to talk"
-        >
-          {uploading ? <Spinner size={24} /> : isSomeoneElseSpeaking ? <MicOff size={28} /> : <Mic size={28} />}
-        </button>
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          {amISpeaking && (
+            <>
+              <div className="ptt-ring" />
+              <div className="ptt-ring" style={{ animationDelay: '0.35s' }} />
+            </>
+          )}
+          <button
+            onMouseDown={handleStartTalk}
+            onTouchStart={handleStartTalk}
+            style={{
+              width: 70,
+              height: 70,
+              borderRadius: '50%',
+              border: amISpeaking ? '3px solid #ef4444' : `3px solid ${channelColor}`,
+              background: amISpeaking
+                ? 'radial-gradient(circle, #ef4444 0%, #b91c1c 100%)'
+                : (isSomeoneElseSpeaking ? '#333' : T.gradientVbt),
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: isSomeoneElseSpeaking || uploading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s',
+              animation: amISpeaking ? 'wt-pulse 1.4s ease-in-out infinite' : 'none',
+              boxShadow: amISpeaking
+                ? '0 0 24px rgba(239,68,68,0.4)'
+                : (isSomeoneElseSpeaking ? 'none' : `0 0 20px ${channelColor}33`),
+              opacity: isSomeoneElseSpeaking || uploading ? 0.5 : 1,
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
+            aria-label="Push to talk"
+          >
+            {uploading ? <Spinner size={24} /> : isSomeoneElseSpeaking ? <MicOff size={28} /> : <Mic size={28} />}
+          </button>
+        </div>
 
         <span
           style={{

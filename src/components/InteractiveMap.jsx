@@ -283,11 +283,21 @@ export default function InteractiveMap({
 
                   {/* Status dot / sub-label */}
                   {isActive && (
-                    <circle
-                      cx={pos.x} cy={pos.y + 16}
-                      r="3.5"
-                      fill="#29b6f6"
-                    />
+                    <>
+                      <circle
+                        cx={pos.x} cy={pos.y + 16}
+                        r="3.5"
+                        fill="#ef4444"
+                      />
+                      <circle
+                        cx={pos.x} cy={pos.y + 16}
+                        r="3.5"
+                        fill="none"
+                        stroke="#ef4444"
+                        strokeWidth="1.5"
+                        className="live-dot-pulse"
+                      />
+                    </>
                   )}
                   {!isActive && (
                     <text

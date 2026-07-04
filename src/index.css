@@ -2,44 +2,92 @@
 /* Removed Google Fonts import since we now load them locally from node_modules */
 
 :root {
-  --vbt-blue: #3B82F6;
-  --vbt-sky: #60A5FA;
-  --vbt-cta: #F97316;
-  --bg-dark: #070a13;
-  --bg-surface: rgba(13, 20, 38, 0.65);
-  --bg-surface-hover: rgba(20, 30, 58, 0.85);
-  --border-glow: rgba(96, 165, 250, 0.15);
-  --border-light: rgba(255, 255, 255, 0.06);
-  
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  
-  /* Team Colors */
-  --color-shakes: #00b0ff;
-  --color-shakes-rgb: 0, 176, 255;
-  --color-fries: #ff9100;
-  --color-fries-rgb: 255, 145, 0;
-  --color-tie: #a855f7;
-  
-  --gradient-vbt: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
-  --gradient-shakes: linear-gradient(135deg, #00b0ff 0%, #0077c2 100%);
-  --gradient-fries: linear-gradient(135deg, #ff9100 0%, #e65100 100%);
-  --gradient-card: linear-gradient(135deg, rgba(20, 30, 58, 0.4) 0%, rgba(13, 20, 38, 0.6) 100%);
-  
-  --shadow-glow-shakes: 0 0 15px rgba(0, 176, 255, 0.25);
-  --shadow-glow-fries: 0 0 15px rgba(255, 145, 0, 0.25);
-  --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  
-  --font-title: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  /* ── Brand ─────────────────────────────────────────────── */
+  --vbt-blue:  #3B82F6;
+  --vbt-sky:   #60A5FA;
+  --vbt-cta:   #F97316;
 
-  /* Safe area inset shorthand variables — updated dynamically by the env() function.
-     Use these anywhere you need to offset for notch / Dynamic Island / home bar. */
+  /* ── iOS Dark Color System ──────────────────────────────
+     Mirrors Apple's UIColor semantic palette for dark mode:
+     systemBackground → #000, secondarySystemBackground → #1C1C1E
+     tertiarySystemBackground → #2C2C2E, quaternary → #3A3A3C       */
+  --bg-dark:          #000000;
+  --bg-surface:       #1C1C1E;
+  --bg-elevated:      #2C2C2E;
+  --bg-card:          #1C1C1E;
+  --bg-surface-hover: #2C2C2E;
+  --bg-grouped:       #000000;
+
+  /* ── iOS Separator ─────────────────────────────────────── */
+  --separator:        rgba(60, 60, 67, 0.36);
+  --separator-opaque: #38383A;
+  --border-light:     rgba(255, 255, 255, 0.08);
+  --border-glow:      rgba(96, 165, 250, 0.2);
+
+  /* ── iOS Text ───────────────────────────────────────────── */
+  --text-primary:   #FFFFFF;
+  --text-secondary: rgba(235, 235, 245, 0.6);
+  --text-muted:     rgba(235, 235, 245, 0.3);
+  --text-label:     #EBEBF5;
+
+  /* ── Team Colors ────────────────────────────────────────── */
+  --color-side1:      #00b0ff;
+  --color-side1-rgb:  0, 176, 255;
+  --color-side2:      #ff9100;
+  --color-side2-rgb:  255, 145, 0;
+  --color-tie:        #a855f7;
+
+  /* Backwards compatibility aliases */
+  --color-shakes:     var(--color-side1);
+  --color-shakes-rgb: var(--color-side1-rgb);
+  --color-fries:      var(--color-side2);
+  --color-fries-rgb:  var(--color-side2-rgb);
+
+  /* ── Gradients ──────────────────────────────────────────── */
+  --gradient-vbt:    linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+  --gradient-side1:  linear-gradient(135deg, #00b0ff 0%, #0077c2 100%);
+  --gradient-side2:  linear-gradient(135deg, #ff9100 0%, #e65100 100%);
+  --gradient-card:   linear-gradient(135deg, rgba(28,28,30,0.8) 0%, rgba(44,44,46,0.8) 100%);
+
+  --gradient-shakes: var(--gradient-side1);
+  --gradient-fries:  var(--gradient-side2);
+
+  /* ── Shadows ────────────────────────────────────────────── */
+  --shadow-glow-side1: 0 0 14px rgba(0, 176, 255, 0.28);
+  --shadow-glow-side2: 0 0 14px rgba(255, 145, 0, 0.28);
+  --shadow-glow-shakes: var(--shadow-glow-side1);
+  --shadow-glow-fries:  var(--shadow-glow-side2);
+  --shadow-card:        0 2px 12px rgba(0, 0, 0, 0.5);
+  --shadow-elevated:    0 8px 28px rgba(0, 0, 0, 0.6);
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-title: 'Outfit', -apple-system, sans-serif;
+  --font-body:  'Inter',  -apple-system, sans-serif;
+
+  /* ── Safe Area ──────────────────────────────────────────── */
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
+
+  /* ── Spacing ────────────────────────────────────────────── */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-pill: 9999px;
+
+  /* ── Glass (used sparingly: nav overlays, modals only) ───── */
+  --glass-bg:       rgba(28, 28, 30, 0.82);
+  --glass-bg-hover: rgba(44, 44, 46, 0.92);
+  --glass-bg-deep:  rgba(0, 0, 0, 0.88);
 }
 
 html {
@@ -75,14 +123,14 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-primary);
   font-family: var(--font-body);
-  /* Use dvh so the body never goes behind the browser chrome */
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   overflow-x: hidden;
   line-height: 1.5;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(20, 65, 161, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(41, 182, 246, 0.08) 0px, transparent 50%);
+  /* Subtle ambient glow — barely visible, keeps OLED feel */
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(59, 130, 246, 0.06) 0px, transparent 55%),
+    radial-gradient(ellipse at 80% 100%, rgba(96, 165, 250, 0.04) 0px, transparent 55%);
   background-attachment: fixed;
 }
 
@@ -189,20 +237,21 @@ h1, h2, h3, h4, h5, h6 {
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Glassmorphism primitives */
+/* ── iOS-style system cards ────────────────────────────────────────────────
+   Real iOS apps use flat dark-surface cells, NOT blur on every card.
+   Blur is reserved for the nav bar, header, and modal sheets only.          */
 .glass-panel {
   background: var(--bg-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-light);
-  border-radius: 16px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  /* No backdrop-filter — use it only where it matters (overlays/nav) */
 }
 
 .glass-panel:hover {
-  background: var(--bg-surface-hover);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .glass-card-shakes {
@@ -233,23 +282,25 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.tug-of-war-bar-side1,
 .tug-of-war-bar-shakes {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  background: var(--gradient-shakes);
-  box-shadow: var(--shadow-glow-shakes);
+  background: var(--gradient-side1);
+  box-shadow: var(--shadow-glow-side1);
   transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.tug-of-war-bar-side2,
 .tug-of-war-bar-fries {
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
-  background: var(--gradient-fries);
-  box-shadow: var(--shadow-glow-fries);
+  background: var(--gradient-side2);
+  box-shadow: var(--shadow-glow-side2);
   transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -359,44 +410,49 @@ body {
   transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Mobile Responsive Utility Classes */
+/* ── iOS Tab Bar ────────────────────────────────────────────────────────────
+   Spec: 49px content height + safe-area-bottom. Frosted glass background.
+   Border-top is omitted — the blur creates natural visual separation.        */
 .mobile-nav-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  /* Height: 68px tabs + home indicator bar (iPhone X+ = ~34px, Android = varies) */
-  height: calc(68px + env(safe-area-inset-bottom, 0px));
-  background: rgba(13, 20, 38, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border-light);
+  height: calc(49px + env(safe-area-inset-bottom, 0px));
+  background: rgba(18, 18, 18, 0.88);
+  backdrop-filter: saturate(180%) blur(28px);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-around;
-  align-items: flex-start;    /* tabs sit at top; padding-bottom pushes them up from home bar */
+  align-items: center;
   z-index: 1010;
-  padding-top: 4px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  /* Left/right for notchless landscape Android */
   padding-left:  env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
 
+/* ── iOS Tab Item ────────────────────────────────────────────────────────────
+   iOS 16+ style: clean, centered layout with color highlight on active.      */
 .mobile-nav-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  flex: 1;
+  height: 100%;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  width: 72px;
-  height: 52px;
-  gap: 4px;
+  transition: color 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+  gap: 2px;
 }
 
 .mobile-nav-item.active {
@@ -404,15 +460,28 @@ body {
 }
 
 .mobile-nav-item.active svg {
-  filter: drop-shadow(0 0 5px rgba(41, 182, 246, 0.5));
+  filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.45));
+}
+
+.mobile-nav-item svg {
+  position: relative;
+  z-index: 1;
+}
+
+.mobile-nav-item span {
+  position: relative;
+  z-index: 1;
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.9);
+  transition: transform 0.1s ease;
 }
 
 .content-area {
-  padding: 16px;
-  padding-top: 12px;
-  /* Bottom clears nav bar (68px) + home indicator + a little breathing room */
-  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-  /* Left/right for landscape notches */
+  padding: 12px 16px;
+  /* Bottom clears iOS tab bar (49px) + home indicator (~34px) + breathing room */
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   padding-left:  max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   max-width: 600px;
@@ -440,6 +509,18 @@ body {
   background: rgba(255, 145, 0, 0.15);
   color: var(--color-fries);
   border: 1px solid rgba(255, 145, 0, 0.3);
+}
+
+.badge-neutral {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.badge-admin {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 /* Dynamic Live dot indicators */
@@ -633,37 +714,7 @@ button {
   }
 }
 
-/* Active nav tab pill underline indicator */
-.mobile-nav-item {
-  position: relative;
-  color: var(--text-muted);
-  transition: color 0.2s ease;
-}
 
-.mobile-nav-item.active {
-  color: var(--vbt-sky) !important;
-}
-
-.mobile-nav-item::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%) scaleX(0);
-  width: 20px;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--gradient-vbt);
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.mobile-nav-item.active::after {
-  transform: translateX(-50%) scaleX(1);
-}
-
-.mobile-nav-item:active {
-  transform: scale(0.92);
-}
 
 /* Removed visible scrollbar for mobile navigation bar to maintain native look */
 
@@ -924,3 +975,357 @@ button {
     margin-bottom: 80px !important;
   }
 }
+
+/* ─── Mobile-first utility improvements ─────────────────────────────────────*/
+
+/* Skeleton loading shimmer — use on card placeholders during data load */
+.skeleton {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.14) 60%,
+    transparent 100%
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+/* Empty state styling */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-state-icon {
+  font-size: 2rem;
+  opacity: 0.6;
+  line-height: 1;
+}
+
+.empty-state-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: var(--font-title);
+}
+
+.empty-state-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 240px;
+}
+
+/* Schedule filter chip row */
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+
+.filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: all 0.18s ease;
+  min-height: 36px;
+}
+
+.filter-chip:active {
+  transform: scale(0.96);
+}
+
+.filter-chip.active {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: var(--vbt-sky);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Section divider with label */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 12px;
+}
+
+.section-label::before,
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-light);
+}
+
+.section-label span {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Pill tag for roles/teams */
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Header status strip — thin colored bar under header */
+.status-strip {
+  height: 3px;
+  width: 100%;
+  background: var(--gradient-vbt);
+  opacity: 0.6;
+}
+
+/* Pull-to-refresh visual indicator placeholder */
+.ptr-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  gap: 8px;
+}
+
+/* Score digit — large scoreboard number */
+.score-digit {
+  font-family: var(--font-title);
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Pulsing live indicator row */
+.live-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ef4444;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Settings section card with label */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.settings-section-header h4 {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.settings-section-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-light);
+}
+
+/* PTT (Walkie-Talkie) speaking animation */
+@keyframes ptt-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.ptt-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #ef4444;
+  animation: ptt-ring 1s ease-out infinite;
+  pointer-events: none;
+}
+
+.ptt-ring:nth-child(2) {
+  animation-delay: 0.35s;
+}
+
+/* Tug-of-war bar — larger variant */
+.tug-of-war-container-lg {
+  position: relative;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Role card active state ring */
+.role-card-selected {
+  box-shadow: 0 0 0 2px currentColor, 0 8px 32px rgba(0,0,0,0.3);
+}
+
+/* Coordinator button — visible secondary action */
+.coordinator-reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(148, 163, 184, 0.06);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.coordinator-reveal-btn:hover,
+.coordinator-reveal-btn:active {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: var(--text-secondary);
+}
+
+/* Page transition fade */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: page-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Input focus ring using brand color */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Touch feedback for interactive glass cards */
+.glass-panel:active,
+.glass-ticket:active {
+  transform: scale(0.99);
+  transition: transform 0.1s ease;
+}
+
+/* Danger zone card */
+.danger-card {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  background: rgba(239, 68, 68, 0.03) !important;
+}
+
+.danger-card h3, .danger-card h4 {
+  color: #ef4444 !important;
+}
+
+
+
+/* ─── Accessibility ───────────────────────────────────────────────────────────*/
+
+/* Reduce Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .skeleton::after { animation: none; }
+}
+
+/* Dynamic Type / font scaling support */
+body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Focus visibility */
+:focus-visible {
+  outline: 2px solid var(--vbt-sky);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* iOS native feel — no tap highlight flash */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+/* GPU compositing for animated elements */
+.page-enter, .filter-chip, .mobile-nav-item {
+  transform: translateZ(0);
+}
+
+/* Smooth scroll */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

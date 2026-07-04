@@ -107,6 +107,14 @@ import OfflineBackupModal from './components/OfflineBackupModal';
 import { playChime, unlockAudioContext, getSharedAudioContext } from './chimes';
 import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
+// Extracted Tab Components
+import MyTeamTab from './components/MyTeamTab';
+import TimelineFeedTab from './components/TimelineFeedTab';
+import ScoreboardTab from './components/ScoreboardTab';
+import ScheduleTab from './components/ScheduleTab';
+import SettingsTab from './components/SettingsTab';
+import ServiceTab from './components/ServiceTab';
+
 // Firebase Web Push VAPID key (Generate in Firebase Console -> Project Settings -> Cloud Messaging -> Web Push Certificates)
 // Replace this placeholder with your actual key to connect browser push notifications.
 const WEBPUSH_VAPID_KEY = "BBWNlIKCRTY40ybSED7bBc5AUlRT7IHvZ0EajhdPVnxDcuSnZ7_3I50nXF79S6QG8cRcqr3UCIVBcC-v4Yvc3RU"; 
@@ -327,10 +335,7 @@ function RotationTimerDisplay({ rotationTimer, setShowRotateNow, handleTimerPaus
 
   return (
     <div style={{
-      position:'fixed',top:`calc(env(safe-area-inset-top) + 8px)`,right:'8px',
-      zIndex:700,background:'rgba(13,20,38,0.92)',backdropFilter:'blur(10px)',
-      border:'1px solid rgba(255,255,255,0.12)',borderRadius:'12px',
-      padding:'6px 12px',display:'flex',alignItems:'center',gap:'8px',
+      display:'flex',alignItems:'center',gap:'8px',
     }}>
       <span style={{fontSize:'0.7rem',color:rotationSecondsLeft<=60?'#f87171':'#4ade80',fontFamily:'monospace',fontWeight:'800'}}>
         {rotationSecondsLeft!=null ? (Math.floor(rotationSecondsLeft/60)+':'+(rotationSecondsLeft%60<10?'0':'')+(rotationSecondsLeft%60)) : '--:--'}
@@ -710,8 +715,8 @@ export default function App() {
   }, []);
 
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
-  const side1Name = eventConfig.side1Name || 'Shakes';
-  const side2Name = eventConfig.side2Name || 'Fries';
+  const side1Name = eventConfig.side1Name || 'Team A';
+  const side2Name = eventConfig.side2Name || 'Team B';
   const daysCount = eventConfig.daysCount || (eventConfig.eventType === 'camp' ? 2 : 1);
 
   const getTeamColorHex = (teamCode) => {
@@ -858,6 +863,7 @@ export default function App() {
   const [selectedMapLocation, setSelectedMapLocation] = useState(null);
   const [expandedFaqs, setExpandedFaqs] = useState({});
   const [scheduleTeamFilter, setScheduleTeamFilter] = useState('');
+  const [scheduleFilter, setScheduleFilter] = useState('All');
   const [scheduleBlockFilter, setScheduleBlockFilter] = useState('All');
   const [scheduleDayFilter, setScheduleDayFilter] = useState('1');
   const [scheduleSortMode, setScheduleSortMode] = useState('block');
@@ -980,9 +986,9 @@ export default function App() {
       const normalizedBlockScores = {};
       for (const key in normalizedData.blockScores) {
         const val = normalizedData.blockScores[key];
-        if (val === 'shakes') normalizedBlockScores[key] = 'Shakes';
-        else if (val === 'fries') normalizedBlockScores[key] = 'Fries';
-        else if (val === 'tie') normalizedBlockScores[key] = 'Tie';
+        if (val === 'teamA' || val === 'shakes') normalizedBlockScores[key] = side1Name;
+        else if (val === 'teamB' || val === 'fries') normalizedBlockScores[key] = side2Name;
+        else if (val === 'tie' || val === 'TIE') normalizedBlockScores[key] = 'Tie';
         else normalizedBlockScores[key] = 'NA';
       }
       normalizedData.blockScores = normalizedBlockScores;
@@ -2476,8 +2482,8 @@ export default function App() {
           eventDate: newEventDate || new Date().toISOString().split('T')[0],
           eventType: 'camp',
           daysCount: finalDaysCount,
-          side1Name: newEventSide1 || 'Shakes',
-          side2Name: newEventSide2 || 'Fries',
+          side1Name: newEventSide1 || 'Team A',
+          side2Name: newEventSide2 || 'Team B',
           primaryColor: '#1441a1',
           logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
           passcodeCoordinator: newEventPassCoord.trim().toUpperCase(),
@@ -3023,8 +3029,8 @@ export default function App() {
     const friesFinal = friesBlocksTotal - friesDeductions + friesTokenPoints;
 
     let winner = 'TIE';
-    if (shakesFinal > friesFinal) winner = 'SHAKES';
-    else if (friesFinal > shakesFinal) winner = 'FRIES';
+    if (shakesFinal > friesFinal) winner = 'SIDE1';
+    else if (friesFinal > shakesFinal) winner = 'SIDE2';
 
     return {
       isService: false,
@@ -5129,6 +5135,28 @@ export default function App() {
     );
   }
 
+  // Central mode-aware label map
+  // All user-visible naming derives from eventConfig.eventType so it stays
+  // consistent across tabs, headings, and the More drawer.
+  const eventType = eventConfig?.eventType || 'camp';
+  const eventLabels = {
+    // Prefix used in compound names: 'Camp ', 'Service ', or ''
+    prefix: eventType === 'camp' ? 'Camp ' : eventType === 'service' ? 'Service ' : '',
+    // Nav / tab bar labels
+    scores:    eventType === 'camp' ? 'Camp Scores'    : eventType === 'service' ? 'Service Scores'    : 'Scores',
+    schedule:  eventType === 'camp' ? 'Schedule'       : eventType === 'service' ? 'Schedule'          : 'Schedule',
+    feed:      eventType === 'camp' ? 'Camp Feed'      : eventType === 'service' ? 'Service Feed'      : 'Feed',
+    // Short tab label (fits on nav bar)
+    scoresShort:   eventType === 'camp' ? 'Scores'  : eventType === 'service' ? 'Scores'  : 'Scores',
+    scheduleShort: 'Schedule',
+    feedShort:     eventType === 'camp' ? 'Feed'    : eventType === 'service' ? 'Feed'    : 'Feed',
+    // Section headings (used inside tab content)
+    scoreboardHeading: eventType === 'camp' ? 'Camp Scoreboard'    : eventType === 'service' ? 'Service Scoreboard'    : 'Scoreboard',
+    feedHeading:       eventType === 'camp' ? 'Live Camp Feed'     : eventType === 'service' ? 'Live Service Feed'     : 'Live Feed',
+    // Misc
+    rateBtn:   eventType === 'service' ? "Rate Today's Service" : eventType === 'camp' ? "Rate Today's Camp" : 'Share Feedback',
+  };
+
   const getActiveTabs = () => {
     if (!currentUser) return [];
     const role = currentUser.role || 'volunteer';
@@ -5136,41 +5164,48 @@ export default function App() {
     const isLeader = role === 'leader';
     const isReferee = role === 'referee';
     const unread = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
+
     if (eventConfig?.eventType === 'service') {
       if (isReferee) return [
         { id: 'service', label: 'My Games', icon: BookOpen },
         { id: 'scoreboard', label: 'Scores', icon: Trophy },
+        { id: 'info', label: 'Map', icon: MapIcon },
         { id: 'walkie', label: 'Radio', icon: Radio },
         { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
       ];
       if (!isAdmin && !isLeader) return [
         { id: 'schedule', label: 'Schedule', icon: Calendar },
         { id: 'service', label: 'My Games', icon: BookOpen },
+        { id: 'info', label: 'Map', icon: MapIcon },
         { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
       ];
+      // Admin/Leader: Exactly 5 tabs. Scores and Map are accessed via the More drawer.
       return [
         { id: 'schedule', label: 'Schedule', icon: Calendar },
         { id: 'service', label: 'My Games', icon: BookOpen },
         { id: 'walkie', label: 'Radio', icon: Radio },
-        { id: 'scoreboard', label: 'Scores', icon: Trophy },
         { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
         { id: 'more', label: 'More', icon: MoreHorizontal },
       ];
     }
+
+    // Normal / Camp Mode
     if (isReferee) return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
+      { id: 'info', label: 'Map', icon: MapIcon },
       { id: 'walkie', label: 'Radio', icon: Radio },
     ];
     if (!isAdmin && !isLeader) return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
+      { id: 'info', label: 'Map', icon: MapIcon },
       { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
     ];
+    // Admin/Leader: Exactly 5 tabs. Map is accessed via the More drawer.
     return [
       { id: 'schedule', label: 'Schedule', icon: Calendar },
       { id: 'scoreboard', label: 'Scores', icon: Trophy },
-      { id: 'info', label: 'Map', icon: MapIcon },
       { id: 'walkie', label: 'Radio', icon: Radio },
       { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
       { id: 'more', label: 'More', icon: MoreHorizontal },
@@ -5233,16 +5268,18 @@ export default function App() {
         </div>
       )}
       {/* New Alert Banner System */}
-      <AlertBanner
-        alert={urgentAlert}
-        onDismiss={() => setUrgentAlert({ show: false, text: '', type: 'urgent', timestamp: '' })}
-        isAdmin={currentUser?.role === 'admin'}
-        onCreateAlert={async (text) => {
-          setUrgentAlert({ show: true, text, type: 'urgent', timestamp: new Date().toISOString() });
-          await addAnnouncement(currentEventCode, `🚨 URGENT: ${text}`, currentUser?.name || 'Admin', 'ping');
-          await triggerRemotePushNotification("🚨 URGENT ALERT", text);
-        }}
-      />
+      <div style={{ transform: urgentAlert.show ? 'translateY(0)' : 'translateY(-100%)', transition: 'transform 0.3s ease', overflow: 'hidden', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <AlertBanner
+          alert={urgentAlert}
+          onDismiss={() => setUrgentAlert({ show: false, text: '', type: 'urgent', timestamp: '' })}
+          isAdmin={currentUser?.role === 'admin'}
+          onCreateAlert={async (text) => {
+            setUrgentAlert({ show: true, text, type: 'urgent', timestamp: new Date().toISOString() });
+            await addAnnouncement(currentEventCode, `🚨 URGENT: ${text}`, currentUser?.name || 'Admin', 'ping');
+            await triggerRemotePushNotification("🚨 URGENT ALERT", text);
+          }}
+        />
+      </div>
       {/* Header */}
       <header className="glass-panel" style={{
         position: 'sticky',
@@ -5320,6 +5357,19 @@ export default function App() {
           </div>
           
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+                color: 'var(--text-secondary)', fontSize: '1.1rem', borderRadius: '8px',
+                minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+              title={isDarkMode ? 'Switch to light' : 'Switch to dark'}
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
             {/* Notification Permission Request */}
             {('Notification' in window) && (
               <button
@@ -5354,6 +5404,7 @@ export default function App() {
                   flexShrink: 0
                 }}
                 title={Notification.permission === 'granted' ? "Notifications Active (Click to Force Resubscribe)" : "Enable Alerts"}
+                aria-label="Notifications"
               >
                 <Bell size={16} style={Notification.permission === 'granted' ? {} : { animation: 'pulse-glow 1.5s infinite' }} />
               </button>
@@ -5374,6 +5425,7 @@ export default function App() {
                 borderRadius: '8px',
                 cursor: 'pointer'
               }}
+              aria-label="Log out"
             >
               <LogOut size={16} />
             </button>
@@ -5456,2324 +5508,118 @@ export default function App() {
         
         {/* Tab 1: Scoreboard Accordions */}
         {currentTab === 'scoreboard' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Standings section rendered inside Scores page only */}
-            <div style={{ width: '100%', marginBottom: '8px' }}>
-              {eventConfig.eventType !== 'normal' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trophy size={18} style={{ color: '#fbbf24' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
-                  </div>
-                  
-                  <div className="standings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                    {scoreCalculations.colors.map(colorName => {
-                      const colorHex = getTeamColorHex(colorName);
-                      const score = scoreCalculations.finalScores[colorName] || 0;
-                      const winsPts = scoreCalculations.wins[colorName] || 0;
-                      const tokCount = scoreCalculations.tokensCount[colorName] || 0;
-                      const ded = scoreCalculations.deductions[colorName] || 0;
-                      const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
-                      
-                      return (
-                        <div key={colorName} className="glass-panel hover-lift" style={{ 
-                          padding: '14px', 
-                          borderLeft: `4px solid ${colorHex}`,
-                          background: 'rgba(13, 20, 38, 0.45)',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}>
-                          <div style={{
-                            position: 'absolute',
-                            top: '-15px',
-                            right: '-15px',
-                            width: '50px',
-                            height: '50px',
-                            background: `radial-gradient(circle, ${colorHex}15 0%, transparent 70%)`,
-                            borderRadius: '50%',
-                            pointerEvents: 'none'
-                          }} />
-                          
-                          <h4 style={{ 
-                            fontSize: '0.85rem', 
-                            fontWeight: '800', 
-                            color: '#ffffff', 
-                            margin: '0 0 4px 0',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <span>{customName}</span>
-                            {scoreCalculations.leadColor === colorName && (
-                              <span style={{ fontSize: '0.7rem', color: '#fbbf24', animation: 'pulse-glow 1.5s infinite' }}>👑 Lead</span>
-                            )}
-                          </h4>
-                          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1', marginBottom: '6px' }}>
-                            {score}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                            <div>🎮 Games: <strong style={{ color: '#ffffff' }}>{winsPts}</strong> pts</div>
-                            <div>🪙 Tokens: <strong style={{ color: '#ffffff' }}>{tokCount}</strong> ({(tokCount * 2)} pts)</div>
-                            {ded > 0 && <div style={{ color: '#ef4444' }}>⚠️ Deductions: <strong>-{ded}</strong> pts</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : eventConfig.eventType === 'normal' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trophy size={18} style={{ color: '#fbbf24' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Leaderboard (Normal Mode)</span>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {scoreCalculations.sortedTeams.map((teamCode, idx) => {
-                      const team = campData?.teams?.[teamCode];
-                      const score = scoreCalculations.finalScores[teamCode] || 0;
-                      const winsPts = scoreCalculations.wins[teamCode] || 0;
-                      const ded = scoreCalculations.deductions[teamCode] || 0;
-                      
-                      return (
-                        <div key={teamCode} className="glass-panel" style={{ 
-                          padding: '10px 14px', 
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          background: idx === 0 ? 'rgba(251, 191, 36, 0.08)' : 'rgba(13, 20, 38, 0.45)',
-                          borderColor: idx === 0 ? '#fbbf24' : 'var(--border-light)'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: idx === 0 ? '#fbbf24' : 'var(--text-secondary)', width: '20px' }}>
-                              #{idx + 1}
-                            </span>
-                            <div>
-                              <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
-                                {teamCode} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>({team?.side})</span>
-                              </h4>
-                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                Wins: <strong>{winsPts}</strong> • Deductions: <strong style={{ color: ded > 0 ? '#ef4444' : 'var(--text-muted)' }}>-{ded}</strong>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div style={{ fontSize: '1.4rem', fontWeight: '800', color: idx === 0 ? '#fbbf24' : '#ffffff', fontFamily: 'monospace' }}>
-                            {score} pts
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div className="glass-panel animate-fade" style={{ padding: '16px', background: 'linear-gradient(180deg, rgba(20, 30, 58, 0.5) 0%, rgba(13, 20, 38, 0.7) 100%)' }}>
-                  <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Trophy size={18} style={{ color: '#fbbf24' }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Current standings</span>
-                    </div>
-                    {scoreCalculations.winner !== 'TIE' && (
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '2px 8px',
-                        borderRadius: '9999px',
-                        fontSize: '0.65rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        background: scoreCalculations.winner === 'SHAKES' ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 145, 0, 0.15)',
-                        border: scoreCalculations.winner === 'SHAKES' ? '1px solid rgba(0, 176, 255, 0.3)' : '1px solid rgba(255, 145, 0, 0.3)',
-                        color: scoreCalculations.winner === 'SHAKES' ? 'var(--color-shakes)' : 'var(--color-fries)'
-                      }}>
-                        {scoreCalculations.winner} leading
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
-                    <div>
-                      <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-shakes)', textTransform: 'uppercase' }}>{side1Name}</p>
-                      <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
-                        {scoreCalculations.shakesFinal}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>VS</span>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-fries)', textTransform: 'uppercase' }}>{side2Name}</p>
-                      <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', lineHeight: '1' }}>
-                        {scoreCalculations.friesFinal}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="tug-of-war-container">
-                    <div className="tug-of-war-bar-shakes" style={{ width: `${shakesPercentage}%` }} />
-                    <div className="tug-of-war-bar-fries" style={{ width: `${friesPercentage}%` }} />
-                    <div className="tug-of-war-center" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <h2 style={{ fontSize: '1.25rem', color: '#ffffff', marginBottom: '4px' }}>Game Score Entry</h2>
-            
-            {eventConfig.eventType !== 'normal' ? (
-              currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
-                <div style={{
-                  background: 'rgba(41, 182, 246, 0.1)',
-                  border: '1px solid rgba(41, 182, 246, 0.3)',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  color: '#e2e8f0',
-                  fontSize: '0.85rem',
-                  lineHeight: '1.5'
-                }}>
-                  <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    👴 Scoring Helper Card
-                  </h3>
-                  <p style={{ margin: 0 }}>
-                    Click <strong>By Block</strong> or <strong>By Game</strong> below. Find the matchup, and click the winning sub-team's button (e.g., <strong>Falcons 1</strong> or <strong>Eagles 1</strong>) to award points. Click <strong>Reset</strong> to undo.
-                  </p>
-                </div>
-              ) : (
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  color: '#e2e8f0',
-                  fontSize: '0.85rem',
-                  lineHeight: '1.5'
-                }}>
-                  <h3 style={{ color: '#94a3b8', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    👴 View-Only Helper Card
-                  </h3>
-                  <p style={{ margin: 0 }}>
-                    This scoreboard shows the points for all teams. Point values update automatically as game rounds finish and Station Leaders submit wins.
-                  </p>
-                </div>
-              )
-            ) : (
-              currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') ? (
-                <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(41, 182, 246, 0.06)', border: '1px solid rgba(41, 182, 246, 0.2)', borderRadius: '12px' }}>
-                  <p style={{ fontSize: '0.78rem', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                    <span style={{ fontSize: '1rem' }}>📝</span>
-                    <span><strong>{currentUser.role === 'admin' ? 'Coordinator' : 'Game Leader'} View:</strong> Tap the winner options below to submit scores in real-time. Any changes immediately update all devices.</span>
-                  </p>
-                </div>
-              ) : (
-                <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                    <span style={{ fontSize: '1rem' }}>👀</span>
-                    <span><strong>Team Leader View:</strong> Live scoreboard. Winner selection buttons are locked for security. If you see a discrepancy, contact a Coordinator.</span>
-                  </p>
-                </div>
-              )
-            )}
-            
-            {/* View Mode Switcher */}
-            <div className="toggle-group" style={{ marginBottom: '4px' }}>
-              <button 
-                type="button"
-                className={`toggle-btn ${scoreViewMode === 'block' ? 'active' : ''}`}
-                onClick={() => setScoreViewMode('block')}
-              >
-                By Block
-              </button>
-              <button 
-                type="button"
-                className={`toggle-btn ${scoreViewMode === 'game' ? 'active' : ''}`}
-                onClick={() => setScoreViewMode('game')}
-              >
-                By Game
-              </button>
-            </div>
-
-            {scoreViewMode === 'block' && [1, 2, 3, 4].map((blockNum) => {
-              const isOpen = expandedBlocks[blockNum];
-              const blockTitle = 
-                blockNum === 1 ? 'Block 1' :
-                blockNum === 2 ? 'Block 2' :
-                blockNum === 3 ? 'Block 3' :
-                'Block 4';
-                
-              const bScores = scoreCalculations[`b${blockNum}`];
-              
-              return (
-                <div key={blockNum} className="glass-panel" style={{ overflow: 'hidden' }}>
-                  <div 
-                    className="block-header block-header-responsive" 
-                    onClick={() => setExpandedBlocks({ ...expandedBlocks, [blockNum]: !isOpen })}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{blockTitle}</h3>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {eventConfig.eventType !== 'normal' ? (
-                          <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            {['Red', 'White', 'Black', 'Blue'].map((c, i) => {
-                              const customColorName = eventConfig.teamNames?.[c.toLowerCase()] || c;
-                              const colorHex = getTeamColorHex(c);
-                              return (
-                                <span key={c}>
-                                  {i > 0 && ' | '}
-                                  {customColorName}: <span style={{ color: colorHex, fontWeight: '700' }}>{bScores?.[c] || 0}</span>
-                                </span>
-                              );
-                            })}
-                          </span>
-                        ) : (
-                          <>
-                            Score: {side1Name} <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{bScores?.shakes || 0}</span> - {side2Name} <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{bScores?.fries || 0}</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <span style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>▼</span>
-                  </div>
-                  
-                  {isOpen && (
-                    <div className="block-content block-content-responsive" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(0,0,0,0.1)' }}>
-                      {Array.from(new Set(campData.matchups.filter(m => m.block === blockNum && m.game.toUpperCase() !== 'SPLIT').map(m => m.round))).map(roundNum => {
-                        const roundMatches = campData.matchups.filter(m => m.block === blockNum && m.round === roundNum && m.game.toUpperCase() !== 'SPLIT');
-                        
-                        return (
-                          <div key={roundNum} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '12px' }}>
-                            <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                              Round {roundNum}
-                            </h4>
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              {roundMatches.map((m, idx) => {
-                                const key = `${m.block}_${m.round}_${m.game}`;
-                                const winner = (campState.blockScores || {})[key] || 'NA';
-                                const pts = campData.gamePoints[m.game];
-                                const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
-                                const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
-                                
-                                return (
-                                  <div key={idx} className="glass-panel matchup-card-wrapper" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)' }}>
-                                    <div className="matchup-header-responsive" style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ffffff' }}>{m.game}</span>
-                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({pts} pts)</span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <MapPin size={10} style={{ color: 'var(--text-muted)' }} />
-                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{m.location}</span>
-                                          </div>
-                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>•</span>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <Clock size={10} style={{ color: isActive ? 'var(--vbt-sky)' : 'var(--text-muted)' }} />
-                                            <span style={{ fontSize: '0.7rem', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)', fontWeight: isActive ? '700' : 'normal' }}>
-                                              {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(m.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : m.time}
-                                            </span>
-                                          </div>
-                                          {isActive && (
-                                            <span style={{ borderRadius: '9999px', animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 6px', fontSize: '0.6rem', fontWeight: '800', letterSpacing: '0.05em' }}>
-                                              LIVE
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: '800' }}>
-                                        {winner === 'NA' ? (
-                                          <span style={{ color: 'var(--text-muted)' }}>Pending</span>
-                                        ) : winner === 'teamA' || winner === 'Shakes' ? (
-                                          <span style={{ color: getTeamColorHex(m.teamA || m.shakes) }}>
-                                            {m.teamA || m.shakes} Win
-                                          </span>
-                                        ) : winner === 'teamB' || winner === 'Fries' ? (
-                                          <span style={{ color: getTeamColorHex(m.teamB || m.fries) }}>
-                                            {m.teamB || m.fries} Win
-                                          </span>
-                                        ) : (
-                                          <span style={{ color: 'var(--color-tie)' }}>Tie</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '8px' }}>
-                                      <>
-                                        <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '600' }}>{m.teamA || m.shakes}</span>
-                                        <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                        <span style={{ color: getTeamColorHex(m.teamB || m.fries), fontWeight: '600' }}>{m.teamB || m.fries}</span>
-                                      </>
-                                    </div>
-                                    
-                                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') && (
-                                      <div className="winner-selector">
-                                        <button 
-                                          className={`winner-option ${winner === 'teamA' || winner === 'Shakes' ? 'active' : ''}`}
-                                          style={{
-                                            background: winner === 'teamA' || winner === 'Shakes' ? getTeamColorHex(m.teamA || m.shakes) : 'transparent',
-                                            color: winner === 'teamA' || winner === 'Shakes' ? '#ffffff' : getTeamColorHex(m.teamA || m.shakes),
-                                            border: `1px solid ${getTeamColorHex(m.teamA || m.shakes)}`,
-                                            borderRadius: '4px',
-                                            padding: '4px 8px'
-                                          }}
-                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamA')}
-                                        >
-                                          {m.teamA || m.shakes}
-                                        </button>
-                                        <button 
-                                          className={`winner-option ${winner === 'TIE' ? 'active' : ''}`}
-                                          style={{
-                                            borderRadius: '4px',
-                                            padding: '4px 8px'
-                                          }}
-                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
-                                        >
-                                          Tie
-                                        </button>
-                                        <button 
-                                          className={`winner-option ${winner === 'teamB' || winner === 'Fries' ? 'active' : ''}`}
-                                          style={{
-                                            background: winner === 'teamB' || winner === 'Fries' ? getTeamColorHex(m.teamB || m.fries) : 'transparent',
-                                            color: winner === 'teamB' || winner === 'Fries' ? '#ffffff' : getTeamColorHex(m.teamB || m.fries),
-                                            border: `1px solid ${getTeamColorHex(m.teamB || m.fries)}`,
-                                            borderRadius: '4px',
-                                            padding: '4px 8px'
-                                          }}
-                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamB')}
-                                        >
-                                          {m.teamB || m.fries}
-                                        </button>
-                                        <button 
-                                          className={`winner-option`}
-                                          style={{ color: winner === 'NA' ? '#ffffff' : 'var(--text-muted)', borderRadius: '4px', padding: '4px 8px' }}
-                                          onClick={() => handleToggleWinner(m.block, m.round, m.game, 'NA')}
-                                        >
-                                          Reset
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {scoreViewMode === 'game' && uniqueGames.map((gameName) => {
-              const isOpen = expandedGames[gameName];
-              const gameMatches = campData.matchups.filter(m => m.game === gameName);
-              const pts = campData.gamePoints[gameName] || 0;
-              
-              const completedCount = gameMatches.filter(m => {
-                const key = `${m.block}_${m.round}_${m.game}`;
-                return campState.blockScores?.[key] && campState.blockScores[key] !== 'NA';
-              }).length;
-              
-              return (
-                <div key={gameName} className="glass-panel" style={{ overflow: 'hidden' }}>
-                  <div 
-                    className="block-header block-header-responsive" 
-                    onClick={() => setExpandedGames({ ...expandedGames, [gameName]: !isOpen })}
-                    style={{ background: 'linear-gradient(90deg, rgba(20, 65, 161, 0.08) 0%, rgba(13, 20, 38, 0.15) 100%)' }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{gameName} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({pts} pts)</span></h3>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        Logged: <span style={{ color: 'var(--vbt-sky)', fontWeight: '700' }}>{completedCount}</span> / {gameMatches.length} matches
-                      </p>
-                    </div>
-                    <span style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>▼</span>
-                  </div>
-                  
-                  {isOpen && (
-                    <div className="block-content block-content-responsive" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)', padding: '12px' }}>
-                      {gameMatches.map((m, idx) => {
-                        const key = `${m.block}_${m.round}_${m.game}`;
-                        const winner = (campState.blockScores || {})[key] || 'NA';
-                        const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
-                        const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
-                        
-                        return (
-                          <div key={idx} className="glass-panel matchup-card-wrapper" style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="matchup-header-responsive" style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                              <div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--vbt-sky)' }}>
-                                  Block {m.block} • Round {m.round}
-                                </span>
-                                <span style={{ fontSize: '0.7rem', color: isActive ? 'var(--vbt-sky)' : 'var(--text-muted)', marginLeft: '8px', fontWeight: isActive ? '700' : 'normal' }}>
-                                  {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(m.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : m.time}
-                                </span>
-                                {isActive && (
-                                  <span style={{ animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 6px', fontSize: '0.6rem', borderRadius: '4px', fontWeight: '800', letterSpacing: '0.05em', marginLeft: '6px' }}>
-                                    LIVE
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: '800' }}>
-                                {winner === 'NA' ? (
-                                  <span style={{ color: 'var(--text-muted)' }}>Pending</span>
-                                ) : winner === 'teamA' || winner === 'Shakes' ? (
-                                  <span style={{ color: getTeamColorHex(m.teamA || m.shakes) }}>
-                                    {m.teamA || m.shakes} Win
-                                  </span>
-                                ) : winner === 'teamB' || winner === 'Fries' ? (
-                                  <span style={{ color: getTeamColorHex(m.teamB || m.fries) }}>
-                                    {m.teamB || m.fries} Win
-                                  </span>
-                                ) : (
-                                  <span style={{ color: 'var(--color-tie)' }}>Tie</span>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '8px' }}>
-                              <>
-                                <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '600' }}>{m.teamA || m.shakes}</span>
-                                <span style={{ color: 'var(--text-muted)' }}>vs</span>
-                                <span style={{ color: getTeamColorHex(m.teamB || m.fries), fontWeight: '600' }}>{m.teamB || m.fries}</span>
-                              </>
-                            </div>
-                            
-                            {currentUser && (currentUser.role === 'admin' || currentUser.role === 'referee') && (
-                              <div className="winner-selector">
-                                <button 
-                                  className={`winner-option ${winner === 'teamA' || winner === 'Shakes' ? 'active-shakes' : ''}`}
-                                  style={{
-                                    background: winner === 'teamA' || winner === 'Shakes' ? getTeamColorHex(m.teamA || m.shakes) : 'transparent',
-                                    color: winner === 'teamA' || winner === 'Shakes' ? '#ffffff' : getTeamColorHex(m.teamA || m.shakes),
-                                    border: `1px solid ${getTeamColorHex(m.teamA || m.shakes)}`,
-                                    borderRadius: '4px',
-                                    padding: '4px 8px'
-                                  }}
-                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamA')}
-                                >
-                                  {m.teamA || m.shakes}
-                                </button>
-                                <button 
-                                  className={`winner-option ${winner === 'TIE' ? 'active-tie' : ''}`}
-                                  style={{
-                                    borderRadius: '4px',
-                                    padding: '4px 8px'
-                                  }}
-                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
-                                >
-                                  Tie
-                                </button>
-                                <button 
-                                  className={`winner-option ${winner === 'teamB' || winner === 'Fries' ? 'active-fries' : ''}`}
-                                  style={{
-                                    background: winner === 'teamB' || winner === 'Fries' ? getTeamColorHex(m.teamB || m.fries) : 'transparent',
-                                    color: winner === 'teamB' || winner === 'Fries' ? '#ffffff' : getTeamColorHex(m.teamB || m.fries),
-                                    border: `1px solid ${getTeamColorHex(m.teamB || m.fries)}`,
-                                    borderRadius: '4px',
-                                    padding: '4px 8px'
-                                  }}
-                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamB')}
-                                >
-                                  {m.teamB || m.fries}
-                                </button>
-                                <button 
-                                  className={`winner-option`}
-                                  style={{ color: winner === 'NA' ? '#ffffff' : 'var(--text-muted)', borderRadius: '4px', padding: '4px 8px' }}
-                                  onClick={() => handleToggleWinner(m.block, m.round, m.game, 'NA')}
-                                >
-                                  Reset
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Tab 2: My Team Personalized Stats */}
-        {currentTab === 'myteam' && myTeamInfo && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="glass-panel" style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.1) 0%, rgba(13, 20, 38, 0.4) 100%)' }}>
-              <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    background: `${getTeamColorHex(currentUser.side)}22`,
-                    border: `1px solid ${getTeamColorHex(currentUser.side)}55`,
-                    color: '#ffffff',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    {(eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side).toUpperCase()}
-                  </span>
-                  <h2 style={{ fontSize: '1.75rem', color: '#ffffff', marginTop: '6px' }}>Team {currentUser.teamCode}</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Leaders: {myTeamInfo.leaders}</p>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Grade: {myTeamInfo.grade}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700' }}>My Deductions</p>
-                  <p style={{ fontSize: '2.5rem', fontWeight: '800', color: myTeamInfo.deductions > 0 ? '#ef4444' : '#22c55e', lineHeight: 1 }}>
-                    -{myTeamInfo.deductions}
-                  </p>
-                  <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>pts deducted</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
-                <button 
-                  onClick={() => handleAdjustDeduction(currentUser.teamCode, 1)}
-                  disabled={myTeamInfo.deductions >= 10}
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: myTeamInfo.deductions >= 10 ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(239, 68, 68, 0.3)',
-                    background: myTeamInfo.deductions >= 10 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(239, 68, 68, 0.08)',
-                    color: myTeamInfo.deductions >= 10 ? 'rgba(255, 255, 255, 0.25)' : '#ef4444',
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: '600',
-                    fontSize: '0.85rem',
-                    cursor: myTeamInfo.deductions >= 10 ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Plus size={14} /> Add Deduction
-                </button>
-                <button 
-                  onClick={() => handleAdjustDeduction(currentUser.teamCode, -1)}
-                  disabled={myTeamInfo.deductions <= 0}
-                  style={{
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light)',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: myTeamInfo.deductions <= 0 ? 'rgba(255, 255, 255, 0.25)' : '#ffffff',
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: '600',
-                    fontSize: '0.85rem',
-                    cursor: myTeamInfo.deductions <= 0 ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: myTeamInfo.deductions <= 0 ? 0.5 : 1
-                  }}
-                >
-                  <Minus size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* WHERE YOU SHOULD BE NOW! Banner */}
-            <div className="glass-panel" style={{
-              padding: '16px',
-              background: currentActiveSlot 
-                ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(13, 20, 38, 0.6) 100%)' 
-                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(13, 20, 38, 0.6) 100%)',
-              border: '1px solid',
-              borderColor: currentActiveSlot ? 'rgba(239, 68, 68, 0.35)' : 'var(--border-light)',
-              borderRadius: '12px',
-              boxShadow: currentActiveSlot ? '0 0 15px rgba(239, 68, 68, 0.15)' : 'none'
-            }}>
-              <p style={{
-                fontSize: '0.75rem',
-                color: currentActiveSlot ? '#ef4444' : 'var(--text-secondary)',
-                fontWeight: '800',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span className={currentActiveSlot ? "live-dot" : ""} style={{ background: currentActiveSlot ? "#ef4444" : "transparent" }} />
-                WHERE YOU SHOULD BE NOW!
-              </p>
-              {currentActiveSlot ? (
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', color: '#ffffff', fontWeight: '800', marginBottom: '4px' }}>
-                    {currentActiveSlot.game}
-                  </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <MapPin size={14} style={{ color: 'var(--vbt-sky)' }} />
-                      <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ffffff' }}>
-                        {currentActiveSlot.location}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock size={14} style={{ color: 'var(--text-secondary)' }} />
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        {getEffectiveTimeShift() > 0 ? getShiftedTimeStr(currentActiveSlot.time, getEffectiveTimeShift()) : currentActiveSlot.time}
-                      </span>
-                    </div>
-                    {getEffectiveTimeShift() > 0 && (
-                      <span style={{ display: 'inline-block', borderRadius: '9999px', background: '#ef4444', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        +{getEffectiveTimeShift()}m delay
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: '700', margin: 0 }}>
-                  No active game matches. Break / Free Play
-                </p>
-              )}
-            </div>
-
-            <div className="glass-panel" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                <Clock size={16} style={{ color: 'var(--vbt-sky)' }} />
-                <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>Team Timeline & Schedule</h3>
-              </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {Array.from({ length: daysCount }, (_, i) => i + 1).map(d => {
-                  const daySchedule = myTeamInfo.schedule.filter(s => {
-                    const sBlockNum = parseInt(s.block?.replace('Block ', ''), 10) || 1;
-                    const sDay = s.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(sBlockNum) ? 1 : 2) : 1);
-                    return sDay === d;
-                  });
-
-                  const colors = ['var(--vbt-sky)', '#f43f5e', '#a855f7', '#eab308', '#10b981'];
-                  const headerColor = colors[(d - 1) % colors.length];
-
-                  return (
-                    <div key={`myteam-day-${d}`}>
-                      <h4 style={{ 
-                        fontSize: '0.75rem', 
-                        color: headerColor, 
-                        fontWeight: '700', 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.05em',
-                        marginBottom: '8px',
-                        borderBottom: `1px solid ${headerColor}33`,
-                        paddingBottom: '4px'
-                      }}>
-                        Day {d} {eventConfig.eventType === 'camp' ? (d === 1 ? '(Blocks 1-3)' : '(Block 4)') : ''}
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {daySchedule.length === 0 ? (
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px' }}>
-                            No Day {d} activities scheduled.
-                          </p>
-                        ) : (
-                          daySchedule.map((slot, idx) => {
-                            const sBlockNum = parseInt(slot.block?.replace('Block ', ''), 10) || 1;
-                            const sDay = slot.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(sBlockNum) ? 1 : 2) : 1);
-                            const isActive = isTimeSlotActive(slot.time, slot.block, sDay);
-                            return (
-                              <div 
-                                key={`day-${d}-${idx}`} 
-                                className="glass-panel"
-                                style={{ 
-                                  padding: '12px', 
-                                  background: isActive ? 'rgba(41, 182, 246, 0.08)' : 'rgba(0,0,0,0.15)',
-                                  borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)',
-                                  boxShadow: isActive ? 'var(--shadow-glow-shakes)' : 'none'
-                                }}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isActive ? 'var(--vbt-sky)' : 'var(--text-secondary)' }}>
-                                      {getEffectiveTimeShift() > 0 ? `${getShiftedTimeStr(slot.time, getEffectiveTimeShift())} (+${getEffectiveTimeShift()}m)` : slot.time}
-                                    </span>
-                                    {isActive && (
-                                      <span style={{ display: 'inline-block', borderRadius: '9999px', animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 8px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.05em' }}>
-                                        LIVE NOW
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{slot.block}</span>
-                                </div>
-                                
-                                <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div>
-                                    <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{slot.game}</p>
-                                    {slot.gameExtra && (
-                                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Split: {slot.gameExtra}</p>
-                                    )}
-                                    {slot.opponent && (
-                                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                                        Opponent: <span style={{ color: '#ffffff', fontWeight: '600' }}>{slot.opponent}</span>
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px' }}>
-                                    <MapPin size={12} style={{ color: 'var(--vbt-sky)' }} />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ffffff' }}>{slot.location}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Camp Sub-Teams Directory */}
-            <div className="glass-panel" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                <Users size={16} style={{ color: 'var(--vbt-sky)' }} />
-                <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>Camp Teams Directory</h3>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
-                {['Red', 'White', 'Black', 'Blue'].map(colorName => {
-                  const colorHex = getTeamColorHex(colorName);
-                  const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
-                  const colorTeams = Object.entries(campData.teams || {})
-                    .filter(([_, t]) => t.side === colorName);
-
-                  return (
-                    <div key={colorName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <h4 style={{ fontSize: '0.75rem', color: colorHex, fontWeight: '700', textTransform: 'uppercase', borderBottom: `1px solid ${colorHex}33`, paddingBottom: '4px' }}>
-                        {customName}
-                      </h4>
-                      {colorTeams.length === 0 ? (
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No teams</p>
-                      ) : (
-                        colorTeams.map(([code, t]) => (
-                          <div key={code} style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', fontSize: '0.75rem', borderLeft: `3px solid ${colorHex}` }}>
-                            <p style={{ fontWeight: '700', color: '#ffffff', margin: 0 }}>{code} (Grade {t.grade})</p>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', margin: '4px 0 0 0' }}>{t.leaders}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: Full Schedule filterable */}
-        {currentTab === 'schedule' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            {/* ── MY ASSIGNMENT HERO CARD (referee / leader roles) ── */}
-            {currentUser && (currentUser.role === 'referee' || currentUser.role === 'leader') && (() => {
-              const roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[currentUser.id];
-              let assignmentTitle = '';
-              let assignmentDetail = '';
-              let assignmentIcon = '📍';
-
-              if (currentUser.role === 'referee') {
-                if (roleCode) {
-                  if (roleCode.startsWith('station_')) {
-                    const stationNum = roleCode.replace('station_', '');
-                    const station = eventConfig.stations?.[roleCode];
-                    assignmentTitle = station?.name || `Station ${stationNum}`;
-                    assignmentDetail = station?.location ? `📌 ${station.location}` : `Station ${stationNum}`;
-                    assignmentIcon = '🎯';
-                  } else if (roleCode.startsWith('big_game_')) {
-                    assignmentTitle = eventConfig.bigGameName || 'Big Game';
-                    assignmentDetail = '📌 Main Area';
-                    assignmentIcon = '🏆';
-                  } else if (roleCode === 'reflection') {
-                    assignmentTitle = eventConfig.reflectionName || 'Reflection';
-                    assignmentDetail = '📌 Reflection Area';
-                    assignmentIcon = '🙏';
-                  } else {
-                    assignmentTitle = 'Assigned by coordinator';
-                    assignmentDetail = 'Check with your coordinator for your station';
-                    assignmentIcon = '🎯';
-                  }
-                } else if (currentUser.assignedGames?.length > 0) {
-                  assignmentTitle = currentUser.assignedGames.join(', ');
-                  assignmentDetail = 'Your assigned game(s) — find them in the schedule below';
-                  assignmentIcon = '🎯';
-                } else {
-                  assignmentTitle = 'Check your assignment below';
-                  assignmentDetail = 'Find your game station in the schedule below';
-                  assignmentIcon = '🎯';
-                }
-              } else if (currentUser.role === 'leader') {
-                const teams = currentUser.assignedTeams || [];
-                if (teams.length > 0) {
-                  assignmentTitle = teams.map(t => {
-                    const name = eventConfig.teamNames?.[t.toLowerCase()] || t;
-                    return name.charAt(0).toUpperCase() + name.slice(1);
-                  }).join(' & ');
-                  assignmentDetail = 'Your team(s) to lead today';
-                  assignmentIcon = '👥';
-                } else {
-                  assignmentTitle = 'Team Leader';
-                  assignmentDetail = 'Your team assignment will appear here';
-                  assignmentIcon = '👥';
-                }
-              }
-
-              return (
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.25) 0%, rgba(41, 182, 246, 0.1) 100%)',
-                  border: '1px solid rgba(41, 182, 246, 0.35)',
-                  borderRadius: '16px',
-                  padding: '16px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '14px',
-                  boxShadow: '0 4px 20px rgba(41, 182, 246, 0.12)'
-                }}>
-                  <div style={{
-                    width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0,
-                    background: 'rgba(41, 182, 246, 0.15)',
-                    border: '1px solid rgba(41, 182, 246, 0.3)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.5rem'
-                  }}>
-                    {assignmentIcon}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#29b6f6', margin: '0 0 3px 0' }}>
-                      Your Assignment Today
-                    </p>
-                    <p style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', margin: '0 0 3px 0', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {assignmentTitle}
-                    </p>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                      {assignmentDetail}
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {isReferee && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowFullSchedule(!showFullSchedule)}
-                  className="glass-btn"
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(41, 182, 246, 0.3)',
-                    background: showFullSchedule ? 'rgba(41, 182, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                    color: '#ffffff',
-                    fontSize: '0.8rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {showFullSchedule ? '👁️ Hide Full Schedule' : '👁️ Show Full Schedule'}
-                </button>
-              </div>
-            )}
-
-            {(!isReferee || showFullSchedule) && (
-              <>
-            <ScheduleExporter
-              scheduleData={campData}
-              campData={campData}
-              eventConfig={eventConfig}
-              getTeamColorHex={getTeamColorHex}
-            />
-
-            {/* Live Service Countdown & Timeline Tracker Card */}
-            <ScheduleTimelineTrackerCard
-              campData={campData}
-              eventConfig={eventConfig}
-              getEffectiveTimeShift={getEffectiveTimeShift}
-              getShiftedTimeStr={getShiftedTimeStr}
-              getEventCurrentDay={getEventCurrentDay}
-              parseTimeToMs={parseTimeToMs}
-              getEventTimeRange={getEventTimeRange}
-              getActiveSlotProgress={getActiveSlotProgress}
-              activeSlot={currentActiveSlot}
-              getTeamColorHex={getTeamColorHex}
-            />
-            {eventConfig.eventType !== 'normal' ? (
-              <div style={{
-                background: 'rgba(41, 182, 246, 0.1)',
-                border: '1px solid rgba(41, 182, 246, 0.3)',
-                borderRadius: '12px',
-                padding: '14px',
-                color: '#e2e8f0',
-                fontSize: '0.85rem',
-                lineHeight: '1.5'
-              }}>
-                <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  👴 Schedule Helper Card
-                </h3>
-                <p style={{ margin: 0 }}>
-                  Find your team name (e.g., <strong>Falcons 1</strong> or <strong>Eagles 2</strong>) in the matchups below. For each Round, it shows which station game you play, where it is located, and what time it starts.
-                </p>
-              </div>
-            ) : (
-              <div className="glass-panel" style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-light)', borderRadius: '12px' }}>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', lineHeight: '1.4' }}>
-                  <span style={{ fontSize: '1rem' }}>📅</span>
-                  <span><strong>Live Schedule:</strong> View today's blocks, locations, and matchups. Active matches are marked <strong>LIVE</strong>.</span>
-                </p>
-              </div>
-            )}
-
-            {/* Day Selector Segmented Control */}
-            {daysCount > 1 && (
-              <div className="toggle-group" style={{ 
-                display: 'flex',
-                width: '100%',
-                background: 'rgba(0,0,0,0.25)',
-                borderRadius: '10px',
-                padding: '2px',
-                border: '1px solid var(--border-light)',
-                overflowX: 'auto'
-              }}>
-                {Array.from({ length: daysCount }, (_, i) => i + 1).map(d => (
-                  <button 
-                    key={d}
-                    type="button"
-                    className={`toggle-btn ${scheduleDayFilter === String(d) ? 'active' : ''}`}
-                    onClick={() => setScheduleDayFilter(String(d))}
-                    style={{ 
-                      flex: 1, 
-                      padding: '8px 12px', 
-                      fontSize: '0.8rem', 
-                      fontWeight: '700',
-                      borderRadius: '8px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease-in-out',
-                      background: scheduleDayFilter === String(d) ? 'var(--gradient-vbt)' : 'transparent',
-                      color: '#ffffff',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Day {d} {eventConfig.eventType === 'camp' ? (d === 1 ? '(Blocks 1-3)' : '(Block 4)') : ''}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <h2 style={{ fontSize: '1.2rem', color: '#ffffff' }}>Matchups & Locations</h2>
-              <div className="schedule-filter-dropdowns" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {eventConfig.eventType !== 'normal' ? (
-                  <select 
-                    value={scheduleBlockFilter}
-                    onChange={(e) => setScheduleBlockFilter(e.target.value)}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border-light)',
-                      color: '#ffffff',
-                      fontSize: '0.75rem',
-                      outline: 'none',
-                      fontWeight: '600'
-                    }}
-                  >
-                    <option value="All">All Blocks</option>
-                    <option value="1">Rotational Stations (Block 1)</option>
-                    <option value="2">Big Game (Block 2)</option>
-                    <option value="3">Reflection (Block 3)</option>
-                  </select>
-                ) : scheduleDayFilter === '1' ? (
-                  <select 
-                    value={scheduleBlockFilter}
-                    onChange={(e) => setScheduleBlockFilter(e.target.value)}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border-light)',
-                      color: '#ffffff',
-                      fontSize: '0.75rem',
-                      outline: 'none',
-                      fontWeight: '600'
-                    }}
-                  >
-                    <option value="All">All Blocks</option>
-                    <option value="1">Block 1</option>
-                    <option value="2">Block 2</option>
-                    <option value="3">Block 3</option>
-                  </select>
-                ) : (
-                  <div style={{
-                    padding: '6px 10px',
-                    borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid var(--border-light)',
-                    color: 'var(--vbt-sky)',
-                    fontSize: '0.75rem',
-                    fontWeight: '700'
-                  }}>
-                    Block 4
-                  </div>
-                )}
-                
-                <select 
-                  value={scheduleTeamFilter}
-                  onChange={(e) => setScheduleTeamFilter(e.target.value)}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-light)',
-                    color: '#ffffff',
-                    fontSize: '0.75rem',
-                    outline: 'none',
-                    fontWeight: '600'
-                  }}
-                >
-                  <option value="">All Teams</option>
-                  {Object.keys(campData.teams).map(code => (
-                    <option key={code} value={code}>{code}</option>
-                  ))}
-                </select>
-
-                <select 
-                  value={scheduleSortMode}
-                  onChange={(e) => setScheduleSortMode(e.target.value)}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-light)',
-                    color: '#ffffff',
-                    fontSize: '0.75rem',
-                    outline: 'none',
-                    fontWeight: '600'
-                  }}
-                >
-                  <option value="block">Sort: Block Order</option>
-                  <option value="game">Sort: Game Order</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Schedule Controls (Coordinators & Game Leaders) / Status Banner (Others) */}
-            {currentUser && (
-              currentUser.role === 'admin' ||
-              (eventConfig.eventType === 'service' ? currentUser.role === 'service_day_leader' : currentUser.role === 'referee')
-            ) ? (
-              <div className="glass-panel" style={{ 
-                padding: '12px', 
-                background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.12) 0%, rgba(13, 20, 38, 0.5) 100%)', 
-                border: '1px solid rgba(41, 182, 246, 0.3)',
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '10px' 
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Clock3 size={16} style={{ color: 'var(--vbt-sky)' }} />
-                    <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      ⚡ Timer Controls
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>
-                    <span className={campState.isTimerPaused ? "" : "live-dot"} style={{ background: campState.isTimerPaused ? "#94a3b8" : "#22c55e", width: '6px', height: '6px' }} />
-                    <span style={{ fontSize: '0.65rem', fontFamily: 'monospace', fontWeight: '700', color: '#ffffff' }}>
-                      {campState.isTimerPaused ? 'PAUSED' : 'RUNNING'}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Current Shift</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '800', color: getEffectiveTimeShift() > 0 ? '#ef4444' : '#22c55e', fontFamily: 'var(--font-title)' }}>
-                      {getEffectiveTimeShift() > 0 ? `+${getEffectiveTimeShift()} min` : 'On Schedule'}
-                    </span>
-                  </div>
-                  
-                  <div className="timer-controls-buttons-container" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button 
-                      onClick={handleToggleTimer}
-                      className="timer-resume-pause-btn"
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '6px',
-                        fontWeight: '700',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        background: campState.isTimerPaused ? 'var(--gradient-vbt)' : 'rgba(239, 68, 68, 0.2)',
-                        border: campState.isTimerPaused ? 'none' : '1px solid rgba(239, 68, 68, 0.4)',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      {campState.isTimerPaused ? '▶️ Resume' : '⏸️ Pause'}
-                    </button>
-
-                    <div className="timer-adjust-row" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <button 
-                        onClick={() => handleAdjustTimeShift(-5)}
-                        disabled={(campState.timeShiftMinutes || 0) <= 0}
-                        style={{
-                          padding: '8px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-light)',
-                          background: 'rgba(255,255,255,0.05)',
-                          color: (campState.timeShiftMinutes || 0) <= 0 ? 'var(--text-muted)' : '#ffffff',
-                          fontWeight: '700',
-                          fontSize: '0.75rem',
-                          cursor: (campState.timeShiftMinutes || 0) <= 0 ? 'not-allowed' : 'pointer'
-                        }}
-                        title="Reduce delay by 5m"
-                      >
-                        -5m
-                      </button>
-                      <button 
-                        onClick={() => handleAdjustTimeShift(5)}
-                        style={{
-                          padding: '8px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-light)',
-                          background: 'rgba(255,255,255,0.05)',
-                          color: '#ffffff',
-                          fontWeight: '700',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer'
-                        }}
-                        title="Increase delay by 5m"
-                      >
-                        +5m
-                      </button>
-                      <input 
-                        type="number"
-                        id="customDelayInput"
-                        placeholder="Min"
-                        style={{
-                          width: '45px',
-                          padding: '6px 4px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-light)',
-                          background: 'rgba(0,0,0,0.4)',
-                          color: '#ffffff',
-                          fontSize: '0.72rem',
-                          outline: 'none',
-                          textAlign: 'center',
-                          height: '28px',
-                          boxSizing: 'border-box'
-                        }}
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter') {
-                            const val = parseInt(e.target.value, 10);
-                            if (!isNaN(val) && val !== 0) {
-                              await handleAdjustTimeShift(val);
-                              e.target.value = '';
-                            }
-                          }
-                        }}
-                      />
-                      <button 
-                        onClick={async () => {
-                          const input = document.getElementById('customDelayInput');
-                          const val = parseInt(input?.value, 10);
-                          if (!isNaN(val) && val !== 0) {
-                            await handleAdjustTimeShift(val);
-                            if (input) input.value = '';
-                          }
-                        }}
-                        style={{
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-light)',
-                          background: 'rgba(255,255,255,0.05)',
-                          color: '#ffffff',
-                          fontWeight: '700',
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          height: '28px',
-                          boxSizing: 'border-box',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                        title="Apply custom delay shift"
-                      >
-                        Shift
-                      </button>
-                      <button 
-                        onClick={handleResetTimeShift}
-                        disabled={getEffectiveTimeShift() === 0}
-                        style={{
-                          padding: '8px 8px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: getEffectiveTimeShift() === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.08)',
-                          color: getEffectiveTimeShift() === 0 ? 'var(--text-muted)' : '#ffffff',
-                          fontWeight: '700',
-                          fontSize: '0.75rem',
-                          cursor: getEffectiveTimeShift() === 0 ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Broadcast Sync Pings (Centralized Bell) */}
-                <div className="broadcast-sync-container" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>🚨 Broadcast Round Sync:</span>
-                  <button 
-                    onClick={async () => {
-                      if (window.confirm("Broadcast ROUND START ping to all devices?")) {
-                        const msg = "🚨 ROUND STARTING NOW! Please move to your next location immediately.";
-                        await addAnnouncement(currentEventCode, msg, currentUser.name, 'ping');
-                        await triggerRemotePushNotification("VBT Round Sync Alert", msg);
-                      }
-                    }}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      
-
-                      color: '#4ade80',
-                      fontWeight: '700',
-                      fontSize: '0.72rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    🔔 Round Start
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if (window.confirm("Broadcast ROUND END ping to all devices?")) {
-                        const msg = "🚨 ROUND ENDING! Wrap up your games and report scores.";
-                        await addAnnouncement(currentEventCode, msg, currentUser.name, 'ping');
-                        await triggerRemotePushNotification("VBT Round Sync Alert", msg);
-                      }
-                    }}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      
-
-                      color: '#f87171',
-                      fontWeight: '700',
-                      fontSize: '0.72rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    🔕 Round End
-                  </button>
-                </div>
-                
-                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>
-                  * Pausing time automatically accumulates a live delay. Resuming solidifies the delay. Matchup times shift automatically.
-                </p>
-              </div>
-            ) : (
-              // Read-only delay warning banner for Team Leaders
-              <div className="glass-panel" style={{ 
-                padding: '12px 16px', 
-                background: getEffectiveTimeShift() > 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)', 
-                border: '1px solid',
-                borderColor: getEffectiveTimeShift() > 0 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)',
-                borderRadius: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Clock3 size={16} style={{ color: getEffectiveTimeShift() > 0 ? '#f87171' : '#4ade80' }} />
-                  <span style={{ fontSize: '0.78rem', color: '#ffffff' }}>
-                    {getEffectiveTimeShift() > 0 ? (
-                      <span><strong>Schedule Delay:</strong> Matchup times shifted by <strong>+{getEffectiveTimeShift()} mins</strong>.</span>
-                    ) : (
-                      <span><strong>On Schedule:</strong> Camp is running exactly on time!</span>
-                    )}
-                  </span>
-                </div>
-                {campState.isTimerPaused && (
-                  <span style={{ display: 'inline-block', borderRadius: '9999px', background: '#ef4444', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    PAUSED
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Where is everyone at (Live Location Tracker) */}
-            <div className="glass-panel" style={{ padding: '16px', background: 'rgba(0,0,0,0.15)' }}>
-              <div 
-                onClick={() => setIsWhereIsEveryoneCollapsed(!isWhereIsEveryoneCollapsed)}
-                style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isWhereIsEveryoneCollapsed ? '0' : '12px' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MapPin size={18} style={{ color: 'var(--vbt-sky)' }} />
-                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '700' }}>Where is everyone at? (Live Tracker)</h3>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span className="live-dot" style={{ animation: 'pulse-glow 1.5s infinite' }} />
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Locations</span>
-                  </div>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    {isWhereIsEveryoneCollapsed ? '▲ Expand' : '▼ Collapse'}
-                  </span>
-                </div>
-              </div>
-              
-              {!isWhereIsEveryoneCollapsed && (
-                <div className="live-location-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-                  {liveLocationStatus.map((loc) => {
-                    const active = loc.activeMatchup;
-                    return (
-                      <div 
-                        key={loc.id} 
-                        style={{ 
-                          background: active ? 'rgba(41, 182, 246, 0.08)' : 'rgba(255,255,255,0.02)',
-                          border: '1px solid',
-                          borderColor: active ? 'rgba(41, 182, 246, 0.25)' : 'var(--border-light)',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          minHeight: '100px',
-                          gap: '6px',
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                      >
-                        <div>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', display: 'block', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '2px', marginBottom: '4px' }}>
-                            {loc.name}
-                          </span>
-                          {active ? (
-                            <>
-                              <p style={{ fontSize: '0.85rem', fontWeight: '800', color: '#ffffff', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                {active.game}
-                              </p>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
-                                Block {active.block} • Rd {active.round}
-                              </span>
-                            </>
-                          ) : (
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '4px 0 0 0' }}>
-                              Empty / Free Play
-                            </p>
-                          )}
-                        </div>
-                        
-                        {active && (
-                          <div style={{ 
-                            background: 'rgba(0,0,0,0.25)', 
-                            padding: '4px', 
-                            borderRadius: '4px', 
-                            fontSize: '0.7rem', 
-                            fontWeight: '700',
-                            textAlign: 'center',
-                            color: '#ffffff',
-                            border: '1px solid rgba(255,255,255,0.03)'
-                          }}>
-                            <span style={{ color: getTeamColorHex(active.teamA || active.shakes) }}>{active.teamA || active.shakes}</span>
-                            <span style={{ color: 'var(--text-muted)', margin: '0 4px', fontWeight: 'normal' }}>vs</span>
-                            <span style={{ color: getTeamColorHex(active.teamB || active.fries) }}>{active.teamB || active.fries}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-            {/* 📋 Game Leader Control Panel */}
-            {currentUser && (currentUser.role === 'referee' || currentUser.role === 'admin') && (
-              <div className="glass-panel animate-fade-in" style={{ 
-                padding: '16px', 
-                background: 'linear-gradient(135deg, rgba(20, 65, 161, 0.15) 0%, rgba(13, 20, 38, 0.7) 100%)', 
-                border: '1px solid rgba(41, 182, 246, 0.4)',
-                borderRadius: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>📋</span>
-                    <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '800', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Game Leader Control Panel
-                    </h3>
-                  </div>
-                  <span style={{ background: 'var(--vbt-sky)', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '700', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    ACTIVE GAME
-                  </span>
-                </div>
-
-                {/* Game Selection Dropdown */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>
-                    Assigned Game / Station
-                  </label>
-                  <select
-                    value={refereeSelectedGame}
-                    onChange={(e) => {
-                      const selectedVal = e.target.value;
-                      const assignedGame = getRefereeAssignedGame();
-                      if (selectedVal && assignedGame && selectedVal !== assignedGame) {
-                        const proceed = window.confirm(
-                          `Warning: Your officially assigned station/game is "${assignedGame}". Are you sure you want to manage "${selectedVal}" instead?`
-                        );
-                        if (!proceed) return;
-                      }
-                      setRefereeSelectedGame(selectedVal);
-                      localStorage.setItem('vbt_ref_selected_game', selectedVal);
-                    }}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-surface)',
-                      border: '1px solid rgba(41, 182, 246, 0.3)',
-                      color: '#ffffff',
-                      fontSize: '0.85rem',
-                      outline: 'none',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      width: '100%'
-                    }}
-                  >
-                    <option value="">-- Select Game --</option>
-                    {(() => {
-                      const gameNames = Array.from(new Set(campData.matchups.map(m => m.game).filter(Boolean))).sort();
-                      return gameNames.map(gName => (
-                        <option key={gName} value={gName}>{gName}</option>
-                      ));
-                    })()}
-                  </select>
-                </div>
-
-                {/* Matchups list for the selected game */}
-                {refereeSelectedGame ? (
-                  (() => {
-                    const refMatchups = campData.matchups.filter(m => {
-                      if (m.game !== refereeSelectedGame) return false;
-                      if (daysCount > 1) {
-                        const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
-                        if (scheduleDayFilter !== String(mDay)) return false;
-                      }
-                      return true;
-                    }).sort((a, b) => {
-                      if (a.block !== b.block) return (a.block || 1) - (b.block || 1);
-                      return (a.round || 1) - (b.round || 1);
-                    });
-
-                    if (refMatchups.length === 0) {
-                      return (
-                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                          No matchups scheduled for this game on Day {scheduleDayFilter}.
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {refMatchups.map((m, idx) => {
-                          const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
-                          const isMatchActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
-                          const matchupKey = `${m.block}_${m.round}_${m.game}`;
-                          const winner = (campState.blockScores || {})[matchupKey] || 'NA';
-
-                          // Format shift
-                          const effectiveShift = getEffectiveTimeShift();
-                          const shiftMs = effectiveShift * 60 * 1000;
-                          const baseStartMs = parseTimeToMs(m.time);
-                          let timeString = m.time;
-                          if (baseStartMs > 0 && effectiveShift !== 0) {
-                            const date = new Date(baseStartMs + shiftMs);
-                            timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          }
-
-                          return (
-                            <div 
-                              key={idx} 
-                              style={{ 
-                                padding: '12px', 
-                                background: isMatchActive ? 'rgba(20, 65, 161, 0.2)' : 'rgba(0, 0, 0, 0.25)', 
-                                border: '1px solid',
-                                borderColor: isMatchActive ? 'var(--vbt-sky)' : 'rgba(255, 255, 255, 0.08)',
-                                borderRadius: '8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px'
-                              }}
-                            >
-                              {/* Header info */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
-                                    Round {m.round} (Block {m.block})
-                                  </span>
-                                  {isMatchActive && (
-                                    <span style={{ 
-                                      background: 'rgba(74, 222, 128, 0.2)', 
-                                      color: '#4ade80', 
-                                      fontSize: '0.6rem', 
-                                      padding: '1px 5px', 
-                                      borderRadius: '4px',
-                                      fontWeight: '800',
-                                      letterSpacing: '0.05em',
-                                      border: '1px solid rgba(74, 222, 128, 0.3)'
-                                    }}>
-                                      LIVE
-                                    </span>
-                                  )}
-                                </div>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--vbt-sky)', fontWeight: '800', fontFamily: 'monospace' }}>
-                                  🕒 {timeString}
-                                </span>
-                              </div>
-
-                              {/* Simple point adjuster logic */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '8px 12px', borderRadius: '6px' }}>
-                                {/* teamA side */}
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
-                                  <span style={{ fontSize: '0.7rem', color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
-                                    {m.teamA || m.shakes}
-                                  </span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'teamA', -1)}
-                                      style={{
-                                        width: '26px',
-                                        height: '26px',
-                                        borderRadius: '50%',
-                                        
-
-                                        color: '#ffffff',
-                                        fontWeight: '800',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.9rem'
-                                      }}
-                                    >
-                                      -
-                                    </button>
-                                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                      {m.teamAScore || m.shakesScore || 0}
-                                    </span>
-                                    <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'teamA', 1)}
-                                      style={{
-                                        width: '26px',
-                                        height: '26px',
-                                        borderRadius: '50%',
-                                        
-
-                                        color: '#ffffff',
-                                        fontWeight: '800',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.9rem'
-                                      }}
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Divider */}
-                                <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(255,255,255,0.08)', margin: '0 8px' }} />
-
-                                {/* teamB side */}
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
-                                  <span style={{ fontSize: '0.7rem', color: getTeamColorHex(m.teamB || m.fries), fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
-                                    {m.teamB || m.fries}
-                                  </span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'teamB', -1)}
-                                      style={{
-                                        width: '26px',
-                                        height: '26px',
-                                        borderRadius: '50%',
-                                        
-
-                                        color: '#ffffff',
-                                        fontWeight: '800',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.9rem'
-                                      }}
-                                    >
-                                      -
-                                    </button>
-                                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                      {m.teamBScore || m.friesScore || 0}
-                                    </span>
-                                    <button
-                                      onClick={() => handleUpdateMatchupScore(m, 'teamB', 1)}
-                                      style={{
-                                        width: '26px',
-                                        height: '26px',
-                                        borderRadius: '50%',
-                                        
-
-                                        color: '#ffffff',
-                                        fontWeight: '800',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.9rem'
-                                      }}
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Winner Indicator / Live Timer controls */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                                {/* Winner badge */}
-                                <div>
-                                  {winner !== 'NA' ? (
-                                    <span style={{ 
-                                      fontSize: '0.65rem', 
-                                      fontWeight: '800', 
-                                      color: (winner === 'teamA' || winner === 'Shakes') ? getTeamColorHex(m.teamA || m.shakes) : (winner === 'teamB' || winner === 'Fries') ? getTeamColorHex(m.teamB || m.fries) : 'var(--color-tie)', 
-                                      textTransform: 'uppercase' 
-                                    }}>
-                                      🏆 Winner: {winner === 'TIE' ? 'Tie Match' : (winner === 'teamA' || winner === 'Shakes') ? (m.teamA || m.shakes) : (winner === 'teamB' || winner === 'Fries') ? (m.teamB || m.fries) : winner}
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                      Waiting for scores...
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Timer / Duration tracker */}
-                                <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                                  <MatchupStopwatch actualStart={m.actualStart} actualEnd={m.actualEnd} />
-                                </div>
-                              </div>
-
-                              {/* Stopwatch Actions */}
-                              {canControlStopwatch(currentUser) && (
-                                <div style={{ display: 'flex', gap: '8px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '4px' }}>
-                                  {!m.actualStart && (
-                                    <button
-                                      onClick={() => handleStartMatchupTimer(m)}
-                                      style={{
-                                        flex: 1,
-                                        padding: '6px',
-                                        borderRadius: '6px',
-                                        
-
-                                        color: '#4ade80',
-                                        fontSize: '0.72rem',
-                                        fontWeight: '700',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      ▶️ Start Match
-                                    </button>
-                                  )}
-
-                                  {m.actualStart && !m.actualEnd && (
-                                    <button
-                                      onClick={() => handleStopMatchupTimer(m)}
-                                      style={{
-                                        flex: 1,
-                                        padding: '6px',
-                                        borderRadius: '6px',
-                                        background: 'rgba(239, 68, 68, 0.15)',
-                                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                                        color: '#f87171',
-                                        fontSize: '0.72rem',
-                                        fontWeight: '700',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      ⏹️ Stop Match
-                                    </button>
-                                  )}
-
-                                  {m.actualStart && m.actualEnd && (
-                                    <button
-                                      onClick={() => handleResetMatchupTimer(m)}
-                                      style={{
-                                        flex: 1,
-                                        padding: '6px',
-                                        borderRadius: '6px',
-                                        background: 'rgba(255, 255, 255, 0.05)',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        color: '#ffffff',
-                                        fontSize: '0.72rem',
-                                        fontWeight: '700',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      🔄 Reset Timer
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                    Select a game above to manage matchups and scores.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(!isReferee || showFullSchedule) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {filteredMatchups.length === 0 ? (
-                <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No matchups fit the current filters.
-                </div>
-              ) : (
-                filteredMatchups.map((m, idx) => {
-                  const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
-                  const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
-                  const key = `${m.block}_${m.round}_${m.game}`;
-                  const winner = (campState.blockScores || {})[key] || 'NA';
-                  
-                  return (
-                    <div 
-                      key={idx}
-                      className="glass-panel"
-                      style={{ 
-                        padding: '12px',
-                        background: isActive ? 'rgba(20, 65, 161, 0.08)' : 'var(--bg-surface)',
-                        borderColor: isActive ? 'var(--vbt-sky)' : 'var(--border-light)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.7rem', color: isActive ? 'var(--vbt-sky)' : 'var(--text-muted)', fontWeight: '700' }}>
-                            BLOCK {m.block} • RD {m.round}
-                          </span>
-                          {isActive && (
-                            <span style={{ display: 'inline-block', borderRadius: '9999px', animation: 'pulse-glow 1.5s infinite', background: '#ef4444', color: '#ffffff', border: 'none', padding: '2px 8px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.05em' }}>
-                              LIVE
-                            </span>
-                          )}
-                          {/* Live Start Time display */}
-                          {m.actualStart && (
-                            <span style={{ fontSize: '0.62rem', color: '#29b6f6', background: 'rgba(41, 182, 246, 0.15)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700', fontFamily: 'monospace' }}>
-                              ⏱️ START: {new Date(m.actualStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </span>
-                          )}
-                          
-                          {/* Live Running Stopwatch display */}
-                          {m.actualStart && !m.actualEnd && (
-                            <MatchupRunningStopwatch actualStart={m.actualStart} />
-                          )}
-                        </div>
-                        <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '700' }}>
-                          {getEffectiveTimeShift() > 0 ? (
-                            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                              <span>{getShiftedTimeStr(m.time, getEffectiveTimeShift())}</span>
-                              <span style={{ fontSize: '0.6rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '1px 4px', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                +{getEffectiveTimeShift()}m delay
-                              </span>
-                            </span>
-                          ) : (
-                            m.time
-                          )}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>{m.game}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                            <MapPin size={10} style={{ color: 'var(--text-muted)' }} />
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{m.location}</span>
-                          </div>
-                          
-                          {/* F1 Split Time / delay cause display */}
-                          {m.actualStart && m.actualEnd && (() => {
-                            const durationSecs = Math.round((new Date(m.actualEnd).getTime() - new Date(m.actualStart).getTime()) / 1000);
-                            const splitSecs = durationSecs - 1800; // 30 mins expected
-                            const absSplitSecs = Math.abs(splitSecs);
-                            const splitMins = Math.floor(absSplitSecs / 60);
-                            const splitSecsRemainder = absSplitSecs % 60;
-                            const splitFormatted = `${splitSecs >= 0 ? '+' : '-'}${splitMins}m ${splitSecsRemainder}s`;
-                            
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                                  Duration: {Math.floor(durationSecs / 60)}m {durationSecs % 60}s
-                                </span>
-                                <span style={{
-                                  fontSize: '0.62rem',
-                                  fontWeight: '800',
-                                  fontFamily: 'monospace',
-                                  padding: '1px 5px',
-                                  borderRadius: '4px',
-                                  background: splitSecs > 0 ? 'rgba(239, 68, 68, 0.15)' : splitSecs < 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                                  border: splitSecs > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : splitSecs < 0 ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255, 255, 255, 0.15)',
-                                  color: splitSecs > 0 ? '#f87171' : splitSecs < 0 ? '#4ade80' : 'var(--text-muted)'
-                                }} title="Split time relative to scheduled 30 minutes">
-                                  🏎️ SPLIT: {splitFormatted}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
-                            <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{m.teamA || m.shakes}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>vs</span>
-                            <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{m.teamB || m.fries}</span>
-                          </div>
-                          {((m.teamAScore !== undefined && m.teamAScore !== null) || (m.teamBScore !== undefined && m.teamBScore !== null) || (m.shakesScore !== undefined && m.shakesScore !== null) || (m.friesScore !== undefined && m.friesScore !== null)) && (
-                            <div style={{ fontSize: '0.8rem', fontWeight: '800', color: '#ffffff', marginTop: '4px', textAlign: 'center', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
-                              {m.teamAScore !== undefined ? m.teamAScore : m.shakesScore || 0} - {m.teamBScore !== undefined ? m.teamBScore : m.friesScore || 0}
-                            </div>
-                          )}
-                          {winner !== 'NA' && (
-                            <p style={{ fontSize: '0.6rem', color: (winner === 'Shakes' || winner === 'teamA') ? 'var(--color-shakes)' : (winner === 'Fries' || winner === 'teamB') ? 'var(--color-fries)' : 'var(--color-tie)', fontWeight: '800', textTransform: 'uppercase', marginTop: '4px' }}>
-                              {(winner === 'teamA' || winner === 'Shakes') ? (m.teamA || m.shakes) : (winner === 'teamB' || winner === 'Fries') ? (m.teamB || m.fries) : winner} won
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Individual Matchup Stopwatch Action Panel */}
-                      {canControlStopwatch(currentUser) && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--border-light)' }}>
-                          {!m.actualStart && (
-                            <button
-                              onClick={() => handleStartMatchupTimer(m)}
-                              style={{
-                                flex: 1,
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: 'rgba(34, 197, 94, 0.2)',
-                                color: '#4ade80',
-                                fontSize: '0.75rem',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              ▶️ Start Match
-                            </button>
-                          )}
-                          
-                          {m.actualStart && !m.actualEnd && (
-                            <button
-                              onClick={() => handleStopMatchupTimer(m)}
-                              style={{
-                                flex: 1,
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: 'rgba(239, 68, 68, 0.2)',
-                                color: '#f87171',
-                                fontSize: '0.75rem',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              ⏹️ Stop Match
-                            </button>
-                          )}
-                          
-                          {m.actualStart && m.actualEnd && (
-                            <button
-                              onClick={() => handleResetMatchupTimer(m)}
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid rgba(239, 68, 68, 0.3)',
-                                background: 'rgba(239, 68, 68, 0.08)',
-                                color: '#f87171',
-                                fontSize: '0.65rem',
-                                fontWeight: '700',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              🔄 Reset Timer
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            )}
-
-            {/* Roster & Assignments Section */}
-            <div className="glass-panel animate-fade-in" style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', marginTop: '8px' }}>
-              <div 
-                onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isRosterCollapsed ? '0' : '12px' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={18} style={{ color: 'var(--vbt-sky)' }} />
-                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '700', margin: 0 }}>👥 Servant Roster & Assignments</h3>
-                </div>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  {isRosterCollapsed ? '▲ Expand' : '▼ Collapse'}
-                </span>
-              </div>
-
-              {!isRosterCollapsed && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <input
-                    type="text"
-                    placeholder="🔍 Search servants, roles, or stations..."
-                    value={rosterSearch}
-                    onChange={(e) => setRosterSearch(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      border: '1px solid var(--border-light)',
-                      color: '#ffffff',
-                      fontSize: '0.85rem',
-                      outline: 'none',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
-                    {(() => {
-                      const activeServants = eventConfig.activeServants || [];
-                      const rosterList = globalServants
-                        .filter(s => activeServants.includes(s.id))
-                        .map(s => {
-                          const roleCode = eventConfig.servantAssignments?.[s.id] || 'volunteer';
-                          let roleName = 'Volunteer / Ref';
-                          let locationName = 'General';
-                          let teamName = 'None';
-                          let colorHex = '#94a3b8';
-                          
-                          if (roleCode === 'coordinator') {
-                            roleName = 'Coordinator';
-                            locationName = 'Main Hall / Control';
-                            colorHex = '#a855f7';
-                          } else if (roleCode === 'service_leader') {
-                            roleName = 'Service Day Leader';
-                            locationName = 'Main Hall';
-                            colorHex = '#ec4899';
-                          } else if (roleCode.startsWith('station_')) {
-                            const station = eventConfig.stations?.[roleCode];
-                            roleName = `${station?.name || roleCode.replace('station_', 'Station ')} Lead`;
-                            locationName = station?.location || 'Assigned Station';
-                            colorHex = '#f59e0b';
-                          } else if (roleCode.startsWith('big_game_')) {
-                            roleName = `Big Game Lead (${eventConfig.bigGameName || 'Loyalty'})`;
-                            locationName = 'Main Hall';
-                            colorHex = '#eab308';
-                          } else if (roleCode === 'reflection') {
-                            roleName = `Reflection Lead (${eventConfig.reflectionName || 'Reflection'})`;
-                            locationName = 'Classrooms';
-                            colorHex = '#14b8a6';
-                          } else if (roleCode === 'media') {
-                            roleName = 'Media Team';
-                            locationName = 'Roaming';
-                            colorHex = '#3b82f6';
-                          } else if (roleCode.startsWith('team_')) {
-                            const parts = roleCode.split('_');
-                            const color = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
-                            const num = parts[2] || '1';
-                            const customName = eventConfig.teamNames?.[parts[1]] || color;
-                            roleName = `Team Leader (${customName} ${num})`;
-                            teamName = `${customName} ${num}`;
-                            locationName = 'With Sub-team (Schedule)';
-                            colorHex = getTeamColorHex(color);
-                          }
-                          
-                          return { servant: s, roleCode, roleName, locationName, teamName, colorHex };
-                        });
-
-                      const filteredRoster = rosterList.filter(item => {
-                        const searchLower = rosterSearch.toLowerCase();
-                        return (
-                          item.servant.name.toLowerCase().includes(searchLower) ||
-                          item.roleName.toLowerCase().includes(searchLower) ||
-                          item.locationName.toLowerCase().includes(searchLower) ||
-                          item.teamName.toLowerCase().includes(searchLower)
-                        );
-                      });
-
-                      if (filteredRoster.length === 0) {
-                        return (
-                          <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                            No assignments found matching "{rosterSearch}"
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
-                          {filteredRoster.map(item => (
-                            <div 
-                              key={item.servant.id} 
-                              style={{ 
-                                padding: '10px', 
-                                background: 'rgba(255,255,255,0.02)', 
-                                border: '1px solid rgba(255,255,255,0.06)', 
-                                borderRadius: '8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px',
-                                borderLeft: `4px solid ${item.colorHex}`
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#ffffff' }}>
-                                  {item.servant.name}
-                                </span>
-                                <span style={{ 
-                                  fontSize: '0.65rem', 
-                                  fontWeight: '800', 
-                                  padding: '2px 6px', 
-                                  borderRadius: '4px', 
-                                  background: `${item.colorHex}22`,
-                                  color: item.colorHex,
-                                  border: `1px solid ${item.colorHex}44`
-                                }}>
-                                  {item.roleName}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                                <span>📍 {item.locationName}</span>
-                                {item.teamName !== 'None' && (
-                                  <span style={{ fontWeight: '700', color: getTeamColorHex(item.teamName.split(' ')[0]) }}>
-                                    👥 {item.teamName}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
-
-          </div>
-        )}
-
-        {/* Tab 4: Live Timeline / Notifications */}
-        {currentTab === 'timeline' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Feedback button */}
-            <button onClick={()=>setShowFeedbackModal(true)} style={{
-              padding:'10px 16px',borderRadius:'12px',border:'1px solid rgba(74,222,128,0.3)',
-              background:'rgba(74,222,128,0.08)',color:'#4ade80',fontWeight:'600',fontSize:'0.85rem',
-              cursor:'pointer',alignSelf:'flex-start',
-            }}>Rate Today's Service</button>
-            <h2 style={{ fontSize: '1.25rem', color: '#ffffff' }}>Live Camp Feed</h2>
-            
-            <form onSubmit={handlePostAnnouncement} className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input 
-                  type="text"
-                  placeholder="Post announcement or upload photo..."
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid var(--border-light)',
-                    color: '#ffffff',
-                    outline: 'none',
-                    fontSize: '0.875rem'
-                  }}
-                />
-                
-                <input 
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  style={{ display: 'none' }}
-                />
-                
-                <button 
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid var(--border-light)',
-                    color: uploadImage ? 'var(--vbt-sky)' : '#ffffff',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Camera size={16} />
-                </button>
-
-                <button 
-                  type="submit"
-                  style={{
-                    background: 'var(--gradient-vbt)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Send size={16} />
-                </button>
-              </div>
-
-              {uploadImage && (
-                <div style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--vbt-sky)' }}>
-                  <img src={uploadImage} alt="Upload Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button 
-                    type="button"
-                    onClick={() => setUploadImage(null)}
-                    style={{
-                      position: 'absolute',
-                      top: '2px',
-                      right: '2px',
-                      background: 'rgba(0,0,0,0.6)',
-                      border: 'none',
-                      color: '#ffffff',
-                      borderRadius: '50%',
-                      width: '18px',
-                      height: '18px',
-                      fontSize: '10px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-            </form>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {announcements.length === 0 ? (
-                <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No feed items yet. Edits and announcements will show up here.
-                </div>
-              ) : (
-                announcements.map((feed) => (
-                  <FeedMessage
-                    key={feed.id}
-                    message={{
-                      id: feed.id,
-                      text: feed.text,
-                      sender: feed.sender,
-                      senderRole: feed.senderRole || 'viewer',
-                      type: feed.type,
-                      timestamp: feed.timestamp,
-                      imageUrl: feed.image || feed.imageUrl,
-                      reactions: {
-                        '👍': feed.reactions?.thumbsup || [],
-                        '🎉': feed.reactions?.congrats || [],
-                        '🔥': feed.reactions?.fire || []
-                      }
-                    }}
-                    currentUser={currentUser?.name}
-                    onReact={(id, emoji) => {
-                      const emojiToKey = {
-                        '👍': 'thumbsup',
-                        '🎉': 'congrats',
-                        '🔥': 'fire'
-                      };
-                      handleToggleReaction(id, emojiToKey[emoji]);
-                    }}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Photo Feed Enhancement for Timeline */}
-        {currentTab === 'timeline' && (
-          <PhotoFeed
-            announcements={announcements}
+          <ScoreboardTab
+            eventConfig={eventConfig}
+            scoreCalculations={scoreCalculations}
+            campData={campData}
+            campState={campState}
             currentUser={currentUser}
-            eventCode={currentEventCode}
-            onAddAnnouncement={(text, sender, type, imageUrl) => addAnnouncement(currentEventCode, text, sender, type, imageUrl, currentUser?.role)}
-            onUpdateReactions={(announcementId, reactions) => updateAnnouncementReactions(currentEventCode, announcementId, reactions)}
+            scoreViewMode={scoreViewMode}
+            expandedBlocks={expandedBlocks}
+            expandedGames={expandedGames}
+            uniqueGames={uniqueGames}
+            side1Name={side1Name}
+            side2Name={side2Name}
+            shakesPercentage={shakesPercentage}
+            friesPercentage={friesPercentage}
+            getTeamColorHex={getTeamColorHex}
+            setScoreViewMode={setScoreViewMode}
+            setExpandedBlocks={setExpandedBlocks}
+            setExpandedGames={setExpandedGames}
+            handleToggleWinner={handleToggleWinner}
+            getEffectiveTimeShift={getEffectiveTimeShift}
+            getShiftedTimeStr={getShiftedTimeStr}
+            isTimeSlotActive={isTimeSlotActive}
           />
         )}
-
+        {/* Tab 2: My Team Personalized Stats */}
+        {currentTab === 'myteam' && myTeamInfo && (
+          <MyTeamTab
+            currentUser={currentUser}
+            myTeamInfo={myTeamInfo}
+            scoreCalculations={scoreCalculations}
+            getTeamColorHex={getTeamColorHex}
+            eventConfig={eventConfig}
+            isMobile={isMobile}
+          />
+        )}
+        {/* Tab 3: Full Schedule filterable */}
+        {currentTab === 'schedule' && (
+          <ScheduleTab
+            currentUser={currentUser}
+            eventConfig={eventConfig}
+            campData={campData}
+            campState={campState}
+            daysCount={daysCount}
+            scheduleFilter={scheduleFilter}
+            scheduleBlockFilter={scheduleBlockFilter}
+            scheduleTeamFilter={scheduleTeamFilter}
+            scheduleDayFilter={scheduleDayFilter}
+            scheduleSortMode={scheduleSortMode}
+            filteredMatchups={filteredMatchups}
+            isReferee={isReferee}
+            showFullSchedule={showFullSchedule}
+            eventLabels={eventLabels}
+            isWhereIsEveryoneCollapsed={isWhereIsEveryoneCollapsed}
+            isRosterCollapsed={isRosterCollapsed}
+            rosterSearch={rosterSearch}
+            refereeSelectedGame={refereeSelectedGame}
+            globalServants={globalServants}
+            liveLocationStatus={liveLocationStatus}
+            currentEventCode={currentEventCode}
+            getTeamColorHex={getTeamColorHex}
+            getEffectiveTimeShift={getEffectiveTimeShift}
+            getShiftedTimeStr={getShiftedTimeStr}
+            getEventCurrentDay={getEventCurrentDay}
+            parseTimeToMs={parseTimeToMs}
+            getEventTimeRange={getEventTimeRange}
+            getActiveSlotProgress={getActiveSlotProgress}
+            isTimeSlotActive={isTimeSlotActive}
+            canControlStopwatch={canControlStopwatch}
+            getRefereeAssignedGame={getRefereeAssignedGame}
+            handleToggleTimer={handleToggleTimer}
+            handleAdjustTimeShift={handleAdjustTimeShift}
+            handleResetTimeShift={handleResetTimeShift}
+            handleStartMatchupTimer={handleStartMatchupTimer}
+            handleStopMatchupTimer={handleStopMatchupTimer}
+            handleResetMatchupTimer={handleResetMatchupTimer}
+            handleUpdateMatchupScore={handleUpdateMatchupScore}
+            handleToggleWinner={handleToggleWinner}
+            addAnnouncement={addAnnouncement}
+            triggerRemotePushNotification={triggerRemotePushNotification}
+            setIsWhereIsEveryoneCollapsed={setIsWhereIsEveryoneCollapsed}
+            setIsRosterCollapsed={setIsRosterCollapsed}
+            setRosterSearch={setRosterSearch}
+            setRefereeSelectedGame={setRefereeSelectedGame}
+            setShowFullSchedule={setShowFullSchedule}
+            setScheduleFilter={setScheduleFilter}
+            setScheduleBlockFilter={setScheduleBlockFilter}
+            setScheduleTeamFilter={setScheduleTeamFilter}
+            setScheduleDayFilter={setScheduleDayFilter}
+            setScheduleSortMode={setScheduleSortMode}
+          />
+        )}
+        {/* Tab 4: Live Timeline / Notifications */}
+        {currentTab === 'timeline' && (
+          <TimelineFeedTab
+            announcements={announcements}
+            announcementText={announcementText}
+            uploadImage={uploadImage}
+            fileInputRef={fileInputRef}
+            currentUser={currentUser}
+            currentEventCode={currentEventCode}
+            eventLabels={eventLabels}
+            firebaseConnected={firebaseConnected}
+            setShowFeedbackModal={setShowFeedbackModal}
+            setAnnouncementText={setAnnouncementText}
+            setUploadImage={setUploadImage}
+            handlePostAnnouncement={handlePostAnnouncement}
+            handleImageChange={handleImageChange}
+            handleToggleReaction={handleToggleReaction}
+            addAnnouncement={addAnnouncement}
+            updateAnnouncementReactions={updateAnnouncementReactions}
+          />
+        )}
         {/* Tab 5: Stats & Deductions */}
         {currentTab === 'stats' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -8391,2140 +6237,136 @@ export default function App() {
 
         {/* Tab 7: Settings */}
         {currentTab === 'settings' && currentUser && currentUser.role === 'admin' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* ── Admin Quick Tools ─────────────────────────────── */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'4px'}}>
-              {[
-                ['&#128101; Servants','Directory',()=>setShowServantDirectoryModal(true),'#60a5fa'],
-                ['&#127918; Games','Library',()=>setShowGamesLibraryModal(true),'#a78bfa'],
-                ['&#128247; QR Check-in','Self check-in',()=>setShowQRModal(true),'#4ade80'],
-                ['&#128190; Backup','Offline sync',()=>setShowBackupModal(true),'#10b981'],
-                ['&#128203; Debrief','Post-service',()=>setShowDebriefModal(true),'#fbbf24'],
-                ['&#9200; Timer','Rotation clock',()=>handleTimerStart(),'#f97316'],
-                [isDarkMode?'&#9728; Light':'&#9790; Dark',isDarkMode?'Switch to light':'Switch to dark',()=>setIsDarkMode(!isDarkMode),'#94a3b8'],
-              ].map(([title,sub,action,color])=>(
-                <button key={title} onClick={action} style={{padding:'14px 10px',borderRadius:'14px',border:`1px solid ${color}33`,background:`${color}0f`,color:'#fff',cursor:'pointer',textAlign:'left'}}>
-                  <div style={{fontWeight:'700',fontSize:'0.85rem',color}} dangerouslySetInnerHTML={{__html:title}} />
-                  <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',marginTop:'2px'}}>{sub}</div>
-                </button>
-              ))}
-            </div>
-            <h2 style={{ fontSize: '1.25rem', color: '#ffffff' }}>Control Panel</h2>
-
-            {/* Sub-tab selection for Settings */}
-            <div className="toggle-group" style={{ 
-              display: 'flex',
-              background: 'rgba(0,0,0,0.2)',
-              padding: '4px',
-              borderRadius: '10px',
-              border: '1px solid var(--border-light)'
-            }}>
-              <button 
-                className={`toggle-btn ${settingsSubTab === 'config' ? 'active' : ''}`}
-                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
-                onClick={() => setSettingsSubTab('config')}
-              >
-                {eventConfig.eventType === 'service' ? '⚙️ Service Setup' : eventConfig.eventType === 'camp' ? '⚙️ Camp Setup' : '⚙️ Setup'}
-              </button>
-              <button 
-                className={`toggle-btn ${settingsSubTab === 'builder' ? 'active' : ''}`}
-                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
-                onClick={() => setSettingsSubTab('builder')}
-              >
-                📅 Schedule Builder
-              </button>
-              <button 
-                className={`toggle-btn ${settingsSubTab === 'logs' ? 'active' : ''}`}
-                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
-                onClick={() => setSettingsSubTab('logs')}
-              >
-                📜 Audit Logs
-              </button>
-              <button 
-                className={`toggle-btn ${settingsSubTab === 'requests' ? 'active' : ''}`}
-                style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
-                onClick={() => setSettingsSubTab('requests')}
-              >
-                ⛪ Service Requests {serviceRequests.filter(r => r.status === 'pending').length > 0 && `(${serviceRequests.filter(r => r.status === 'pending').length})`}
-              </button>
-            </div>
-
-            {settingsSubTab === 'config' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Event Mode Switcher Card */}
-                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.03)' }}>
-                  <div>
-                    <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', fontWeight: '800', marginBottom: '8px' }}>🛡️ Active Event Mode</h3>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                      Current mode: <strong>{eventConfig.eventType === 'service' ? '⛪ Church Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Summer Camp Mode'}</strong>
-                    </p>
-                    
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (eventConfig.eventType === 'normal') return;
-                          if (window.confirm("Switch to Normal Mode?")) {
-                            setSavingEventConfig(true);
-                            try {
-                              await updateEventConfig(currentEventCode, { eventType: 'normal' });
-                              setEventConfig(prev => ({ ...prev, eventType: 'normal' }));
-                              setEditEventConfig(prev => ({ ...prev, eventType: 'normal' }));
-                              alert("Switched to Normal Mode!");
-                            } catch (e) { alert(e.message); } finally { setSavingEventConfig(false); }
-                          }
-                        }}
-                        disabled={savingEventConfig}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: '8px',
-                          background: eventConfig.eventType === 'normal' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
-                          border: '1px solid var(--border-light)',
-                          color: '#ffffff',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🏀 Normal
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (eventConfig.eventType === 'service') return;
-                          if (eventConfig.daysCount > 1) {
-                            alert("Service Mode is only supported for 1-day events. Set Day Count to 1 first.");
-                            return;
-                          }
-                          if (window.confirm("Switch to Service Mode?")) {
-                            setSavingEventConfig(true);
-                            try {
-                              const updates = { eventType: 'service' };
-                              if (!eventConfig.stations) {
-                                updates.stations = {
-                                  station_1: { name: 'Commitment', location: 'Football Field', howToPlay: '', lesson: '' },
-                                  station_2: { name: 'Knock & Unlock', location: 'Terrace', howToPlay: '', lesson: '' },
-                                  station_3: { name: 'Trust', location: 'Court', howToPlay: '', lesson: '' },
-                                  station_4: { name: 'Communication', location: 'Pool', howToPlay: '', lesson: '' }
-                                };
-                                updates.bigGameName = 'Loyalty (Big Game)';
-                                updates.bigGameLocation = 'Football Field';
-                                updates.reflectionName = 'Reflection';
-                                updates.reflectionLocation = 'Main Hall';
-                              }
-                              await updateEventConfig(currentEventCode, updates);
-                              setEventConfig(prev => ({ ...prev, ...updates }));
-                              setEditEventConfig(prev => ({ ...prev, ...updates }));
-                              alert("Switched to Service Mode!");
-                            } catch (e) { alert(e.message); } finally { setSavingEventConfig(false); }
-                          }
-                        }}
-                        disabled={savingEventConfig}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: '8px',
-                          background: eventConfig.eventType === 'service' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
-                          border: '1px solid var(--border-light)',
-                          color: '#ffffff',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ⛪ Service
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (eventConfig.eventType === 'camp') return;
-                          if (window.confirm("Switch to Camp Mode?")) {
-                            setSavingEventConfig(true);
-                            try {
-                              await updateEventConfig(currentEventCode, { eventType: 'camp' });
-                              setEventConfig(prev => ({ ...prev, eventType: 'camp' }));
-                              setEditEventConfig(prev => ({ ...prev, eventType: 'camp' }));
-                              alert("Switched to Camp Mode!");
-                            } catch (e) { alert(e.message); } finally { setSavingEventConfig(false); }
-                          }
-                        }}
-                        disabled={savingEventConfig}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: '8px',
-                          background: eventConfig.eventType === 'camp' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
-                          border: '1px solid var(--border-light)',
-                          color: '#ffffff',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🏕️ Camp
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <DynamicConfigurator
-                  eventConfig={eventConfig}
-                  campState={campState}
-                  onSaveConfig={async (updates) => {
-                    try {
-                      const { timeShiftMinutes, ...configUpdates } = updates;
-                      await updateEventConfig(currentEventCode, configUpdates);
-                      
-                      if (timeShiftMinutes !== undefined && timeShiftMinutes !== campState.timeShiftMinutes) {
-                        await handleUpdateCampState({ timeShiftMinutes: Number(timeShiftMinutes) || 0 });
-                      }
-                      
-                      if (eventConfig.eventType === 'service') {
-                        await updateScheduleMatchupTimes(
-                          currentEventCode, 
-                          configUpdates.startTime || '15:00', 
-                          Number(configUpdates.roundDurationMinutes) || 20, 
-                          Number(configUpdates.breakMinutes) || 5
-                        );
-                      }
-                      alert("✨ Configuration and schedule times updated successfully!");
-                    } catch (err) {
-                      alert("Failed to save configuration: " + err.message);
-                    }
-                  }}
-                  campData={campData}
-                />
-
-                {/* 🧹 Force Cache Clear Card */}
-                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.03)' }}>
-                  <h3 style={{ fontSize: '0.9rem', color: '#f87171', fontWeight: '800', marginBottom: '4px' }}>🧹 System Maintenance & Cache Clear</h3>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    If you made code changes or updates and want to force everyone currently logged in on their phones to reload, clear their cache, and receive the latest updates, click below.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (window.confirm("Are you sure you want to force a cache clear and reload for all active signed-in clients?")) {
-                        try {
-                          const nextVer = (eventConfig.clearCacheVersion || 0) + 1;
-                          await updateEventConfig(currentEventCode, { clearCacheVersion: nextVer });
-                          alert("Cache clear command successfully sent! All active signed-in clients will automatically clear their cache and reload shortly.");
-                        } catch (err) {
-                          alert("Error sending cache clear command: " + err.message);
-                        }
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      border: 'none',
-                      color: '#ffffff',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
-                    }}
-                  >
-                    🧹 Force Cache Clear & Reload All Clients
-                  </button>
-                </div>
-
-            {eventConfig.eventType !== 'normal' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.02)' }}>
-                  <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', marginBottom: '4px', fontWeight: '800' }}>⚙️ Live Service Configurator</h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    Recalculate expected kids, custom team labels, and servant attendance checklist in real-time.
-                  </p>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div className="config-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
-                        <input
-                          type="number"
-                          value={editKidCount}
-                          onChange={(e) => setEditKidCount(parseInt(e.target.value, 10) || '')}
-                          placeholder="e.g. 100"
-                          style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Days of Event</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={editDaysCount}
-                          onChange={(e) => setEditDaysCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                          style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-                      <h4 style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: '700', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Rename Teams</h4>
-                      <div className="config-grid-teams" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ef4444', marginBottom: '8px', fontWeight: '700' }}>
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444' }}></span>
-                            Red Team
-                          </label>
-                          <input type="text" value={editTeamRed} onChange={(e) => setEditTeamRed(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
-                        </div>
-                        <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ffffff', marginBottom: '8px', fontWeight: '700' }}>
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #ccc' }}></span>
-                            White Team
-                          </label>
-                          <input type="text" value={editTeamWhite} onChange={(e) => setEditTeamWhite(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
-                        </div>
-                        <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '8px', fontWeight: '700' }}>
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#1e293b', border: '1px solid #94a3b8' }}></span>
-                            Black Team
-                          </label>
-                          <input type="text" value={editTeamBlack} onChange={(e) => setEditTeamBlack(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
-                        </div>
-                        <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#38bdf8', marginBottom: '8px', fontWeight: '700' }}>
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#38bdf8' }}></span>
-                            Blue Team
-                          </label>
-                          <input type="text" value={editTeamBlue} onChange={(e) => setEditTeamBlue(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Rename Stations & Games Panel */}
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏁 Rename Games & Locations</h4>
-                      <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Change station names, locations, Big Game, and Reflection details.</p>
-                      
-                      {['station_1', 'station_2', 'station_3', 'station_4'].map((stKey, idx) => {
-                        const st = editStations[stKey] || { name: '', location: '' };
-                        return (
-                          <div key={stKey} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.65rem', color: '#c4b5fd', marginBottom: '4px', fontWeight: '700' }}>Station {idx + 1} Name</label>
-                              <input 
-                                type="text" 
-                                value={st.name || ''} 
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setEditStations(prev => ({
-                                    ...prev,
-                                    [stKey]: { ...prev[stKey], name: val }
-                                  }));
-                                }} 
-                                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.65rem', color: '#c4b5fd', marginBottom: '4px', fontWeight: '700' }}>Station {idx + 1} Location</label>
-                              <input 
-                                type="text" 
-                                value={st.location || ''} 
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setEditStations(prev => ({
-                                    ...prev,
-                                    [stKey]: { ...prev[stKey], location: val }
-                                  }));
-                                }} 
-                                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* Big Game Renaming */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#f59e0b', marginBottom: '4px', fontWeight: '700' }}>Big Game Name</label>
-                          <input 
-                            type="text" 
-                            value={editBigGameName || ''} 
-                            onChange={(e) => setEditBigGameName(e.target.value)} 
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#f59e0b', marginBottom: '4px', fontWeight: '700' }}>Big Game Location</label>
-                          <input 
-                            type="text" 
-                            value={editBigGameLocation || ''} 
-                            onChange={(e) => setEditBigGameLocation(e.target.value)} 
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
-                          />
-                        </div>
-                      </div>
-
-                      {/* Reflection Renaming */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#10b981', marginBottom: '4px', fontWeight: '700' }}>Reflection Name</label>
-                          <input 
-                            type="text" 
-                            value={editReflectionName || ''} 
-                            onChange={(e) => setEditReflectionName(e.target.value)} 
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#10b981', marginBottom: '4px', fontWeight: '700' }}>Reflection Location</label>
-                          <input 
-                            type="text" 
-                            value={editReflectionLocation || ''} 
-                            onChange={(e) => setEditReflectionLocation(e.target.value)} 
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }} 
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Default Sort Mode and Randomize Schedule Pairings Settings */}
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔀 Matchup & Pairing Settings</h4>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Default Matchup Display Order</label>
-                          <select 
-                            value={editDefaultMatchupSortMode}
-                            onChange={(e) => setEditDefaultMatchupSortMode(e.target.value)}
-                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
-                          >
-                            <option value="block">Chronological Block Order (Block/Round)</option>
-                            <option value="game">Grouped Game Order (Game/Station)</option>
-                          </select>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                          <input
-                            type="checkbox"
-                            id="randomizeMatchups"
-                            checked={!!(editEventConfig && editEventConfig.randomizeMatchups)}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setEditEventConfig(prev => ({ ...prev, randomizeMatchups: checked }));
-                            }}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                          />
-                          <label htmlFor="randomizeMatchups" style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}>
-                            🔀 Randomize Matchup Pairings (Rotational Rounds)
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          👥 Leader Roster & Attendance
-                          <span style={{ fontSize: '0.65rem', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(34,197,94,0.3)', textTransform: 'none', letterSpacing: 'normal' }}>⚡ Autosaved</span>
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={handleLiveAutoAssign}
-                          className="btn-glow"
-                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.15)', color: '#c4b5fd', fontSize: '0.7rem', fontWeight: '700', cursor: 'pointer' }}
-                        >
-                          ✨ Live Auto-Assign
-                        </button>
-                      </div>
-                      
-                      <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                        {globalServants.sort((a,b) => a.name.localeCompare(b.name)).map(s => {
-                          const isAttending = editAttending.includes(s.id);
-                          return (
-                            <div key={s.id} style={{ 
-                              display: 'flex', 
-                              flexDirection: 'row', 
-                              flexWrap: 'wrap', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between',
-                              gap: '8px', 
-                              padding: '6px', 
-                              borderRadius: '6px', 
-                              background: isAttending ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.01)', 
-                              border: '1px solid ' + (isAttending ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.02)') 
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '150px' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={isAttending}
-                                  onChange={async () => {
-                                    const updated = editAttending.includes(s.id)
-                                      ? editAttending.filter(id => id !== s.id)
-                                      : [...editAttending, s.id];
-                                    setEditAttending(updated);
-                                    await handleAutoSaveRosterData(updated, editRoles);
-                                  }}
-                                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                                />
-                                <span style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: isAttending ? '700' : 'normal' }}>{s.name}</span>
-                              </div>
-                              
-                              {isAttending && (
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                  <select
-                                    value={editRoles[s.id] || 'volunteer'}
-                                    onChange={async (e) => {
-                                      const newRole = e.target.value;
-                                      const updatedRoles = { ...editRoles, [s.id]: newRole };
-                                      setEditRoles(updatedRoles);
-                                      await handleAutoSaveRosterData(editAttending, updatedRoles);
-                                    }}
-                                    style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', width: '100%', maxWidth: '160px', minHeight: '32px' }}
-                                  >
-                                    <option value="volunteer">Volunteer/Ref</option>
-                                    <option value="coordinator">Coordinator</option>
-                                    <option value="service_leader">Service Day Leader</option>
-                                    <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
-                                    <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
-                                    <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
-                                    <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
-                                    <option value="big_game_1">Big Game Lead 1</option>
-                                    <option value="big_game_2">Big Game Lead 2</option>
-                                    <option value="reflection">Reflection Lead</option>
-                                    <option value="team_red_1">{(editTeamRed || 'Red') + ' 1 Leader'}</option>
-                                    <option value="team_red_2">{(editTeamRed || 'Red') + ' 2 Leader'}</option>
-                                    <option value="team_white_1">{(editTeamWhite || 'White') + ' 1 Leader'}</option>
-                                    <option value="team_white_2">{(editTeamWhite || 'White') + ' 2 Leader'}</option>
-                                    <option value="team_black_1">{(editTeamBlack || 'Black') + ' 1 Leader'}</option>
-                                    <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
-                                    <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
-                                    <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
-                                    <option value="media">Media Coverage</option>
-                                  </select>
-                                  <select
-                                    value={s.uiMode || 'detailed'}
-                                    onChange={async (e) => {
-                                      await updateServant(s.id, { uiMode: e.target.value });
-                                    }}
-                                    style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', minHeight: '32px' }}
-                                  >
-                                    <option value="detailed">Detailed UI</option>
-                                    <option value="dumb">Simple UI (Dumb)</option>
-                                  </select>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Quick Add Servant form inside Controls tab */}
-                      <div style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#a78bfa' }}>➕ Add New Servant to Directory</span>
-                        <div className="quick-add-row" style={{ display: 'flex', gap: '6px' }}>
-                          <input
-                            type="text"
-                            value={quickServantName}
-                            onChange={(e) => setQuickServantName(e.target.value)}
-                            placeholder="Name"
-                            style={{ flex: 2, padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', outline: 'none' }}
-                          />
-                          <input
-                            type="text"
-                            value={quickServantPasscode}
-                            onChange={(e) => setQuickServantPasscode(e.target.value)}
-                            placeholder="Pass (1234)"
-                            style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', outline: 'none' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleQuickAddServant}
-                            disabled={quickServantLoading}
-                            className="btn-glow"
-                            style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: 'var(--gradient-vbt)', color: '#ffffff', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}
-                          >
-                            {quickServantLoading ? '...' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleSaveAndRegenerateSchedule}
-                      disabled={savingEventConfig}
-                      className="btn-glow"
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '10px',
-                        background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
-                        fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.95rem',
-                        cursor: savingEventConfig ? 'not-allowed' : 'pointer', opacity: savingEventConfig ? 0.7 : 1,
-                        boxShadow: '0 4px 15px rgba(124,58,237,0.3)', marginTop: '8px'
-                      }}
-                    >
-                      {savingEventConfig ? 'Saving & Recalculating...' : '🔄 Save Setup & Regenerate Schedule'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="glass-panel" style={{ padding: '16px' }}>
-                {/* Google Sheets Sync panel */}
-                <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Google Sheets Live Sync</h3>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Manage schedule synchronization from your camp spreadsheet. The app polls in the background, or you can force an instant sync below.
-                </p>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {/* Direct Google Sheet link button */}
-                  <a 
-                    href="https://docs.google.com/spreadsheets/d/106n37V38hEdy9Mto0kXS4aipAQDNi5uNh7kR9IWrbME/edit?gid=32520354#gid=32520354"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-light)',
-                      color: '#ffffff',
-                      fontFamily: 'var(--font-title)',
-                      fontWeight: '600',
-                      fontSize: '0.85rem',
-                      textDecoration: 'none',
-                      textAlign: 'center',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-                  >
-                    <Calendar size={16} />
-                    Open Google Sheet
-                  </a>
-
-                  {/* Sync Trigger button */}
-                  <button 
-                    onClick={handleSyncGoogleSheet}
-                    disabled={isSyncing}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      background: 'var(--gradient-vbt)',
-                      border: 'none',
-                      color: '#ffffff',
-                      fontFamily: 'var(--font-title)',
-                      fontWeight: '700',
-                      fontSize: '0.85rem',
-                      cursor: isSyncing ? 'not-allowed' : 'pointer',
-                      opacity: isSyncing ? 0.7 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 12px rgba(41, 182, 246, 0.2)'
-                    }}
-                  >
-                    {isSyncing ? (
-                      <>
-                        <div className="spinner" style={{
-                          width: '14px',
-                          height: '14px',
-                          border: '2px solid rgba(255,255,255,0.3)',
-                          borderTop: '2px solid #ffffff',
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite'
-                        }} />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <Clock3 size={16} />
-                        Sync Google Sheet Now
-                      </>
-                    )}
-                  </button>
-
-                  {/* Sync status messages */}
-                  {syncStatus && (
-                    <div style={{
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: syncError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                      border: syncError ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(34, 197, 94, 0.2)',
-                      color: syncError ? '#f87171' : '#4ade80',
-                      fontSize: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      <AlertCircle size={14} />
-                      <span>{syncStatus}</span>
-                    </div>
-                  )}
-
-                  {/* Step-by-step Apps Script guide */}
-                  <div style={{
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light)',
-                    padding: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    <div>
-                      <h4 style={{ fontSize: '0.78rem', color: '#ffffff', marginBottom: '6px', fontWeight: '700' }}>⚡ Setup Two-Way Auto-Sync</h4>
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
-                        To make updates sync bidirectionally (Spreadsheet ➔ App and App ➔ Spreadsheet), copy this unified code and paste it inside the sheet's <strong>Extensions → Apps Script</strong> editor:
-                      </p>
-                      <pre style={{
-                        background: 'rgba(0,0,0,0.4)',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        fontSize: '0.65rem',
-                        color: 'var(--vbt-sky)',
-                        overflowX: 'auto',
-                        maxHeight: '180px',
-                        fontFamily: 'monospace',
-                        border: '1px solid rgba(255,255,255,0.03)'
-                      }}>
-  {`function onEdit(e) {
-    UrlFetchApp.fetch('https://sync-vbt-sheet-75ez7bhuzq-ew.a.run.app', {
-      method: 'post'
-    });
-  }
-
-  function doPost(e) {
-    try {
-      var postData = JSON.parse(e.postData.contents);
-      var action = postData.action;
-      
-      if (action === "update_scores") {
-        var ss = SpreadsheetApp.getActiveSpreadsheet();
-        var calcSheet = ss.getSheetByName("Score Calculator");
-        
-        // Update Block Scores
-        if (postData.blockScores) {
-          for (var key in postData.blockScores) {
-            var parts = key.split("_");
-            if (parts.length >= 3) {
-              var block = parts[0];
-              var round = parts[1];
-              var gameName = parts.slice(2).join("_");
-              var winner = postData.blockScores[key];
-              if (winner) {
-                var wLower = winner.toLowerCase();
-                if (wLower === "shakes") winner = "Shakes";
-                else if (wLower === "fries") winner = "Fries";
-                else if (wLower === "tie") winner = "Tie";
-                else winner = "NA";
-              }
-              
-              var cell = getScoreCell(block, round, gameName);
-              if (cell) {
-                calcSheet.getRange(cell.row, cell.col).setValue(winner);
-              }
-            }
-          }
-        }
-        
-        // Update Tokens
-        if (postData.tokens) {
-          calcSheet.getRange(48, 8).setValue(postData.tokens.shakes || 0);
-          calcSheet.getRange(48, 9).setValue(postData.tokens.fries || 0);
-        }
-        
-        // Update Point Deductions
-        if (postData.teamDeductions) {
-          var clearCells = ["F4", "F5", "F6", "F7", "F8", "F12", "F13", "F14", "F15", "F16", "F20", "F21", "F25", "F26", "F27", "F28"];
-          for (var team in postData.teamDeductions) {
-            var tSheet = ss.getSheetByName(team);
-            if (tSheet) {
-              for (var i = 0; i < clearCells.length; i++) {
-                tSheet.getRange(clearCells[i]).setValue(0);
-              }
-              tSheet.getRange("F4").setValue(postData.teamDeductions[team] || 0);
-            }
-          }
-        }
-        
-        SpreadsheetApp.flush();
-        return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
-    } catch (err) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  function getScoreCell(block, round, gameName) {
-    var b = parseInt(block);
-    var r = parseInt(round);
-    
-    if (b === 1) {
-      var row = 4 + r;
-      var colMap = { "Big Mac": 3, "Cone Memory": 4, "Scale": 5, "Chubby Bunny": 6 };
-      return { row: row, col: colMap[gameName] };
-    } else if (b === 2) {
-      var row = 15 + r;
-      var colMap = { "Cheesy Strings": 3, "Lift": 4, "Bible Whispers": 5, "Puzzle": 6 };
-      return { row: row, col: colMap[gameName] };
-    } else if (b === 3) {
-      var row = 26 + r;
-      var colMap = { "Big Bucket 1": 4, "Big Bucket 2": 5 };
-      return { row: row, col: colMap[gameName] };
-    } else if (b === 4) {
-      var row = 33 + r;
-      var colMap = { 
-        "Nadala+ 1": 2, "Balloon Darts 1": 3, "Golden Snitch 1": 4,
-        "Nadala+ 2": 5, "Balloon Darts 2": 6, "Golden Snitch 2": 7 
-      };
-      return { row: row, col: colMap[gameName] };
-    }
-    return null;
-  }`}
-                      </pre>
-                    </div>
-
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                      <label style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
-                        🔗 Apps Script Web App URL
-                      </label>
-                      <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
-                        Deploy the Apps Script project as a **Web App** (Execute as: "Me", Who has access: "Anyone"), then paste the generated URL here to enable app-to-sheets write-back:
-                      </p>
-                      <input 
-                        type="text"
-                        value={appsScriptWebappUrl}
-                        onChange={(e) => setAppsScriptWebappUrl(e.target.value)}
-                        onBlur={(e) => handleUpdateCampState({ appsScriptWebappUrl: e.target.value })}
-                        placeholder="https://script.google.com/macros/s/.../exec"
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          background: 'rgba(0, 0, 0, 0.3)',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: '6px',
-                          color: '#ffffff',
-                          fontSize: '0.75rem',
-                          outline: 'none',
-                          fontFamily: 'monospace'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="glass-panel" style={{ padding: '16px' }}>
-              <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Database Synchronization</h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                Firebase sync updates scores instantly across all leaders' phones. Disabling it runs in Offline Mode (stored on this device only).
-              </p>
-              
-              <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '10px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Real-time Firebase Sync</span>
-                <button 
-                  onClick={() => setIsOfflineMode(!isOfflineMode)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontWeight: '700',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    background: isOfflineMode ? 'rgba(255,255,255,0.1)' : 'var(--gradient-vbt)',
-                    color: '#ffffff'
-                  }}
-                >
-                  {isOfflineMode ? 'OFFLINE' : 'ONLINE SYNC'}
-                </button>
-              </div>
-            </div>
-
-            {(currentUser.role === 'admin' || currentUser.role === 'leader' || currentUser.role === 'referee') && (
-              <div className="glass-panel" style={{ padding: '16px' }}>
-                <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '8px' }}>Camp Tokens (+2 pts each)</h3>
-                
-                {eventConfig.eventType !== 'normal' ? (
-                  <div className="config-grid-2col" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                    {['red', 'white', 'black', 'blue'].map(colorKey => {
-                      const colorNameCapitalized = colorKey.charAt(0).toUpperCase() + colorKey.slice(1);
-                      const customName = eventConfig.teamNames?.[colorKey] || colorNameCapitalized;
-                      const colorHex = getTeamColorHex(colorNameCapitalized);
-                      const tokenCount = campState.tokens?.[colorKey] || 0;
-                      return (
-                        <div key={colorKey} style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', borderLeft: `3px solid ${colorHex}` }}>
-                          <span style={{ color: colorHex, fontWeight: '600', fontSize: '0.85rem' }}>{customName}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            {currentUser.role === 'admin' && (
-                              <button onClick={() => handleAdjustTokens(colorKey, -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
-                            )}
-                            <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{tokenCount}</span>
-                            {currentUser.role === 'admin' && (
-                              <button onClick={() => handleAdjustTokens(colorKey, 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px' }}>
-                      <span style={{ color: 'var(--color-shakes)', fontWeight: '600', fontSize: '0.85rem' }}>{side1Name} Tokens</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {currentUser.role === 'admin' && (
-                          <button onClick={() => handleAdjustTokens('shakes', -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
-                        )}
-                        <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{campState.tokens?.shakes || 0}</span>
-                        {currentUser.role === 'admin' && (
-                          <button onClick={() => handleAdjustTokens('shakes', 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px' }}>
-                      <span style={{ color: 'var(--color-fries)', fontWeight: '600', fontSize: '0.85rem' }}>{side2Name} Tokens</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {currentUser.role === 'admin' && (
-                          <button onClick={() => handleAdjustTokens('fries', -1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Minus size={12} /></button>
-                        )}
-                        <span style={{ fontSize: '1rem', fontWeight: '800', width: '20px', textAlign: 'center' }}>{campState.tokens?.fries || 0}</span>
-                        {currentUser.role === 'admin' && (
-                          <button onClick={() => handleAdjustTokens('fries', 1)} style={{ padding: '6px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer' }}><Plus size={12} /></button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {currentUser.role === 'admin' && (
-              <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239, 68, 68, 0.02)' }}>
-                <h3 style={{ fontSize: '0.9rem', color: '#ef4444', marginBottom: '6px' }}>Reset Scoreboard</h3>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  WARNING: This will clear all entered wins, point deductions, and tokens. This cannot be undone.
-                </p>
-                <button 
-                  onClick={async () => {
-                    if (currentUser.role !== 'admin') {
-                      alert("Permission denied. Only Coordinators can reset the database.");
-                      return;
-                    }
-                    if (window.confirm("Are you sure you want to reset ALL scoreboard entries?")) {
-                      await handleUpdateCampState(defaultCampState);
-                      if (!isOfflineMode) {
-                        await addAnnouncement(currentEventCode, "reset the scoreboard to default", currentUser.name, 'system');
-                      }
-                    }
-                  }}
-                  style={{
-                    padding: '10px 16px',
-                    background: '#ef4444',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#ffffff',
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: '600',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    width: '100%'
-                  }}
-                >
-                  Reset Database
-                </button>
-              </div>
-            )}
-
-            {/* ── LEADER ROSTER CARD ──────────────────────────────────────────── */}
-            {currentUser.role === 'admin' && (
-              <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.04)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', marginBottom: '2px' }}>👥 Leader Roster</h3>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Names that appear in the login dropdown — update before each service.</p>
-                  </div>
-                  {!rosterEditMode && (
-                    <button
-                      onClick={handleOpenRosterEdit}
-                      style={{ padding: '7px 12px', borderRadius: '8px', border: 'none', background: 'rgba(167,139,250,0.2)', color: '#a78bfa', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      ✏️ Edit
-                    </button>
-                  )}
-                </div>
-
-                {/* VIEW MODE — compact list */}
-                {!rosterEditMode && (
-                  (eventConfig?.leaderRoster || []).length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {(eventConfig.leaderRoster).map((entry, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: `hsl(${(idx * 53) % 360}, 55%, 40%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '800', color: '#fff', flexShrink: 0 }}>{idx + 1}</div>
-                          <span style={{ fontSize: '0.85rem', color: '#ffffff', flex: 1 }}>{entry.name}</span>
-                          {entry.groupLabel && <span style={{ fontSize: '0.7rem', color: '#a78bfa', background: 'rgba(167,139,250,0.15)', padding: '2px 8px', borderRadius: '10px' }}>{entry.groupLabel}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No leaders added yet. Tap Edit to add names for this service.</p>
-                  )
-                )}
-
-                {/* EDIT MODE */}
-                {rosterEditMode && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {editRoster.map((entry, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: isMobile ? '4px' : '6px', alignItems: 'center' }}>
-                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `hsl(${(idx * 53) % 360}, 55%, 40%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: '800', color: '#fff', flexShrink: 0 }}>{idx + 1}</div>
-                        <input
-                          type="text"
-                          value={entry.name}
-                          onChange={e => handleRosterEntryChange(idx, 'name', e.target.value)}
-                          placeholder="Full name"
-                          style={{ flex: 2, padding: isMobile ? '6px 8px' : '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: isMobile ? '0.74rem' : '0.82rem', outline: 'none' }}
-                        />
-                        <input
-                          type="text"
-                          value={entry.groupLabel}
-                          onChange={e => handleRosterEntryChange(idx, 'groupLabel', e.target.value)}
-                          placeholder="Group"
-                          style={{ flex: 1, padding: isMobile ? '6px 8px' : '8px 10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#a78bfa', fontSize: isMobile ? '0.74rem' : '0.82rem', outline: 'none', textAlign: 'center' }}
-                        />
-                        <button onClick={() => handleRemoveRosterEntry(idx)} style={{ padding: isMobile ? '5px' : '7px', borderRadius: '6px', border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', flexShrink: 0 }}>
-                          <Minus size={11} />
-                        </button>
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', gap: '8px', paddingTop: '4px' }}>
-                      <button onClick={handleAddRosterEntry} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px dashed rgba(167,139,250,0.4)', background: 'transparent', color: '#a78bfa', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                        <Plus size={12} /> Add Leader
-                      </button>
-                      <button onClick={handleSaveRoster} disabled={savingRoster} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontSize: '0.8rem', fontWeight: '700', cursor: savingRoster ? 'not-allowed' : 'pointer', opacity: savingRoster ? 0.7 : 1 }}>
-                        {savingRoster ? 'Saving...' : '💾 Save Roster'}
-                      </button>
-                      <button onClick={() => setRosterEditMode(false)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer' }}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── EVENT SETUP CARD ────────────────────────────────────────── */}
-
-            {currentUser.role === 'admin' && editEventConfig && (() => {
-              // Ensure teams array exists in editEventConfig
-              const DEFAULT_TEAM_PRESETS = [
-                { name: 'Red', color: '#ef4444' },
-                { name: 'White', color: '#f8fafc' },
-                { name: 'Black', color: '#94a3b8' },
-                { name: 'Blue', color: '#29b6f6' },
-                { name: 'Green', color: '#22c55e' },
-                { name: 'Yellow', color: '#facc15' },
-                { name: 'Purple', color: '#a78bfa' },
-                { name: 'Orange', color: '#f97316' },
-              ];
-              const COLOR_SWATCHES = ['#ef4444','#f8fafc','#94a3b8','#29b6f6','#22c55e','#facc15','#a78bfa','#f97316','#ec4899','#14b8a6','#6366f1','#84cc16'];
-              
-              const teams = editEventConfig.teams || (
-                eventConfig.eventType === 'service'
-                  ? [
-                      { name: eventConfig.teamNames?.red || 'Red', color: '#ef4444' },
-                      { name: eventConfig.teamNames?.white || 'White', color: '#f8fafc' },
-                      { name: eventConfig.teamNames?.black || 'Black', color: '#94a3b8' },
-                      { name: eventConfig.teamNames?.blue || 'Blue', color: '#29b6f6' },
-                    ]
-                  : [
-                      { name: editEventConfig.side1Name || eventConfig.side1Name || 'Shakes', color: '#00b0ff' },
-                      { name: editEventConfig.side2Name || eventConfig.side2Name || 'Fries', color: '#ff9100' },
-                    ]
-              );
-
-              const updateTeams = (newTeams) => {
-                setEditEventConfig(prev => ({ ...prev, teams: newTeams }));
-              };
-              const addTeam = () => {
-                const nextPreset = DEFAULT_TEAM_PRESETS[teams.length] || { name: `Team ${teams.length + 1}`, color: COLOR_SWATCHES[teams.length % COLOR_SWATCHES.length] };
-                updateTeams([...teams, nextPreset]);
-              };
-              const removeTeam = (idx) => {
-                if (teams.length <= 2) return;
-                const teamName = teams[idx]?.name || `Team ${idx + 1}`;
-                if (!window.confirm(`Are you sure you want to remove "${teamName}"?`)) return;
-                updateTeams(teams.filter((_, i) => i !== idx));
-              };
-              const updateTeam = (idx, key, value) => {
-                const updated = teams.map((t, i) => i === idx ? { ...t, [key]: value } : t);
-                updateTeams(updated);
-              };
-
-              return (
-              <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(41,182,246,0.2)', background: 'rgba(41,182,246,0.03)' }}>
-                <h3 style={{ fontSize: '0.9rem', color: '#29b6f6', marginBottom: '4px' }}>⚙️ Event Setup</h3>
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Customize this event's branding, team names, and access passcodes.</p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {/* Standard config fields */}
-                  {[['Event Name', 'eventName', 'e.g. VBT Summer Camp 2027'],
-                    ['Description', 'description', 'e.g. Live scoring & team management'],
-                    ['Event Date', 'eventDate', 'e.g. June 20, 2027'],
-                  ].map(([label, field, ph]) => (
-                    <div key={field}>
-                      <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px' }}>{label}</label>
-                      <input
-                        type="text"
-                        value={editEventConfig[field] || ''}
-                        onChange={(e) => setEditEventConfig(prev => ({ ...prev, [field]: e.target.value }))}
-                        placeholder={ph}
-                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
-                      />
-                    </div>
-                  ))}
-
-                  {/* ── DYNAMIC TEAMS EDITOR ──────────────────────────── */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#29b6f6', fontWeight: '700' }}>
-                        Teams ({teams.length})
-                      </label>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const shuffled = [...teams];
-                            for (let i = shuffled.length - 1; i > 0; i--) {
-                              const j = Math.floor(Math.random() * (i + 1));
-                              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                            }
-                            updateTeams(shuffled);
-                          }}
-                          style={{
-                            padding: '0 8px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-light)',
-                            background: 'rgba(167,139,250,0.15)', color: '#c4b5fd',
-                            fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
-                          }}
-                        >
-                          🔀 Randomize
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { if (teams.length > 2) updateTeams(teams.slice(0, -1)); }}
-                          disabled={teams.length <= 2}
-                          style={{
-                            width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-light)',
-                            background: teams.length <= 2 ? 'rgba(0,0,0,0.2)' : 'rgba(239,68,68,0.15)', color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
-                            fontSize: '1rem', fontWeight: '700', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}
-                        >−</button>
-                        <button
-                          type="button"
-                          onClick={addTeam}
-                          disabled={teams.length >= 8}
-                          style={{
-                            width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-light)',
-                            background: teams.length >= 8 ? 'rgba(0,0,0,0.2)' : 'rgba(41,182,246,0.15)', color: teams.length >= 8 ? 'var(--text-muted)' : '#29b6f6',
-                            fontSize: '1rem', fontWeight: '700', cursor: teams.length >= 8 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}
-                        >+</button>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {teams.map((team, idx) => (
-                        <div key={idx} style={{
-                          display: 'flex',
-                          flexDirection: isMobile ? 'column' : 'row',
-                          alignItems: isMobile ? 'stretch' : 'center',
-                          gap: '8px',
-                          padding: isMobile ? '10px 12px' : '8px 10px',
-                          borderRadius: '10px',
-                          background: 'rgba(0,0,0,0.2)',
-                          border: `1px solid ${team.color}33`
-                        }}>
-                          {/* Top Row: Color Picker, Badge, Input, Delete Button */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                            {/* Color indicator + picker */}
-                            <div style={{ position: 'relative', flexShrink: 0 }}>
-                              <div
-                                style={{
-                                  width: '32px', height: '32px', borderRadius: '8px',
-                                  background: team.color, border: '2px solid rgba(255,255,255,0.2)',
-                                  cursor: 'pointer', position: 'relative', overflow: 'hidden'
-                                }}
-                              >
-                                <input
-                                  type="color"
-                                  value={team.color}
-                                  onChange={(e) => updateTeam(idx, 'color', e.target.value)}
-                                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Team number badge */}
-                            <span style={{
-                              fontSize: '0.65rem', fontWeight: '800', color: team.color,
-                              minWidth: '14px', textAlign: 'center'
-                            }}>
-                              {idx + 1}
-                            </span>
-
-                            {/* Name input */}
-                            <input
-                              type="text"
-                              value={team.name}
-                              onChange={(e) => updateTeam(idx, 'name', e.target.value)}
-                              placeholder={`Team ${idx + 1}`}
-                              style={{
-                                flex: 1, padding: '7px 10px', borderRadius: '6px',
-                                background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                                color: '#ffffff', fontSize: '0.85rem', outline: 'none',
-                                fontFamily: 'var(--font-body)'
-                              }}
-                            />
-
-                            {/* Remove button (Desktop inline) */}
-                            {!isMobile && (
-                              <button
-                                type="button"
-                                onClick={() => removeTeam(idx)}
-                                disabled={teams.length <= 2}
-                                style={{
-                                  width: '24px', height: '24px', borderRadius: '6px',
-                                  border: 'none', background: teams.length <= 2 ? 'transparent' : 'rgba(239,68,68,0.15)',
-                                  color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
-                                  fontSize: '0.8rem', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                                }}
-                              >✕</button>
-                            )}
-                          </div>
-
-                          {/* Bottom Row / Inline Color Swatches & mobile actions */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '10px',
-                            paddingLeft: isMobile ? '40px' : '0px',
-                            marginTop: isMobile ? '2px' : '0px'
-                          }}>
-                            {/* Color swatches */}
-                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                              {isMobile && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginRight: '4px' }}>Color:</span>}
-                              {COLOR_SWATCHES.slice(0, isMobile ? 8 : 4).map((c) => (
-                                <div
-                                  key={c}
-                                  onClick={() => updateTeam(idx, 'color', c)}
-                                  style={{
-                                    width: isMobile ? '18px' : '14px',
-                                    height: isMobile ? '18px' : '14px',
-                                    borderRadius: '3px',
-                                    background: c, cursor: 'pointer',
-                                    border: team.color === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.15)',
-                                    transition: 'transform 0.15s',
-                                  }}
-                                />
-                              ))}
-                            </div>
-
-                            {/* Remove button (Mobile bottom right) */}
-                            {isMobile && (
-                              <button
-                                type="button"
-                                onClick={() => removeTeam(idx)}
-                                disabled={teams.length <= 2}
-                                style={{
-                                  padding: '4px 10px', borderRadius: '6px',
-                                  border: 'none', background: teams.length <= 2 ? 'transparent' : 'rgba(239,68,68,0.15)',
-                                  color: teams.length <= 2 ? 'var(--text-muted)' : '#ef4444',
-                                  fontSize: '0.75rem', fontWeight: '700', cursor: teams.length <= 2 ? 'not-allowed' : 'pointer',
-                                  display: 'flex', alignItems: 'center', gap: '4px'
-                                }}
-                              >✕ Remove</button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Passcode fields */}
-                  {[['Coordinator Passcode', 'passcodeCoordinator', 'Admin passcode'],
-                    ['Game Leader Passcode', 'passcodeGameLeader', 'Referee passcode'],
-                    ['Team Leader Passcode', 'passcodeTeamLeader', 'Leader passcode']
-                  ].map(([label, field, ph]) => (
-                    <div key={field}>
-                      <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px' }}>{label}</label>
-                      <input
-                        type="text"
-                        value={editEventConfig[field] || ''}
-                        onChange={(e) => setEditEventConfig(prev => ({ ...prev, [field]: e.target.value }))}
-                        placeholder={ph}
-                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
-                      />
-                    </div>
-                  ))}
-
-                  <button
-                    onClick={handleSaveEventConfig}
-                    disabled={savingEventConfig}
-                    style={{
-                      padding: '11px', background: 'var(--gradient-vbt)', border: 'none',
-                      borderRadius: '8px', color: '#ffffff', fontFamily: 'var(--font-title)',
-                      fontWeight: '700', fontSize: '0.85rem', cursor: savingEventConfig ? 'not-allowed' : 'pointer',
-                      opacity: savingEventConfig ? 0.7 : 1, width: '100%'
-                    }}
-                  >
-                    {savingEventConfig ? 'Saving...' : '💾 Save Event Config'}
-                  </button>
-
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Current Event Code (share this with your staff):</p>
-                    <code style={{ display: 'block', background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '6px', color: '#29b6f6', fontSize: '0.85rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {currentEventCode}
-                    </code>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleLeaveEvent}
-                    style={{
-                      padding: '10px', background: 'transparent', border: '1px solid var(--border-light)',
-                      borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', width: '100%'
-                    }}
-                  >
-                    🔀 Switch to a Different Event
-                  </button>
-                </div>
-              </div>
-              );
-            })()}
-            </div>
-            )}
-
-            {settingsSubTab === 'builder' && (
-              <ScheduleBuilder
-                eventCode={currentEventCode}
-                eventConfig={eventConfig}
-                campData={campData}
-                getTeamColorHex={getTeamColorHex}
-                onPublish={(docs) => {
-                  playChime('schedule');
-                }}
-              />
-            )}
-
-            {settingsSubTab === 'logs' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="glass-panel" style={{ padding: '16px', border: '1px solid rgba(41, 182, 246, 0.3)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                    <h3 style={{ fontSize: '1rem', color: '#38bdf8', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                      📜 Chronological Audit Logs
-                    </h3>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {['All', 'score', 'deduction', 'system'].map((typeOption) => (
-                        <button
-                          key={typeOption}
-                          type="button"
-                          onClick={() => setAuditLogFilter(typeOption)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            background: auditLogFilter === typeOption ? 'var(--vbt-blue)' : 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid ' + (auditLogFilter === typeOption ? 'var(--vbt-sky)' : 'rgba(255, 255, 255, 0.1)'),
-                            color: '#ffffff',
-                            fontSize: '0.75rem',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            textTransform: 'capitalize',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {typeOption}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
-                    {(() => {
-                      const filteredLogs = announcements.filter(log => {
-                        if (auditLogFilter === 'All') {
-                          return ['score', 'deduction', 'system'].includes(log.type);
-                        }
-                        return log.type === auditLogFilter;
-                      }).sort((a, b) => {
-                        const timeA = a.timestamp ? (a.timestamp.seconds ? a.timestamp.seconds * 1000 : new Date(a.timestamp).getTime()) : 0;
-                        const timeB = b.timestamp ? (b.timestamp.seconds ? b.timestamp.seconds * 1000 : new Date(b.timestamp).getTime()) : 0;
-                        return timeB - timeA; // newest first
-                      });
-
-                      if (filteredLogs.length === 0) {
-                        return (
-                          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                            No logs found matching filter: {auditLogFilter}
-                          </div>
-                        );
-                      }
-
-                      return filteredLogs.map((log) => {
-                        const logTime = log.timestamp ? (log.timestamp.seconds ? new Date(log.timestamp.seconds * 1000) : new Date(log.timestamp)) : new Date();
-                        const timeStr = logTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + logTime.toLocaleDateString();
-                        
-                        let badgeColor = '#94a3b8';
-                        if (log.type === 'score') badgeColor = '#22c55e';
-                        if (log.type === 'deduction') badgeColor = '#ef4444';
-                        if (log.type === 'system') badgeColor = '#38bdf8';
-
-                        return (
-                          <div
-                            key={log.id}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
-                              padding: '10px 12px',
-                              borderRadius: '8px',
-                              background: 'rgba(255,255,255,0.03)',
-                              border: '1px solid rgba(255,255,255,0.06)',
-                              fontSize: '0.8rem'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{
-                                fontSize: '0.65rem',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: `${badgeColor}22`,
-                                border: `1px solid ${badgeColor}44`,
-                                color: badgeColor,
-                                fontWeight: '700',
-                                textTransform: 'uppercase'
-                              }}>
-                                {log.type}
-                              </span>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                {timeStr}
-                              </span>
-                            </div>
-                            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', lineHeight: '1.4' }}>
-                              {log.text}
-                            </p>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                              By: <strong>{log.sender}</strong> ({log.senderRole || 'unknown'})
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {settingsSubTab === 'requests' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{
-                  background: 'rgba(167, 139, 250, 0.1)',
-                  border: '1px solid rgba(167, 139, 250, 0.3)',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  color: '#e2e8f0',
-                  fontSize: '0.85rem',
-                  lineHeight: '1.5'
-                }}>
-                  <h3 style={{ color: '#c4b5fd', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    ⛪ Service Requests Manager
-                  </h3>
-                  <p style={{ margin: 0 }}>
-                    View and manage service outreach requests submitted by churches. You can approve or reject requests, and instantly generate/pre-fill a new event from any request!
-                  </p>
-                </div>
-
-                {/* Filter and Search controls */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* Status filter toggle */}
-                  <div className="toggle-group" style={{ 
-                    display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-light)'
-                  }}>
-                    {['All', 'pending', 'approved', 'rejected'].map(filterVal => (
-                      <button
-                        key={filterVal}
-                        className={`toggle-btn ${settingsRequestFilter === filterVal ? 'active' : ''}`}
-                        onClick={() => setSettingsRequestFilter(filterVal)}
-                        style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', border: 'none', cursor: 'pointer', textTransform: 'capitalize' }}
-                      >
-                        {filterVal}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Search input */}
-                  <input
-                    type="text"
-                    placeholder="Search by Church or Contact..."
-                    value={settingsRequestSearch}
-                    onChange={(e) => setSettingsRequestSearch(e.target.value)}
-                    style={{
-                      flex: 1, minWidth: '180px', padding: '8px 12px', borderRadius: '8px',
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                      color: '#ffffff', fontSize: '0.8rem', outline: 'none'
-                    }}
-                  />
-                </div>
-
-                {/* Requests list */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {(() => {
-                    const filtered = serviceRequests.filter(req => {
-                      // Filter by status
-                      if (settingsRequestFilter !== 'All' && req.status !== settingsRequestFilter) return false;
-                      // Filter by search
-                      if (settingsRequestSearch.trim()) {
-                        const searchLower = settingsRequestSearch.toLowerCase();
-                        const matchChurch = (req.churchName || '').toLowerCase().includes(searchLower);
-                        const matchContact = (req.contactName || '').toLowerCase().includes(searchLower);
-                        return matchChurch || matchContact;
-                      }
-                      return true;
-                    });
-
-                    if (filtered.length === 0) {
-                      return (
-                        <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border-light)' }}>
-                          <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '8px' }}>📭</span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No service requests found.</span>
-                        </div>
-                      );
-                    }
-
-                    return filtered.map(req => {
-                      const isExpanded = !!expandedRequests[req.id];
-                      const statusColors = {
-                        pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b', label: 'Pending' },
-                        approved: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', text: '#4ade80', label: 'Approved' },
-                        rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', text: '#f87171', label: 'Rejected' }
-                      };
-                      const statusStyle = statusColors[req.status] || statusColors.pending;
-
-                      return (
-                        <div
-                          key={req.id}
-                          className="glass-panel"
-                          style={{
-                            padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px',
-                            transition: 'all 0.2s', border: isExpanded ? '1px solid rgba(167, 139, 250, 0.3)' : '1px solid var(--border-light)',
-                            position: 'relative'
-                          }}
-                        >
-                          {/* Card Header */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <h4 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0, fontWeight: '800' }}>
-                                {req.churchName || 'Unnamed Request'}
-                              </h4>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                👤 {req.contactName || 'No contact'} | 📞 {req.contactNumber || 'No phone'}
-                              </span>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{
-                                padding: '3px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700',
-                                background: statusStyle.bg, border: `1px solid ${statusStyle.border}`, color: statusStyle.text
-                              }}>
-                                {statusStyle.label}
-                              </span>
-                              <button
-                                onClick={() => setExpandedRequests(prev => ({ ...prev, [req.id]: !isExpanded }))}
-                                style={{
-                                  background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer',
-                                  fontSize: '0.9rem', display: 'flex', alignItems: 'center', padding: '4px'
-                                }}
-                              >
-                                {isExpanded ? '▲' : '▼'}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Preview Details */}
-                          {!isExpanded && (
-                            <div style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              <span>📅 Date: <strong>{req.serviceDate || 'Not set'}</strong></span>
-                              <span>⛪ Location: <strong>{req.serviceLocation || 'Not set'}</strong></span>
-                            </div>
-                          )}
-
-                          {/* Expanded Details */}
-                          {isExpanded && (
-                            <div style={{
-                              display: 'flex', flexDirection: 'column', gap: '12px',
-                              padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px',
-                              fontSize: '0.8rem', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.03)'
-                            }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                                <div>📅 <strong>Date & Time:</strong> {req.serviceDate || 'Pending'} ({req.serviceStartTime || '?'}-{req.serviceEndTime || '?'})</div>
-                                <div>📍 <strong>Location:</strong> {req.serviceLocation || 'Pending'}</div>
-                                <div>👥 <strong>Gender Grp:</strong> {req.targetGender || 'Mix'}</div>
-                                <div>🎂 <strong>Age/Grade:</strong> {req.targetAgeGrade || 'Not specified'}</div>
-                                <div>🔢 <strong>Est. Kids:</strong> {req.participantsCount || 'Not specified'}</div>
-                                <div>🛡️ <strong>Teams Split:</strong> {req.alreadySplitTeams === 'yes' ? `Yes (${req.teamsCount || '?'} teams)` : 'No'}</div>
-                                <div>👨‍🏫 <strong>Servants Need:</strong> {req.needSpecificServantsCount === 'yes' ? `Yes (${req.servantsCount || '?'} servants)` : 'No'}</div>
-                                <div>🤝 <strong>Servants Helping VBT:</strong> {req.servantsAvailableHelping || 'yes'}</div>
-                              </div>
-                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
-                                📖 <strong>Topic or Theme:</strong>
-                                <p style={{ margin: '4px 0 0 0', lineHeight: '1.5', color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
-                                  {req.serviceTopic || 'None specified.'}
-                                </p>
-                              </div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                                Submitted: {req.createdAt ? new Date(req.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Action Bar */}
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                            <button
-                              onClick={() => {
-                                if (confirm("Are you sure you want to delete this service request?")) {
-                                  deleteServiceRequest(req.id);
-                                }
-                              }}
-                              style={{
-                                padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.4)',
-                                background: 'transparent', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer'
-                              }}
-                            >
-                              🗑️ Delete
-                            </button>
-
-                            {req.status !== 'rejected' && (
-                              <button
-                                onClick={() => updateServiceRequestStatus(req.id, 'rejected')}
-                                style={{
-                                  padding: '6px 12px', borderRadius: '8px', border: 'none',
-                                  background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer'
-                                }}
-                              >
-                                ✕ Reject
-                              </button>
-                            )}
-
-                            {req.status !== 'approved' && (
-                              <button
-                                onClick={() => updateServiceRequestStatus(req.id, 'approved')}
-                                style={{
-                                  padding: '6px 12px', borderRadius: '8px', border: 'none',
-                                  background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontSize: '0.75rem', cursor: 'pointer'
-                                }}
-                              >
-                                ✓ Approve
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => {
-                                // Approve if not already approved
-                                if (req.status !== 'approved') {
-                                  updateServiceRequestStatus(req.id, 'approved');
-                                }
-                                // Pre-fill create event wizard
-                                setNewEventName(req.churchName || '');
-                                const suggestedCode = (req.churchName || '')
-                                  .toLowerCase()
-                                  .replace(/[^a-z0-9]+/g, '_')
-                                  .substring(0, 15) + '_' + Math.floor(Math.random() * 1000);
-                                setNewEventCode(suggestedCode);
-                                setNewEventDate(req.serviceDate || '');
-                                setNewEventType('service');
-                                
-                                const countInt = parseInt(req.participantsCount) || 100;
-                                setNewKidCount(countInt);
-
-                                setNewServiceBrief(`Location: ${req.serviceLocation || ''}\nTime: ${req.serviceStartTime || ''} - ${req.serviceEndTime || ''}\nTopic: ${req.serviceTopic || ''}\nTarget Group: ${req.targetGender || ''} | ${req.targetAgeGrade || ''} | ${req.participantsCount || ''} kids\nContact: ${req.contactName || ''} (${req.contactNumber || ''})`);
-                                
-                                setShowCreateEvent(true);
-                                setCreationStep(1); // Step 1 of the wizard
-                                
-                                // Close more drawer and deselect event code to trigger landing page
-                                setShowMoreDrawer(false);
-                                setCurrentEventCode(null);
-                                localStorage.removeItem('vbt_current_event');
-                              }}
-                              className="btn-glow"
-                              style={{
-                                padding: '6px 14px', borderRadius: '8px', border: 'none',
-                                background: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)', color: '#ffffff',
-                                fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer'
-                              }}
-                            >
-                              ⚡ Create Event
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-            )}
-          </div>
+          <SettingsTab
+            currentUser={currentUser}
+            isDarkMode={isDarkMode}
+            settingsSubTab={settingsSubTab}
+            eventConfig={eventConfig}
+            serviceRequests={serviceRequests}
+            savingEventConfig={savingEventConfig}
+            currentEventCode={currentEventCode}
+            campState={campState}
+            campData={campData}
+            editKidCount={editKidCount}
+            editDaysCount={editDaysCount}
+            editTeamRed={editTeamRed}
+            editTeamWhite={editTeamWhite}
+            editTeamBlack={editTeamBlack}
+            editTeamBlue={editTeamBlue}
+            editStations={editStations}
+            editBigGameName={editBigGameName}
+            editBigGameLocation={editBigGameLocation}
+            editReflectionName={editReflectionName}
+            editReflectionLocation={editReflectionLocation}
+            editDefaultMatchupSortMode={editDefaultMatchupSortMode}
+            editEventConfig={editEventConfig}
+            globalServants={globalServants}
+            editAttending={editAttending}
+            editRoles={editRoles}
+            quickServantName={quickServantName}
+            quickServantPasscode={quickServantPasscode}
+            quickServantLoading={quickServantLoading}
+            isSyncing={isSyncing}
+            syncStatus={syncStatus}
+            syncError={syncError}
+            appsScriptWebappUrl={appsScriptWebappUrl}
+            isOfflineMode={isOfflineMode}
+            side1Name={side1Name}
+            side2Name={side2Name}
+            rosterEditMode={rosterEditMode}
+            editRoster={editRoster}
+            savingRoster={savingRoster}
+            settingsRequestFilter={settingsRequestFilter}
+            settingsRequestSearch={settingsRequestSearch}
+            expandedRequests={expandedRequests}
+            isMobile={isMobile}
+            announcements={announcements}
+            auditLogFilter={auditLogFilter}
+            expandedBlocks={expandedBlocks}
+            expandedGames={expandedGames}
+            uniqueGames={uniqueGames}
+            showOnboardingTip={showOnboardingTip}
+            setShowServantDirectoryModal={setShowServantDirectoryModal}
+            setShowGamesLibraryModal={setShowGamesLibraryModal}
+            setShowQRModal={setShowQRModal}
+            setShowBackupModal={setShowBackupModal}
+            setShowDebriefModal={setShowDebriefModal}
+            handleTimerStart={handleTimerStart}
+            setIsDarkMode={setIsDarkMode}
+            setSettingsSubTab={setSettingsSubTab}
+            updateEventConfig={updateEventConfig}
+            setEventConfig={setEventConfig}
+            setEditEventConfig={setEditEventConfig}
+            handleUpdateCampState={handleUpdateCampState}
+            updateScheduleMatchupTimes={updateScheduleMatchupTimes}
+            handleAutoSaveRosterData={handleAutoSaveRosterData}
+            setEditAttending={setEditAttending}
+            setEditRoles={setEditRoles}
+            setQuickServantName={setQuickServantName}
+            setQuickServantPasscode={setQuickServantPasscode}
+            handleQuickAddServant={handleQuickAddServant}
+            handleSyncGoogleSheet={handleSyncGoogleSheet}
+            setAppsScriptWebappUrl={setAppsScriptWebappUrl}
+            setIsOfflineMode={setIsOfflineMode}
+            handleAdjustTokens={handleAdjustTokens}
+            handleOpenRosterEdit={handleOpenRosterEdit}
+            handleRosterEntryChange={handleRosterEntryChange}
+            handleRemoveRosterEntry={handleRemoveRosterEntry}
+            handleAddRosterEntry={handleAddRosterEntry}
+            handleSaveRoster={handleSaveRoster}
+            setRosterEditMode={setRosterEditMode}
+            handleSaveEventConfig={handleSaveEventConfig}
+            handleLeaveEvent={handleLeaveEvent}
+            setAuditLogFilter={setAuditLogFilter}
+            setSettingsRequestFilter={setSettingsRequestFilter}
+            setSettingsRequestSearch={setSettingsRequestSearch}
+            setExpandedRequests={setExpandedRequests}
+            setNewEventName={setNewEventName}
+            setNewEventCode={setNewEventCode}
+            setNewEventDate={setNewEventDate}
+            setNewEventType={setNewEventType}
+            setNewKidCount={setNewKidCount}
+            setNewServiceBrief={setNewServiceBrief}
+            setShowCreateEvent={setShowCreateEvent}
+            setCreationStep={setCreationStep}
+            setCurrentEventCode={setCurrentEventCode}
+            playChime={playChime}
+            handleSaveAndRegenerateSchedule={handleSaveAndRegenerateSchedule}
+            updateServant={updateServant}
+            handleLiveAutoAssign={handleLiveAutoAssign}
+            getTeamColorHex={getTeamColorHex}
+          />
         )}
-
         {/* Tab: Service */}
         {currentTab === 'service' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            <div style={{
-              background: 'rgba(41, 182, 246, 0.1)',
-              border: '1px solid rgba(41, 182, 246, 0.3)',
-              borderRadius: '12px',
-              padding: '14px',
-              color: '#e2e8f0',
-              fontSize: '0.85rem',
-              lineHeight: '1.5'
-            }}>
-              <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                👴 Games & Theme Helper Card
-              </h3>
-              <p style={{ margin: 0 }}>
-                Here you can view the outreach service target brief, team sub-group breakdowns (with kid counts), and the active station games with rules and Bible lessons.
-              </p>
-            </div>
-
-            {/* ── COORDINATOR EDIT BAR ─────────────────────────────── */}
-            {currentUser && currentUser.role === 'admin' && (
-              <div className="service-edit-bar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button
-                  onClick={() => {
-                    setEditServiceBrief(serviceData.serviceBrief);
-                    setEditGroups([...serviceData.groups]);
-                    setEditGames(serviceData.games.map(g => ({ ...g })));
-                    setServiceEditMode(true);
-                  }}
-                  style={{
-                    flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
-                    background: serviceEditMode ? 'rgba(255,255,255,0.08)' : 'var(--gradient-vbt)',
-                    color: '#ffffff', fontFamily: 'var(--font-title)', fontWeight: '700',
-                    fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-                  }}
-                >
-                  <Settings size={14} /> {serviceEditMode ? 'Editing...' : 'Edit Service Info'}
-                </button>
-                {serviceEditMode && (
-                  <>
-                    <button
-                      onClick={handleSaveServiceData}
-                      disabled={savingService}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
-                        background: 'rgba(34,197,94,0.25)', color: '#4ade80',
-                        fontFamily: 'var(--font-title)', fontWeight: '700', fontSize: '0.8rem',
-                        cursor: savingService ? 'not-allowed' : 'pointer', opacity: savingService ? 0.7 : 1
-                      }}
-                    >
-                      {savingService ? 'Saving...' : '💾 Save'}
-                    </button>
-                    <button
-                      onClick={() => setServiceEditMode(false)}
-                      style={{
-                        padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)',
-                        background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer'
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* ── SECTION 1: SERVICE BRIEF ─────────────────────────── */}
-            <div className="glass-panel" style={{ padding: '18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <div style={{ width: '4px', height: '20px', background: 'var(--gradient-vbt)', borderRadius: '2px' }} />
-                <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0 }}>📋 Service Brief</h3>
-              </div>
-
-              {serviceEditMode ? (
-                <textarea
-                  value={editServiceBrief}
-                  onChange={(e) => setEditServiceBrief(e.target.value)}
-                  placeholder="Describe the service: what it's about, the theme, what to expect..."
-                  rows={5}
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '10px',
-                    background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                    color: '#ffffff', fontSize: '0.875rem', outline: 'none',
-                    fontFamily: 'inherit', lineHeight: '1.6', resize: 'vertical'
-                  }}
-                />
-              ) : serviceData.serviceBrief ? (
-                <p style={{
-                  fontSize: '0.875rem', color: 'var(--text-secondary)',
-                  lineHeight: '1.7', whiteSpace: 'pre-wrap', margin: 0
-                }}>
-                  {serviceData.serviceBrief}
-                </p>
-              ) : (
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  {currentUser?.role === 'admin' ? 'Tap "Edit Service Info" above to add a service brief.' : 'No service brief posted yet.'}
-                </p>
-              )}
-            </div>
-
-            {/* ── SECTION 2: GROUPS / KIDS SPLIT ───────────────────── */}
-            <div className="glass-panel" style={{ padding: '18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '4px', height: '20px', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', borderRadius: '2px' }} />
-                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0 }}>👥 Groups</h3>
-                </div>
-                {/* Total kids badge */}
-                {(serviceEditMode ? totalKids : serviceData.groups.reduce((s, g) => s + (parseInt(g.kidCount) || 0), 0)) > 0 && (
-                  <span style={{
-                    background: 'rgba(41,182,246,0.15)', border: '1px solid rgba(41,182,246,0.3)',
-                    color: '#29b6f6', fontSize: '0.75rem', fontWeight: '700',
-                    padding: '3px 10px', borderRadius: '20px'
-                  }}>
-                    {serviceEditMode ? totalKids : serviceData.groups.reduce((s, g) => s + (parseInt(g.kidCount) || 0), 0)} kids total
-                  </span>
-                )}
-              </div>
-
-              {/* VIEW MODE */}
-              {!serviceEditMode && (
-                serviceData.groups.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {serviceData.groups.map((group, idx) => (
-                      <div key={idx} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        background: 'rgba(255,255,255,0.04)', borderRadius: '10px',
-                        padding: '12px 14px', border: '1px solid var(--border-light)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '34px', height: '34px', borderRadius: '50%',
-                            background: `hsl(${(idx * 47) % 360}, 60%, 40%)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '0.75rem', fontWeight: '800', color: '#fff', flexShrink: 0
-                          }}>
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <p style={{ fontSize: '0.875rem', color: '#ffffff', fontWeight: '600', margin: 0 }}>
-                              {group.leaderName || `Group ${idx + 1}`}
-                            </p>
-                            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>Leader</p>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)', margin: 0, lineHeight: 1 }}>
-                            {group.kidCount || '—'}
-                          </p>
-                          <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: '1px 0 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>kids</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    {currentUser?.role === 'admin' ? 'Tap "Edit Service Info" to assign groups.' : 'No groups assigned yet.'}
-                  </p>
-                )
-              )}
-
-              {/* EDIT MODE */}
-              {serviceEditMode && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {editGroups.map((group, idx) => (
-                    <div key={idx} className="service-group-edit-row" style={{
-                      display: 'flex', gap: '8px', alignItems: 'center',
-                      background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px'
-                    }}>
-                      <div style={{
-                        width: '28px', height: '28px', borderRadius: '50%',
-                        background: `hsl(${(idx * 47) % 360}, 60%, 40%)`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.7rem', fontWeight: '800', color: '#fff', flexShrink: 0
-                      }}>{idx + 1}</div>
-                      <input
-                        type="text"
-                        value={group.leaderName}
-                        onChange={(e) => handleGroupChange(idx, 'leaderName', e.target.value)}
-                        placeholder="Leader name"
-                        style={{
-                          flex: 1, padding: '8px 10px', borderRadius: '8px',
-                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                          color: '#ffffff', fontSize: '0.85rem', outline: 'none'
-                        }}
-                      />
-                      <input
-                        type="number"
-                        value={group.kidCount}
-                        onChange={(e) => handleGroupChange(idx, 'kidCount', e.target.value)}
-                        placeholder="# kids"
-                        min="0"
-                        style={{
-                          width: '70px', padding: '8px 10px', borderRadius: '8px',
-                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                          color: '#ffffff', fontSize: '0.85rem', outline: 'none', textAlign: 'center'
-                        }}
-                      />
-                      <button
-                        onClick={() => handleRemoveGroup(idx)}
-                        style={{
-                          padding: '8px', borderRadius: '6px', border: 'none',
-                          background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', flexShrink: 0
-                        }}
-                      >
-                        <Minus size={12} />
-                      </button>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
-                    <button
-                      onClick={handleAddGroup}
-                      style={{
-                        padding: '8px 14px', borderRadius: '8px', border: '1px dashed rgba(41,182,246,0.4)',
-                        background: 'transparent', color: '#29b6f6', fontSize: '0.8rem', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '6px'
-                      }}
-                    >
-                      <Plus size={12} /> Add Group
-                    </button>
-                    {editGroups.length > 0 && (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
-                        {totalKids} kids total
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── SECTION 3: GAMES + BIBLE STUDY ───────────────────── */}
-            <div className="glass-panel" style={{ padding: '18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '4px', height: '20px', background: 'linear-gradient(135deg, #a78bfa, #ec4899)', borderRadius: '2px' }} />
-                  <h3 style={{ fontSize: '0.95rem', color: '#ffffff', margin: 0 }}>🎮 Games & Bible Study</h3>
-                </div>
-                {!serviceEditMode && (
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Tap a game to expand</span>
-                )}
-              </div>
-
-              {/* VIEW MODE — accordion */}
-              {!serviceEditMode && (
-                serviceData.games.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {serviceData.games.map((game, idx) => {
-                      const isOpen = !!expandedServiceGame[idx];
-                      const isLiveStation = currentActiveSlot && game.name &&
-                        (currentActiveSlot.name || '').toLowerCase().includes((game.name || '').toLowerCase());
-                      return (
-                        <div key={idx} style={{
-                          borderRadius: '12px',
-                          border: isLiveStation ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border-light)',
-                          overflow: 'hidden',
-                          background: isLiveStation ? 'rgba(34,197,94,0.05)' : isOpen ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'
-                        }}>
-                          {/* Accordion header */}
-                          <button
-                            onClick={() => setExpandedServiceGame(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                            className="game-detail-header-btn"
-                            style={{
-                              width: '100%', padding: '13px 14px', background: 'none', border: 'none',
-                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                              cursor: 'pointer', color: '#ffffff'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                              <span style={{
-                                width: '26px', height: '26px', borderRadius: '8px',
-                                background: `linear-gradient(135deg, hsl(${(idx * 60 + 200) % 360}, 70%, 50%), hsl(${(idx * 60 + 240) % 360}, 60%, 40%))`,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.7rem', fontWeight: '800', flexShrink: 0
-                              }}>{idx + 1}</span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.9rem', fontWeight: '700' }}>
-                                    {game.name || `Game ${idx + 1}`}
-                                  </span>
-                                  {isLiveStation && (
-                                    <span style={{
-                                      fontSize: '0.6rem', fontWeight: '800', textTransform: 'uppercase',
-                                      letterSpacing: '0.06em', color: '#22c55e',
-                                      background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)',
-                                      borderRadius: '4px', padding: '1px 5px'
-                                    }}>LIVE</span>
-                                  )}
-                                </div>
-                                {game.location && (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                    📌 {game.location}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <span style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
-                          </button>
-
-                          {/* Accordion body */}
-                          {isOpen && (
-                            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {game.howToPlay && (
-                                <div>
-                                  <p style={{
-                                    fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-                                    color: '#29b6f6', fontWeight: '700', marginBottom: '6px'
-                                  }}>🎯 How to Play</p>
-                                  <p style={{
-                                    fontSize: '0.85rem', color: 'var(--text-secondary)',
-                                    lineHeight: '1.65', whiteSpace: 'pre-wrap', margin: 0
-                                  }}>{game.howToPlay}</p>
-                                </div>
-                              )}
-                              {game.lesson && (
-                                <div style={{
-                                  background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)',
-                                  borderRadius: '10px', padding: '12px'
-                                }}>
-                                  <p style={{
-                                    fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-                                    color: '#a78bfa', fontWeight: '700', marginBottom: '6px'
-                                  }}>📖 Lesson Learned</p>
-                                  <p style={{
-                                    fontSize: '0.875rem', color: '#c4b5fd',
-                                    lineHeight: '1.65', whiteSpace: 'pre-wrap', margin: 0
-                                  }}>{game.lesson}</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    {currentUser?.role === 'admin' ? 'Tap "Edit Service Info" to add games and Bible lessons.' : 'No games posted yet.'}
-                  </p>
-                )
-              )}
-
-              {/* EDIT MODE */}
-              {serviceEditMode && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {editGames.map((game, idx) => (
-                    <div key={idx} style={{
-                      background: 'rgba(255,255,255,0.03)', borderRadius: '12px',
-                      border: '1px solid var(--border-light)', padding: '14px',
-                      display: 'flex', flexDirection: 'column', gap: '10px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{
-                          fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-                          color: '#a78bfa', fontWeight: '700'
-                        }}>Game {idx + 1}</span>
-                        <button
-                          onClick={() => handleRemoveGame(idx)}
-                          style={{
-                            padding: '5px 8px', borderRadius: '6px', border: 'none',
-                            background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem'
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-
-                      <input
-                        type="text"
-                        value={game.name}
-                        onChange={(e) => handleGameChange(idx, 'name', e.target.value)}
-                        placeholder="Game name (e.g. Cone Memory)"
-                        style={{
-                          width: '100%', padding: '9px 12px', borderRadius: '8px',
-                          background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                          color: '#ffffff', fontSize: '0.875rem', outline: 'none', fontWeight: '700'
-                        }}
-                      />
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#29b6f6', fontWeight: '700', marginBottom: '5px' }}>🎯 How to Play</label>
-                        <textarea
-                          value={game.howToPlay}
-                          onChange={(e) => handleGameChange(idx, 'howToPlay', e.target.value)}
-                          placeholder="Explain how the game works..."
-                          rows={3}
-                          style={{
-                            width: '100%', padding: '9px 12px', borderRadius: '8px',
-                            background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                            color: '#ffffff', fontSize: '0.85rem', outline: 'none',
-                            fontFamily: 'inherit', lineHeight: '1.5', resize: 'vertical'
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#a78bfa', fontWeight: '700', marginBottom: '5px' }}>📖 Lesson Learned (Bible Study)</label>
-                        <textarea
-                          value={game.lesson}
-                          onChange={(e) => handleGameChange(idx, 'lesson', e.target.value)}
-                          placeholder="What spiritual/moral lesson does this game teach?"
-                          rows={3}
-                          style={{
-                            width: '100%', padding: '9px 12px', borderRadius: '8px',
-                            background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.3)',
-                            color: '#ffffff', fontSize: '0.85rem', outline: 'none',
-                            fontFamily: 'inherit', lineHeight: '1.5', resize: 'vertical'
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-
-                  <button
-                    onClick={handleAddGame}
-                    style={{
-                      padding: '10px', borderRadius: '10px',
-                      border: '1px dashed rgba(167,139,250,0.4)',
-                      background: 'transparent', color: '#a78bfa',
-                      fontSize: '0.85rem', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-                    }}
-                  >
-                    <Plus size={13} /> Add a Game
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
+          <ServiceTab
+            currentUser={currentUser}
+            serviceData={serviceData}
+            serviceEditMode={serviceEditMode}
+            savingService={savingService}
+            editServiceBrief={editServiceBrief}
+            editGroups={editGroups}
+            editGames={editGames}
+            totalKids={totalKids}
+            expandedServiceGame={expandedServiceGame}
+            currentActiveSlot={currentActiveSlot}
+            firebaseConnected={firebaseConnected}
+            setEditServiceBrief={setEditServiceBrief}
+            setEditGroups={setEditGroups}
+            setEditGames={setEditGames}
+            setServiceEditMode={setServiceEditMode}
+            handleSaveServiceData={handleSaveServiceData}
+            handleGroupChange={handleGroupChange}
+            handleRemoveGroup={handleRemoveGroup}
+            handleAddGroup={handleAddGroup}
+            setExpandedServiceGame={setExpandedServiceGame}
+            handleGameChange={handleGameChange}
+            handleRemoveGame={handleRemoveGame}
+            handleAddGame={handleAddGame}
+          />
         )}
-
       </main>
     </div>
-
       {/* First-run onboarding tooltip */}
       {showOnboardingTip && currentUser && (() => {
         const role = currentUser.role;
@@ -10583,20 +6425,7 @@ export default function App() {
       })()}
 
       {/* Navigation bar */}
-      <nav 
-        className="mobile-nav-bar" 
-        style={{ 
-          display: 'flex', 
-          width: '100%', 
-          justifyContent: getActiveTabs().length > 5 ? 'flex-start' : 'space-around', 
-          alignItems: 'center',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          paddingLeft: getActiveTabs().length > 5 ? '12px' : '0px',
-          paddingRight: getActiveTabs().length > 5 ? '12px' : '0px',
-          gap: getActiveTabs().length > 5 ? '8px' : '0px'
-        }}
-      >
+      <nav className="mobile-nav-bar">
         {getActiveTabs().map((t) => {
           const Icon = t.icon;
           const mainTabIds = getActiveTabs().filter(tab => tab.id !== 'more').map(tab => tab.id);
@@ -10622,23 +6451,7 @@ export default function App() {
                   }
                 }
               }}
-              style={{
-                flex: getActiveTabs().length > 5 ? '0 0 auto' : '1',
-                minWidth: getActiveTabs().length > 5 ? '68px' : '60px',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.74rem',
-                fontWeight: '700',
-                padding: '6px 8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                background: 'transparent',
-                border: 'none',
-                gap: '2px'
-              }}
+              aria-label={t.label}
             >
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon size={22} style={{ marginBottom: '2px' }} />
@@ -10890,36 +6703,34 @@ export default function App() {
                 </button>
               )}
 
-              {/* Service Mode specific: Camp Map & GPS (For everyone, since in Service Mode it is replaced by Service on the bottom tab bar) */}
-              {eventConfig.eventType === 'service' && (
-                <button
-                  className="more-drawer-item"
-                  onClick={() => {
-                    setCurrentTab('info');
-                    setInfoSubTab('map');
-                    setShowMoreDrawer(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    width: '100%',
-                    padding: '12px 16px',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    borderRadius: '12px',
-                    color: '#ffffff',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s'
-                  }}
-                >
-                  <MapIcon size={18} color="var(--vbt-sky)" /> Camp Map & GPS
-                </button>
-              )}
+              {/* Camp Map & GPS (Accessible to everyone, since in Service Mode it is replaced by Service on the bottom tab bar, and in other modes it helps as a drawer fallback) */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('info');
+                  setInfoSubTab('map');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+              >
+                <MapIcon size={18} color="var(--vbt-sky)" /> Camp Map & GPS
+              </button>
 
               {/* FAQs & Rules (Everyone) */}
               <button

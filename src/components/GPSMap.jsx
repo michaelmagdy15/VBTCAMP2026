@@ -545,26 +545,67 @@ export default function GPSMap({
       // Check if this waypoint is the active target station for the selected team
       const isActiveTarget = activeTargetWaypoint && activeTargetWaypoint.id === wp.id;
 
+      // Check if this waypoint has an active game from liveLocationStatus
+      const locStatus = liveLocationStatus?.find(loc => 
+        loc.id === wp.id || 
+        loc.name?.toLowerCase() === wp.label?.toLowerCase() ||
+        loc.label?.toLowerCase() === wp.label?.toLowerCase() ||
+        loc.name?.toLowerCase() === wp.game?.toLowerCase()
+      );
+      const hasActiveGame = !!(locStatus && locStatus.activeMatchup);
+
+      const markerHtml = isActiveTarget
+        ? `<div style="position:relative;width:24px;height:24px;">
+            <div style="
+              position:absolute;inset:2px;border-radius:50%;
+              background:${color};border:2.5px solid #ffffff;
+              box-shadow:0 0 12px ${color};z-index:2;
+            "></div>
+            <div style="
+              position:absolute;inset:-6px;border-radius:50%;
+              background:${color}33;
+              animation:gpsPulse 1.2s ease-out infinite;z-index:1;
+            "></div>
+            ${hasActiveGame ? `
+              <div style="
+                position:absolute;top:-4px;right:-4px;width:10px;height:10px;
+                border-radius:50%;background:#ef4444;border:1.5px solid #fff;
+                box-shadow:0 0 6px #ef4444;z-index:10;
+              "></div>
+              <div style="
+                position:absolute;top:-8px;right:-8px;width:18px;height:18px;
+                border-radius:50%;background:rgba(239,68,68,0.3);
+                animation:gpsPulse 1s ease-out infinite;z-index:9;
+              "></div>
+            ` : ''}
+          </div>`
+        : `<div style="position:relative;width:20px;height:20px;">
+            <div style="
+              width:20px;height:20px;border-radius:50%;
+              background:${color};border:2.5px solid #fff;
+              box-shadow:0 0 8px ${color}88;
+            "></div>
+            ${hasActiveGame ? `
+              <div style="
+                position:absolute;top:-3px;right:-3px;width:9px;height:9px;
+                border-radius:50%;background:#ef4444;border:1.5px solid #fff;
+                box-shadow:0 0 6px #ef4444;z-index:10;
+              "></div>
+              <div style="
+                position:absolute;top:-7px;right:-7px;width:17px;height:17px;
+                border-radius:50%;background:rgba(239,68,68,0.3);
+                animation:gpsPulse 1s ease-out infinite;z-index:9;
+              "></div>
+            ` : ''}
+          </div>`;
+
       const marker = L.marker([wp.lat, wp.lng], {
-        icon: isActiveTarget 
-          ? L.divIcon({
-              className: '',
-              html: `<div style="position:relative;width:24px;height:24px;">
-                <div style="
-                  position:absolute;inset:2px;border-radius:50%;
-                  background:${color};border:2.5px solid #ffffff;
-                  box-shadow:0 0 12px ${color};z-index:2;
-                "></div>
-                <div style="
-                  position:absolute;inset:-6px;border-radius:50%;
-                  background:${color}33;
-                  animation:gpsPulse 1.2s ease-out infinite;z-index:1;
-                "></div>
-              </div>`,
-              iconSize: [24, 24],
-              iconAnchor: [12, 12],
-            })
-          : makeCircleIcon(color, 20),
+        icon: L.divIcon({
+          className: '',
+          html: markerHtml,
+          iconSize: isActiveTarget ? [24, 24] : [20, 20],
+          iconAnchor: isActiveTarget ? [12, 12] : [10, 10],
+        }),
         draggable: isAdmin,
       }).addTo(map);
 
