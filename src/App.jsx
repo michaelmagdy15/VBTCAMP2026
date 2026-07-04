@@ -3908,6 +3908,11 @@ export default function App() {
               {/* Coordinator actions */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
+                <button onClick={seedJuly6Service}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
+                    background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
+                  🚀 SETUP JULY 6TH SERVICE (AI)
+                </button>
                 <button onClick={() => setShowCreateEvent(true)}
                   style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
                     background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
