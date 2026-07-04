@@ -16,8 +16,8 @@ export default defineConfig({
       workbox: {
         importScripts: ['sw-push.js'], // ← injects our push/notificationclick handlers
         // Cache all app assets including audio files for offline use
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,mp3,wav,webm,ogg}'],
-        maximumFileSizeToCacheInBytes: 15000000, // 15MB — covers all sound files
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,mp3,wav,webm,ogg,woff,woff2,bin}'],
+        maximumFileSizeToCacheInBytes: 100000000, // 100MB — covers all sound files and offline assets
         // Range request support for audio scrubbing on iOS
         runtimeCaching: [
           {

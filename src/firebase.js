@@ -92,8 +92,25 @@ export function subscribeToEventRegistry(callback) {
 export async function getEventRegistry() {
   try {
     const docRef = doc(db, 'vbt_event_registry/events');
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
+    let docSnap;
+
+    if (!navigator.onLine) {
+      try {
+        docSnap = await getDoc(docRef, { source: 'cache' });
+      } catch(e) {}
+    } else {
+      try {
+        docSnap = await Promise.race([
+          getDoc(docRef),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
+      } catch (e) {
+        console.warn("Network fetch timed out or failed. Falling back to cache for registry.");
+        docSnap = await getDoc(docRef, { source: 'cache' }).catch(() => null);
+      }
+    }
+
+    if (docSnap && docSnap.exists()) {
       return docSnap.data().list || [];
     }
   } catch (error) {

@@ -1,13 +1,14 @@
 /* VBT Sports Camp Web App - Custom Design System */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+/* Removed Google Fonts import since we now load them locally from node_modules */
 
 :root {
-  --vbt-blue: #1441a1;
-  --vbt-sky: #29b6f6;
+  --vbt-blue: #3B82F6;
+  --vbt-sky: #60A5FA;
+  --vbt-cta: #F97316;
   --bg-dark: #070a13;
   --bg-surface: rgba(13, 20, 38, 0.65);
   --bg-surface-hover: rgba(20, 30, 58, 0.85);
-  --border-glow: rgba(41, 182, 246, 0.15);
+  --border-glow: rgba(96, 165, 250, 0.15);
   --border-light: rgba(255, 255, 255, 0.06);
   
   --text-primary: #f8fafc;
@@ -21,7 +22,7 @@
   --color-fries-rgb: 255, 145, 0;
   --color-tie: #a855f7;
   
-  --gradient-vbt: linear-gradient(135deg, #1441a1 0%, #29b6f6 100%);
+  --gradient-vbt: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
   --gradient-shakes: linear-gradient(135deg, #00b0ff 0%, #0077c2 100%);
   --gradient-fries: linear-gradient(135deg, #ff9100 0%, #e65100 100%);
   --gradient-card: linear-gradient(135deg, rgba(20, 30, 58, 0.4) 0%, rgba(13, 20, 38, 0.6) 100%);
@@ -31,7 +32,7 @@
   --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   
   --font-title: 'Outfit', sans-serif;
-  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
 
   /* Safe area inset shorthand variables — updated dynamically by the env() function.
      Use these anywhere you need to offset for notch / Dynamic Island / home bar. */
@@ -129,8 +130,28 @@ button,
 .toggle-btn,
 .mobile-nav-item,
 .location-card,
-.more-drawer-item {
+.more-drawer-item,
+.glass-panel {
+  cursor: pointer;
   transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s ease, background-color 0.15s ease;
+}
+
+button:focus-visible,
+.toggle-btn:focus-visible,
+.mobile-nav-item:focus-visible,
+.location-card:focus-visible,
+.glass-panel:focus-visible {
+  outline: 2px solid var(--vbt-cta);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 button:active,
@@ -192,20 +213,14 @@ h1, h2, h3, h4, h5, h6 {
   border-left: 4px solid var(--color-fries);
 }
 
-/* Custom Scrollbar */
+/* Hide Scrollbars for a Native App Feel */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none;
 }
-::-webkit-scrollbar-track {
-  background: var(--bg-dark);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+
+body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* Scoreboard Tug-of-War Progress Bar */
@@ -443,34 +458,29 @@ h1, h2, h3, h4, h5, h6 {
   100% { transform: rotate(360deg); }
 }
 
-/* Concentric Counters-rotating Orbits for Preloader */
-.spinner-outer {
+/* Sports Event Ripple Effect for Preloader */
+.stadium-ripple {
   position: absolute;
-  width: 155px;
-  height: 155px;
-  border: 2px solid transparent;
-  border-top-color: var(--vbt-sky);
-  border-bottom-color: var(--vbt-sky);
+  width: 100px;
+  height: 100px;
+  border: 3px solid var(--vbt-sky);
   border-radius: 50%;
-  animation: spin 2.2s linear infinite;
-  filter: drop-shadow(0 0 6px rgba(41, 182, 246, 0.3));
+  animation: ripple-wave 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
 }
 
-.spinner-inner {
-  position: absolute;
-  width: 130px;
-  height: 130px;
-  border: 2px solid transparent;
-  border-left-color: #a78bfa;
-  border-right-color: #a78bfa;
-  border-radius: 50%;
-  animation: spin-reverse 1.6s linear infinite;
-  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.25));
+.stadium-ripple:nth-child(2) {
+  animation-delay: -1s;
+  border-color: var(--color-shakes);
 }
 
-@keyframes spin-reverse {
-  0% { transform: rotate(360deg); }
-  100% { transform: rotate(0deg); }
+.stadium-ripple:nth-child(3) {
+  animation-delay: -0.5s;
+  border-color: var(--color-fries);
+}
+
+@keyframes ripple-wave {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
 }
 
 /* Ambient glow orbs in background */
@@ -655,19 +665,7 @@ button {
   transform: scale(0.92);
 }
 
-/* Permanent visible thin scrollbar for mobile navigation bar */
-.mobile-nav-bar::-webkit-scrollbar {
-  height: 4px !important;
-  display: block !important;
-}
-.mobile-nav-bar::-webkit-scrollbar-track {
-  background: rgba(13, 20, 38, 0.4) !important;
-}
-.mobile-nav-bar::-webkit-scrollbar-thumb {
-  background: var(--vbt-sky) !important;
-  border-radius: 2px !important;
-  box-shadow: 0 0 4px var(--vbt-sky);
-}
+/* Removed visible scrollbar for mobile navigation bar to maintain native look */
 
 /* Custom Responsive Rules */
 .config-grid-2col {

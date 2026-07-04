@@ -644,7 +644,7 @@ export default function GPSMap({
         setUserPos(coords);
       },
       (err) => console.warn('[GPSMap] geolocation error:', err.message),
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      { enableHighAccuracy: false, maximumAge: 10000, timeout: 10000 }
     );
 
     return () => {

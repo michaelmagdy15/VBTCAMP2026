@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   Trophy, 
   Users, 
@@ -102,6 +103,7 @@ import ScheduleExporter from './components/ScheduleExporter';
 import WalkieTalkie from './components/WalkieTalkie';
 import GPSMap from './components/GPSMap';
 import ScheduleBuilder from './components/ScheduleBuilder';
+import OfflineBackupModal from './components/OfflineBackupModal';
 import { playChime, unlockAudioContext, getSharedAudioContext } from './chimes';
 import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
@@ -255,8 +257,8 @@ function MatchupStopwatch({ actualStart, actualEnd }) {
     const elapsedMins = Math.floor(elapsed / 60);
     const elapsedSecs = elapsed % 60;
     return (
-      <span style={{ color: '#4ade80', fontWeight: '700', fontFamily: 'monospace' }}>
-        ⏱️ RUNNING: {elapsedMins}m {elapsedSecs < 10 ? '0' : ''}{elapsedSecs}s
+      <span style={{ color: '#4ade80', fontWeight: '700', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <Clock size={14} /> RUNNING: {elapsedMins}m {elapsedSecs < 10 ? '0' : ''}{elapsedSecs}s
       </span>
     );
   } else if (actualStart && actualEnd) {
@@ -266,12 +268,12 @@ function MatchupStopwatch({ actualStart, actualEnd }) {
     const totalMins = Math.floor(totalSecs / 60);
     const totalSecsPart = totalSecs % 60;
     return (
-      <span style={{ color: 'var(--text-muted)' }}>
-        ⏱️ TOOK: {totalMins}m {totalSecsPart < 10 ? '0' : ''}{totalSecsPart}s
+      <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <Clock size={14} /> TOOK: {totalMins}m {totalSecsPart < 10 ? '0' : ''}{totalSecsPart}s
       </span>
     );
   }
-  return <span style={{ color: 'var(--text-muted)' }}>⏱️ Scheduled: 30m</span>;
+  return <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> Scheduled: 30m</span>;
 }
 
 function MatchupRunningStopwatch({ actualStart }) {
@@ -299,8 +301,47 @@ function MatchupRunningStopwatch({ actualStart }) {
       gap: '4px',
       fontFamily: 'monospace'
     }}>
-      🏃 RUNNING: {elapsedMins}:{formattedSecs}
+      <Clock size={14} /> RUNNING: {elapsedMins}:{formattedSecs}
     </span>
+  );
+}
+
+function RotationTimerDisplay({ rotationTimer, setShowRotateNow, handleTimerPause, handleTimerResume, handleTimerReset }) {
+  const [rotationSecondsLeft, setRotationSecondsLeft] = useState(null);
+
+  useEffect(() => {
+    if (!rotationTimer) { setRotationSecondsLeft(null); return; }
+    const tick = () => {
+      const { durationMin = 15, startedAt, isPaused, pausedAt, totalPausedMs = 0 } = rotationTimer;
+      if (!startedAt) { setRotationSecondsLeft(null); return; }
+      const sLeft = Math.max(0, durationMin * 60 - (isPaused ? (new Date(pausedAt) - new Date(startedAt) - totalPausedMs) / 1000 : (Date.now() - new Date(startedAt) - totalPausedMs) / 1000));
+      setRotationSecondsLeft(Math.round(sLeft));
+      if (sLeft <= 0 && !isPaused) setShowRotateNow(true);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [rotationTimer, setShowRotateNow]);
+
+  if (!rotationTimer?.startedAt) return null;
+
+  return (
+    <div style={{
+      position:'fixed',top:`calc(env(safe-area-inset-top) + 8px)`,right:'8px',
+      zIndex:700,background:'rgba(13,20,38,0.92)',backdropFilter:'blur(10px)',
+      border:'1px solid rgba(255,255,255,0.12)',borderRadius:'12px',
+      padding:'6px 12px',display:'flex',alignItems:'center',gap:'8px',
+    }}>
+      <span style={{fontSize:'0.7rem',color:rotationSecondsLeft<=60?'#f87171':'#4ade80',fontFamily:'monospace',fontWeight:'800'}}>
+        {rotationSecondsLeft!=null ? (Math.floor(rotationSecondsLeft/60)+':'+(rotationSecondsLeft%60<10?'0':'')+(rotationSecondsLeft%60)) : '--:--'}
+      </span>
+      {!rotationTimer.isPaused ? (
+        <button onClick={handleTimerPause} title='Pause' style={{background:'none',border:'none',cursor:'pointer',color:'#fbbf24',fontSize:'0.9rem',padding:'2px'}}>&#9646;&#9646;</button>
+      ) : (
+        <button onClick={handleTimerResume} title='Resume' style={{background:'none',border:'none',cursor:'pointer',color:'#4ade80',fontSize:'0.9rem',padding:'2px'}}>&#9654;</button>
+      )}
+      <button onClick={handleTimerReset} title='Reset' style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',padding:'2px'}}>&#8635;</button>
+    </div>
   );
 }
 
@@ -319,7 +360,7 @@ function ScheduleTimelineTrackerCard({
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -742,11 +783,65 @@ export default function App() {
     return evCode ? (localStorage.getItem(`vbt_apps_url_${evCode}`) || '') : '';
   });
 
+  // PWA & Onboarding UI State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
   useEffect(() => {
     if (currentEventCode) {
       localStorage.setItem(`vbt_apps_url_${currentEventCode}`, appsScriptWebappUrl);
     }
   }, [appsScriptWebappUrl, currentEventCode]);
+
+  // URL check for QR Check-in logic
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlEvent = searchParams.get('event');
+    const urlCheckin = searchParams.get('checkin');
+
+    if (urlEvent && urlCheckin === '1') {
+      const code = urlEvent.toUpperCase();
+      setCurrentEventCode(code);
+      localStorage.setItem('vbt_current_event', code);
+      // Clean up the URL so it doesn't run again on refresh
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      const isAndroid = /android/i.test(navigator.userAgent || navigator.vendor || window.opera);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+      if ((isAndroid || isIOS) && !isStandalone) {
+        setShowInstallPrompt(true);
+      } else {
+        setShowOnboarding(true);
+      }
+      
+      const savedUserStr = localStorage.getItem(`vbt_user_${code}`);
+      if (savedUserStr) {
+        try {
+          const userObj = JSON.parse(savedUserStr);
+          setCurrentUser(userObj);
+          if (!isOfflineMode) {
+            addAnnouncement(code, `${userObj.name} checked in via QR`, 'System', 'system').catch(() => {});
+          }
+        } catch (e) {
+          console.error("Error parsing saved user:", e);
+        }
+      }
+    }
+  }, []);
 
   // UI state
   const [currentTab, setCurrentTab] = useState('scoreboard');
@@ -780,11 +875,11 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('vbt-theme') !== 'light');
   const [gamesLibrary, setGamesLibrary] = useState([]);
   const [rotationTimer, setRotationTimer] = useState(null);
-  const [rotationSecondsLeft, setRotationSecondsLeft] = useState(null);
   const [showRotateNow, setShowRotateNow] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueueLen, setOfflineQueueLen] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
   const [showRulesOverlay, setShowRulesOverlay] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
@@ -793,6 +888,8 @@ export default function App() {
   const [showDebriefModal, setShowDebriefModal] = useState(false);
   const [debriefData, setDebriefData] = useState({ kidsCount: '', highlights: '', challenges: '', notes: '' });
   const [debriefSaved, setDebriefSaved] = useState(false);
+  const [debriefError, setDebriefError] = useState('');
+  const [feedbackError, setFeedbackError] = useState('');
   const [showServantDirectoryModal, setShowServantDirectoryModal] = useState(false);
   const [showGamesLibraryModal, setShowGamesLibraryModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
@@ -1423,23 +1520,7 @@ export default function App() {
     return unsub;
   }, [currentEventCode]);
 
-  // Rotation timer countdown tick
-  useEffect(() => {
-    if (!rotationTimer) { setRotationSecondsLeft(null); return; }
-    const tick = () => {
-      const { durationMin = 15, startedAt, isPaused, pausedAt, totalPausedMs = 0 } = rotationTimer;
-      if (!startedAt) { setRotationSecondsLeft(null); return; }
-      const pauseOffset = isPaused && pausedAt
-        ? (new Date(pausedAt) - new Date(startedAt) - totalPausedMs) / 1000
-        : (Date.now() - new Date(startedAt) - totalPausedMs) / 1000;
-      const sLeft = Math.max(0, durationMin * 60 - (isPaused ? (new Date(pausedAt) - new Date(startedAt) - totalPausedMs) / 1000 : (Date.now() - new Date(startedAt) - totalPausedMs) / 1000));
-      setRotationSecondsLeft(Math.round(sLeft));
-      if (sLeft <= 0 && !isPaused) setShowRotateNow(true);
-    };
-    tick();
-    const iv = setInterval(tick, 1000);
-    return () => clearInterval(iv);
-  }, [rotationTimer]);
+  // Rotation timer countdown tick logic extracted to RotationTimerDisplay
 
   // Load debrief when modal opens
   useEffect(() => {
@@ -1928,7 +2009,8 @@ export default function App() {
       }
       
       if (!isOfflineMode) {
-        addAnnouncement(currentEventCode, `${servant.name} signed in as ${roleCode.toUpperCase().replace('_', ' ')}`, 'System', 'system');
+        const displayRole = roleCode === 'none' ? '' : ` as ${roleCode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
+        addAnnouncement(currentEventCode, `${servant.name} signed in${displayRole}`, 'System', 'system');
       }
       return;
     }
@@ -2295,18 +2377,20 @@ export default function App() {
   const handleSubmitFeedback = async () => {
     if (!feedbackRating) return;
     try {
+      setFeedbackError('');
       await submitFeedback(currentEventCode, { rating: feedbackRating, comment: feedbackText });
       setFeedbackSubmitted(true);
       setTimeout(() => { setShowFeedbackModal(false); setFeedbackSubmitted(false); setFeedbackRating(0); setFeedbackText(''); }, 2000);
-    } catch (e) { alert('Failed to submit feedback'); }
+    } catch (e) { setFeedbackError('Failed to submit feedback'); }
   };
 
   // Debrief save
   const handleSaveDebrief = async () => {
     try {
+      setDebriefError('');
       await saveDebrief(currentEventCode, { ...debriefData, eventName: eventConfig?.eventName, eventDate: eventConfig?.eventDate });
       setDebriefSaved(true); setTimeout(() => setDebriefSaved(false), 3000);
-    } catch (e) { alert('Failed to save debrief'); }
+    } catch (e) { setDebriefError('Failed to save debrief'); }
   };
 
   // Auto-save games to global library
@@ -3378,11 +3462,11 @@ export default function App() {
 
   // ─── EVENT SELECTION SCREEN ──────────────────────────────────────────────
   const getPreloadMessage = (progress) => {
-    if (progress < 25) return "Connecting to db-vbt...";
-    if (progress < 50) return "Fetching active sports events...";
-    if (progress < 75) return "Synchronizing servant credentials...";
-    if (progress < 90) return "Caching dynamic schedules & matches...";
-    return "VBT Service day loaded. Launching...";
+    if (progress < 25) return "Lacing up shoes...";
+    if (progress < 50) return "Warming up the crowd...";
+    if (progress < 75) return "Preparing the courts...";
+    if (progress < 90) return "Drawing up the playbook...";
+    return "Game ON! Launching...";
   };
 
   // ─── EVENT SELECTION SCREEN ──────────────────────────────────────────────
@@ -3405,8 +3489,9 @@ export default function App() {
         
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center', zIndex: 10 }}>
           <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-            <div className="spinner-outer" />
-            <div className="spinner-inner" />
+            <div className="stadium-ripple" />
+            <div className="stadium-ripple" />
+            <div className="stadium-ripple" />
             <img
               src="/Final VBT Re-Branding 2026-02 (3).png"
               alt="VBT Logo"
@@ -3869,10 +3954,13 @@ export default function App() {
 
                     {newEventType === 'service' ? (
                       <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-                        <h4 style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Custom Team Labels</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                        <h4 style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: '700', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Custom Team Labels</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#ef4444', marginBottom: '4px', fontWeight: '700' }}>Red Team Label</label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ef4444', marginBottom: '8px', fontWeight: '700' }}>
+                              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444' }}></span>
+                              Red Team Label
+                            </label>
                             <input
                               type="text"
                               value={newTeamRed}
@@ -3882,7 +3970,10 @@ export default function App() {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#ffffff', marginBottom: '4px', fontWeight: '700' }}>White Team Label</label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ffffff', marginBottom: '8px', fontWeight: '700' }}>
+                              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #ccc' }}></span>
+                              White Team Label
+                            </label>
                             <input
                               type="text"
                               value={newTeamWhite}
@@ -3892,7 +3983,10 @@ export default function App() {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>Black Team Label</label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '8px', fontWeight: '700' }}>
+                              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#1e293b', border: '1px solid #94a3b8' }}></span>
+                              Black Team Label
+                            </label>
                             <input
                               type="text"
                               value={newTeamBlack}
@@ -3902,7 +3996,10 @@ export default function App() {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#29b6f6', marginBottom: '4px', fontWeight: '700' }}>Blue Team Label</label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#38bdf8', marginBottom: '8px', fontWeight: '700' }}>
+                              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#38bdf8' }}></span>
+                              Blue Team Label
+                            </label>
                             <input
                               type="text"
                               value={newTeamBlue}
@@ -6514,7 +6611,6 @@ export default function App() {
                       style={{
                         padding: '8px 10px',
                         borderRadius: '6px',
-                        border: 'none',
                         fontWeight: '700',
                         fontSize: '0.75rem',
                         cursor: 'pointer',
@@ -6651,9 +6747,8 @@ export default function App() {
                     style={{
                       padding: '6px 10px',
                       borderRadius: '6px',
-                      border: 'none',
-                      background: 'rgba(34, 197, 94, 0.2)',
-                      border: '1px solid rgba(34, 197, 94, 0.4)',
+                      
+
                       color: '#4ade80',
                       fontWeight: '700',
                       fontSize: '0.72rem',
@@ -6676,9 +6771,8 @@ export default function App() {
                     style={{
                       padding: '6px 10px',
                       borderRadius: '6px',
-                      border: 'none',
-                      background: 'rgba(239, 68, 68, 0.2)',
-                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      
+
                       color: '#f87171',
                       fontWeight: '700',
                       fontSize: '0.72rem',
@@ -6973,9 +7067,8 @@ export default function App() {
                                         width: '26px',
                                         height: '26px',
                                         borderRadius: '50%',
-                                        border: 'none',
-                                        background: 'rgba(239, 68, 68, 0.2)',
-                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        
+
                                         color: '#ffffff',
                                         fontWeight: '800',
                                         cursor: 'pointer',
@@ -6996,9 +7089,8 @@ export default function App() {
                                         width: '26px',
                                         height: '26px',
                                         borderRadius: '50%',
-                                        border: 'none',
-                                        background: 'rgba(34, 197, 94, 0.2)',
-                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                        
+
                                         color: '#ffffff',
                                         fontWeight: '800',
                                         cursor: 'pointer',
@@ -7028,9 +7120,8 @@ export default function App() {
                                         width: '26px',
                                         height: '26px',
                                         borderRadius: '50%',
-                                        border: 'none',
-                                        background: 'rgba(239, 68, 68, 0.2)',
-                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        
+
                                         color: '#ffffff',
                                         fontWeight: '800',
                                         cursor: 'pointer',
@@ -7051,9 +7142,8 @@ export default function App() {
                                         width: '26px',
                                         height: '26px',
                                         borderRadius: '50%',
-                                        border: 'none',
-                                        background: 'rgba(34, 197, 94, 0.2)',
-                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                        
+
                                         color: '#ffffff',
                                         fontWeight: '800',
                                         cursor: 'pointer',
@@ -7105,9 +7195,8 @@ export default function App() {
                                         flex: 1,
                                         padding: '6px',
                                         borderRadius: '6px',
-                                        border: 'none',
-                                        background: 'rgba(34, 197, 94, 0.15)',
-                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                        
+
                                         color: '#4ade80',
                                         fontSize: '0.72rem',
                                         fontWeight: '700',
@@ -8309,6 +8398,7 @@ export default function App() {
                 ['&#128101; Servants','Directory',()=>setShowServantDirectoryModal(true),'#60a5fa'],
                 ['&#127918; Games','Library',()=>setShowGamesLibraryModal(true),'#a78bfa'],
                 ['&#128247; QR Check-in','Self check-in',()=>setShowQRModal(true),'#4ade80'],
+                ['&#128190; Backup','Offline sync',()=>setShowBackupModal(true),'#10b981'],
                 ['&#128203; Debrief','Post-service',()=>setShowDebriefModal(true),'#fbbf24'],
                 ['&#9200; Timer','Rotation clock',()=>handleTimerStart(),'#f97316'],
                 [isDarkMode?'&#9728; Light':'&#9790; Dark',isDarkMode?'Switch to light':'Switch to dark',()=>setIsDarkMode(!isDarkMode),'#94a3b8'],
@@ -8578,24 +8668,36 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                      <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Rename Teams</h4>
-                      <div className="config-grid-teams" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                      <h4 style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: '700', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎨 Rename Teams</h4>
+                      <div className="config-grid-teams" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#ef4444', marginBottom: '4px', fontWeight: '700' }}>Red Team</label>
-                          <input type="text" value={editTeamRed} onChange={(e) => setEditTeamRed(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ef4444', marginBottom: '8px', fontWeight: '700' }}>
+                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444' }}></span>
+                            Red Team
+                          </label>
+                          <input type="text" value={editTeamRed} onChange={(e) => setEditTeamRed(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
                         </div>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#ffffff', marginBottom: '4px', fontWeight: '700' }}>White Team</label>
-                          <input type="text" value={editTeamWhite} onChange={(e) => setEditTeamWhite(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ffffff', marginBottom: '8px', fontWeight: '700' }}>
+                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #ccc' }}></span>
+                            White Team
+                          </label>
+                          <input type="text" value={editTeamWhite} onChange={(e) => setEditTeamWhite(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
                         </div>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>Black Team</label>
-                          <input type="text" value={editTeamBlack} onChange={(e) => setEditTeamBlack(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '8px', fontWeight: '700' }}>
+                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#1e293b', border: '1px solid #94a3b8' }}></span>
+                            Black Team
+                          </label>
+                          <input type="text" value={editTeamBlack} onChange={(e) => setEditTeamBlack(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
                         </div>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.65rem', color: '#29b6f6', marginBottom: '4px', fontWeight: '700' }}>Blue Team</label>
-                          <input type="text" value={editTeamBlue} onChange={(e) => setEditTeamBlue(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem' }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#38bdf8', marginBottom: '8px', fontWeight: '700' }}>
+                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#38bdf8' }}></span>
+                            Blue Team
+                          </label>
+                          <input type="text" value={editTeamBlue} onChange={(e) => setEditTeamBlue(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }} />
                         </div>
                       </div>
                     </div>
@@ -10882,7 +10984,6 @@ export default function App() {
         </div>
 
       )}
-      )}
 
       {/* ═══ ROTATE NOW OVERLAY ══════════════════════════════ */}
       {showRotateNow && (
@@ -10946,12 +11047,13 @@ export default function App() {
             {feedbackSubmitted ? (
               <div style={{textAlign:'center',padding:'24px 0',fontSize:'2rem',color:'#4ade80'}}>Thanks! &#128591;</div>
             ) : (<>
+              {feedbackError && <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'#ef4444',padding:'10px',borderRadius:'8px',marginBottom:'16px',fontSize:'0.85rem',textAlign:'center'}}>{feedbackError}</div>}
               <div style={{display:'flex',justifyContent:'center',gap:'12px',marginBottom:'20px'}}>
                 {[1,2,3,4,5].map(n=>(
                   <button key={n} onClick={()=>setFeedbackRating(n)} style={{fontSize:'2rem',background:'none',border:'none',cursor:'pointer',opacity:feedbackRating>=n?1:0.25,transform:feedbackRating>=n?'scale(1.25)':'scale(1)',transition:'all 0.15s'}}>&#11088;</button>
                 ))}
               </div>
-              <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder='Any suggestions? (optional)' rows={3} style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'0.9rem',resize:'none',boxSizing:'border-box',marginBottom:'12px'}} />
+              <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder='Any suggestions? (optional)' rows={3} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'0.9rem',resize:'none',boxSizing:'border-box',marginBottom:'12px'}} />
               <button onClick={handleSubmitFeedback} disabled={!feedbackRating} style={{width:'100%',padding:'14px',borderRadius:'12px',border:'none',background:feedbackRating?'linear-gradient(135deg,#1441a1,#60a5fa)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:'700',cursor:feedbackRating?'pointer':'not-allowed',opacity:feedbackRating?1:0.5}}>Submit Feedback</button>
             </>)}
           </div>
@@ -10964,10 +11066,11 @@ export default function App() {
           <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'90vh',overflowY:'auto',background:'#0d1426',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'24px 24px 0 0',padding:'24px',paddingBottom:`calc(24px + env(safe-area-inset-bottom))`}}>
             <div style={{width:'40px',height:'4px',borderRadius:'2px',background:'rgba(255,255,255,0.2)',margin:'0 auto 20px'}} />
             <h2 style={{fontSize:'1.2rem',fontWeight:'800',color:'#fff',marginBottom:'20px'}}>Post-Service Debrief</h2>
+            {debriefError && <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'#ef4444',padding:'10px',borderRadius:'8px',marginBottom:'16px',fontSize:'0.85rem',textAlign:'center'}}>{debriefError}</div>}
             {[['kidsCount','Kids who showed up','e.g. 118','number'],['highlights','Highlights','Best moments...','textarea'],['challenges','Challenges','Any issues...','textarea'],['notes','Notes for next time','Lessons learned...','textarea']].map(([key,label,ph,type])=>(
               <div key={key} style={{marginBottom:'16px'}}>
                 <label style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>{label}</label>
-                {type==='textarea'?<textarea value={debriefData[key]||''} onChange={e=>setDebriefData(p=>({...p,[key]:e.target.value}))} placeholder={ph} rows={3} style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.9rem',resize:'none',boxSizing:'border-box'}}/>:<input type={type} value={debriefData[key]||''} onChange={e=>setDebriefData(p=>({...p,[key]:e.target.value}))} placeholder={ph} style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box'}}/>}
+                {type==='textarea'?<textarea value={debriefData[key]||''} onChange={e=>setDebriefData(p=>({...p,[key]:e.target.value}))} placeholder={ph} rows={3} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.9rem',resize:'none',boxSizing:'border-box'}}/>:<input type={type} value={debriefData[key]||''} onChange={e=>setDebriefData(p=>({...p,[key]:e.target.value}))} placeholder={ph} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box'}}/>}
               </div>
             ))}
             <button onClick={handleSaveDebrief} style={{width:'100%',padding:'14px',borderRadius:'12px',border:'none',background:debriefSaved?'rgba(74,222,128,0.15)':'linear-gradient(135deg,#1441a1,#60a5fa)',color:debriefSaved?'#4ade80':'#fff',fontWeight:'700',cursor:'pointer',transition:'all 0.3s'}}>{debriefSaved?'Saved! &#10003;':'Save Debrief'}</button>
@@ -11072,7 +11175,7 @@ export default function App() {
                     {g.location && <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.35)',marginBottom:'4px'}}>{g.location}</div>}
                     <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.25)'}}>Used {g.timesUsed||1}x &nbsp;&#183;&nbsp; Last: {g.lastUsedEvent||'—'}</div>
                   </div>
-                  <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.75rem',flexShrink:0,marginTop:'2px'}}>{expandedGame===g.id?'&#9650;':'&#9660;'}</span>
+                  <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.75rem',flexShrink:0,marginTop:'2px'}} onClick={()=>setExpandedGame(expandedGame===g.id?null:g.id)}>{expandedGame===g.id?'&#9650;':'&#9660;'}</span>
                 </div>
                 {expandedGame===g.id && (
                   <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
@@ -11087,24 +11190,177 @@ export default function App() {
         </div>
       )}
 
+      {/* ═══ OFFLINE STATUS BADGE ══════════════════════════════ */}
+      {!isOnline && (
+        <div style={{
+          position:'fixed',top:`calc(env(safe-area-inset-top) + 8px)`,
+          left:'50%',transform:'translateX(-50%)',zIndex:9000,
+          background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.4)',
+          color:'#f87171',borderRadius:'20px',padding:'4px 14px',
+          fontSize:'0.75rem',fontWeight:'700',backdropFilter:'blur(8px)',
+          display:'flex',alignItems:'center',gap:'6px',
+        }}>
+          <span style={{width:'6px',height:'6px',borderRadius:'50%',background:'#f87171',display:'inline-block'}} />
+          Offline{offlineQueueLen > 0 ? ` — ${offlineQueueLen} queued` : ''}
+        </div>
+      )}
+
+      {/* ═══ PWA INSTALL PROMPT ════════════════════════════════ */}
+      {showInstallPrompt && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(5,9,20,0.95)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '24px'
+        }}>
+          <div style={{
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '400px',
+            textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+          }}>
+            {(() => {
+              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+              return (
+                <>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📲</div>
+                  <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>Install VBT App</h2>
+                  <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: '24px' }}>
+                    For the best experience during the event, please install this web app on your home screen. It gives you full-screen access and better offline support!
+                  </p>
+                  
+                  {isIOS && (
+                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '16px', borderRadius: '12px', marginBottom: '20px', textAlign: 'left', fontSize: '0.85rem', color: 'rgba(255,255,255,0.9)' }}>
+                      <strong>To install on iOS:</strong><br/>
+                      1. Tap the Share button <svg style={{display:'inline',verticalAlign:'middle',margin:'0 4px'}} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> in the bottom bar.<br/>
+                      2. Scroll down and tap <strong>"Add to Home Screen"</strong> <svg style={{display:'inline',verticalAlign:'middle',margin:'0 4px'}} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>.
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {!isIOS && (
+                      <button
+                        onClick={async () => {
+                          if (deferredPrompt) {
+                            deferredPrompt.prompt();
+                            const { outcome } = await deferredPrompt.userChoice;
+                            if (outcome === 'accepted') {
+                              console.log('User accepted the install prompt');
+                            }
+                            setDeferredPrompt(null);
+                          }
+                          setShowInstallPrompt(false);
+                          setShowOnboarding(true);
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                          color: '#fff', border: 'none', padding: '14px', borderRadius: '12px',
+                          fontSize: '1rem', fontWeight: '700', cursor: 'pointer'
+                        }}
+                      >
+                        Install App Now
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setShowInstallPrompt(false);
+                        setShowOnboarding(true);
+                      }}
+                      style={{
+                        background: isIOS ? 'linear-gradient(135deg, #3b82f6, #60a5fa)' : 'transparent',
+                        color: isIOS ? '#fff' : 'rgba(255,255,255,0.5)',
+                        border: 'none', padding: '14px', borderRadius: '12px',
+                        fontSize: isIOS ? '1rem' : '0.9rem', cursor: 'pointer',
+                        fontWeight: '700'
+                      }}
+                    >
+                      {isIOS ? 'Got it, Continue' : 'Maybe Later'}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ONBOARDING TOUR ═══════════════════════════════════ */}
+      {showOnboarding && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(5,9,20,0.85)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998, padding: '24px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(180deg, rgba(30,41,59,0.9) 0%, rgba(15,23,42,0.95) 100%)', 
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '24px', padding: '24px', width: '100%', maxWidth: '350px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+          }}>
+            {(() => {
+              const steps = [
+                { emoji: '👋', title: 'Welcome to VBT!', text: "Let's take a quick tour! This app is designed to make our day go incredibly smoothly and make managing kids a breeze." },
+                { emoji: '📰', title: 'Timeline & Feed', text: 'Check the timeline for live announcements, schedules, and instant updates so everyone stays on the same page.' },
+                { emoji: '🏆', title: 'Live Scoreboard', text: 'Keep track of scores and motivate the kids by showing them the live Scoreboard.' },
+                { emoji: '👥', title: 'Your Service & Roles', text: 'Tap the Service tab to instantly see your exact role, team assignments, and game instructions.' }
+              ];
+              const step = steps[onboardingStep];
+              return (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '16px' }}>{step.emoji}</div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#fff', marginBottom: '10px' }}>{step.title}</h3>
+                  <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: '24px', minHeight: '60px' }}>
+                    {step.text}
+                  </p>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {steps.map((_, i) => (
+                        <div key={i} style={{
+                          width: '8px', height: '8px', borderRadius: '50%',
+                          background: i === onboardingStep ? '#38bdf8' : 'rgba(255,255,255,0.2)'
+                        }} />
+                      ))}
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                        onClick={() => setShowOnboarding(false)}
+                        style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600' }}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (onboardingStep < steps.length - 1) {
+                            setOnboardingStep(prev => prev + 1);
+                          } else {
+                            setShowOnboarding(false);
+                          }
+                        }}
+                        style={{
+                          background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)',
+                          padding: '8px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer'
+                        }}
+                      >
+                        {onboardingStep < steps.length - 1 ? 'Next' : 'Finish'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* ═══ ROTATION TIMER WIDGET (Coordinator only, floats in header) ════ */}
       {rotationTimer?.startedAt && (currentUser?.role === 'admin' || currentUser?.role === 'coordinator') && (
-        <div style={{
-          position:'fixed',top:`calc(env(safe-area-inset-top) + 8px)`,right:'8px',
-          zIndex:700,background:'rgba(13,20,38,0.92)',backdropFilter:'blur(10px)',
-          border:'1px solid rgba(255,255,255,0.12)',borderRadius:'12px',
-          padding:'6px 12px',display:'flex',alignItems:'center',gap:'8px',
-        }}>
-          <span style={{fontSize:'0.7rem',color:rotationSecondsLeft<=60?'#f87171':'#4ade80',fontFamily:'monospace',fontWeight:'800'}}>
-            {rotationSecondsLeft!=null ? (Math.floor(rotationSecondsLeft/60)+':'+(rotationSecondsLeft%60<10?'0':'')+(rotationSecondsLeft%60)) : '--:--'}
-          </span>
-          {!rotationTimer.isPaused ? (
-            <button onClick={handleTimerPause} title='Pause' style={{background:'none',border:'none',cursor:'pointer',color:'#fbbf24',fontSize:'0.9rem',padding:'2px'}}>&#9646;&#9646;</button>
-          ) : (
-            <button onClick={handleTimerResume} title='Resume' style={{background:'none',border:'none',cursor:'pointer',color:'#4ade80',fontSize:'0.9rem',padding:'2px'}}>&#9654;</button>
-          )}
-          <button onClick={handleTimerReset} title='Reset' style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',padding:'2px'}}>&#8635;</button>
-        </div>
+        <RotationTimerDisplay 
+          rotationTimer={rotationTimer} 
+          setShowRotateNow={setShowRotateNow} 
+          handleTimerPause={handleTimerPause} 
+          handleTimerResume={handleTimerResume} 
+          handleTimerReset={handleTimerReset} 
+        />
       )}
 
       {/* ═══ GAME RULES FAB ═══════════════════════════════════ */}

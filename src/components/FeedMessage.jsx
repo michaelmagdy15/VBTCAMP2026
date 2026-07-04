@@ -308,8 +308,9 @@ function FeedMessage({ message, currentUser, onReact }) {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 6,
             flexWrap: 'wrap',
+            marginTop: 4,
           }}
         >
           {REACTION_EMOJIS.map((emoji) => {
@@ -322,8 +323,8 @@ function FeedMessage({ message, currentUser, onReact }) {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 14px',
+                  gap: 4,
+                  padding: '4px 10px',
                   borderRadius: 999,
                   fontSize: 14,
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
