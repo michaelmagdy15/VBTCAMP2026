@@ -5524,6 +5524,7 @@ export default function App() {
             setScheduleTeamFilter={setScheduleTeamFilter}
             setScheduleDayFilter={setScheduleDayFilter}
             setScheduleSortMode={setScheduleSortMode}
+            setCurrentUser={setCurrentUser}
           />
         )}
         {/* Tab 4: Live Timeline / Notifications */}
@@ -6305,11 +6306,19 @@ export default function App() {
       {/* First-run onboarding tooltip */}
       {showOnboardingTip && currentUser && (() => {
         const role = currentUser.role;
+        const isService = eventConfig?.eventType === 'service';
         let tipTab = 'schedule';
         let tipMsg = '';
-        if (role === 'referee') { tipTab = 'schedule'; tipMsg = 'Your station & game assignments are here'; }
-        else if (role === 'leader') { tipTab = 'scoreboard'; tipMsg = 'Your team score is tracked here'; }
-        else { tipTab = 'timeline'; tipMsg = 'Announcements from coordinators appear here'; }
+        if (role === 'referee') {
+          tipTab = isService ? 'service' : 'schedule';
+          tipMsg = isService ? 'Your station & game assignments are here' : 'Your station & game assignments are here';
+        } else if (role === 'leader') {
+          tipTab = 'schedule';
+          tipMsg = isService ? 'Your team schedule & assignments are here' : 'Your team score is tracked here';
+        } else {
+          tipTab = 'timeline';
+          tipMsg = 'Announcements from coordinators appear here';
+        }
 
         const tabs = getActiveTabs();
         const tipIdx = tabs.findIndex(t => t.id === tipTab);

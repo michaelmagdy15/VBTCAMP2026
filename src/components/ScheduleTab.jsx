@@ -338,7 +338,8 @@ export default function ScheduleTab({
   setScheduleTeamFilter,
   setScheduleDayFilter,
   setScheduleSortMode,
-  isMobile
+  isMobile,
+  setCurrentUser
 }) {
   const currentActiveSlot = liveLocationStatus.find(l => l.activeMatchup)?.activeMatchup;
 
@@ -410,39 +411,128 @@ export default function ScheduleTab({
             borderRadius: '16px',
             padding: '16px 18px',
             display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
+            flexDirection: 'column',
+            gap: '12px',
             boxShadow: '0 4px 20px rgba(41, 182, 246, 0.12)'
           }}>
-            <div style={{
-              width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0,
-              background: 'rgba(41, 182, 246, 0.15)',
-              border: '1px solid rgba(41, 182, 246, 0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.5rem'
-            }}>
-              {assignmentIcon}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0,
+                background: 'rgba(41, 182, 246, 0.15)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.5rem'
+              }}>
+                {assignmentIcon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#29b6f6', margin: '0 0 3px 0' }}>
+                  Your Assignment Today
+                </p>
+                <p style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', margin: '0 0 3px 0', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {assignmentTitle}
+                </p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  {assignmentDetail}
+                </p>
+              </div>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#29b6f6', margin: '0 0 3px 0' }}>
-                Your Assignment Today
-              </p>
-              <p style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', margin: '0 0 3px 0', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {assignmentTitle}
-              </p>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                {assignmentDetail}
-              </p>
-            </div>
+            {/* Switch Assignment */}
+            {setCurrentUser && (() => {
+              const isLeaderRole = currentUser.role === 'leader';
+              const isRefRole = currentUser.role === 'referee';
+              const options = isLeaderRole
+                ? Object.keys(campData?.teams || {}).filter(c => c !== currentUser.teamCode)
+                : Object.keys(eventConfig.stations || {}).filter(c => c !== roleCode);
+              if (options.length === 0) return null;
+              return (
+                <div style={{ borderTop: '1px solid rgba(41, 182, 246, 0.15)', paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <select
+                      id="switch-assignment-select"
+                      defaultValue=""
+                      style={{
+                        flex: 1, padding: '7px 10px', borderRadius: '8px',
+                        background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(41, 182, 246, 0.25)',
+                        color: '#ffffff', fontSize: '0.75rem', fontWeight: '600', outline: 'none'
+                      }}
+                    >
+                      <option value="" disabled>🔄 Switch to...</option>
+                      {options.map(code => {
+                        const label = isLeaderRole
+                          ? (code || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase())
+                          : (eventConfig.stations?.[code]?.name || code.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+                        return <option key={code} value={code}>{label}</option>;
+                      })}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const sel = document.getElementById('switch-assignment-select');
+                        const newCode = sel?.value;
+                        if (!newCode) { alert('Please select a new assignment first.'); return; }
+                        const label = isLeaderRole
+                          ? newCode.replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase())
+                          : (eventConfig.stations?.[newCode]?.name || newCode);
+                        if (!window.confirm(
+                          `⚠️ Switch Assignment\n\nYou are about to switch from "${assignmentTitle}" to "${label}".\n\nThis will change your schedule view and scoring responsibilities.\n\nAre you sure?`
+                        )) return;
+                        // Build updated user
+                        const updatedUser = { ...currentUser };
+                        if (isLeaderRole) {
+                          updatedUser.teamCode = newCode;
+                          updatedUser.assignedTeams = [newCode.replace('team_', '')];
+                          setScheduleTeamFilter(newCode);
+                        } else if (isRefRole) {
+                          updatedUser.roleCode = newCode;
+                        }
+                        setCurrentUser(updatedUser);
+                        try {
+                          const evCode = localStorage.getItem('vbt_current_event');
+                          if (evCode) localStorage.setItem(`vbt_user_${evCode}`, JSON.stringify(updatedUser));
+                        } catch(_) {}
+                        sel.value = '';
+                      }}
+                      style={{
+                        padding: '7px 14px', borderRadius: '8px', border: '1px solid rgba(249, 115, 22, 0.4)',
+                        background: 'rgba(249, 115, 22, 0.12)', color: '#fb923c',
+                        fontSize: '0.72rem', fontWeight: '800', cursor: 'pointer',
+                        whiteSpace: 'nowrap', transition: 'all 0.2s'
+                      }}
+                    >
+                      🔄 Switch
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: '6px 0 0 0', fontStyle: 'italic' }}>
+                    ⚠️ Only switch if coordinated with your service day leader
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
 
-      {isReferee && (
+      {(isReferee || (currentUser && currentUser.role === 'leader' && currentUser.teamCode)) && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '4px' }}>
           <button
             type="button"
-            onClick={() => setShowFullSchedule(!showFullSchedule)}
+            onClick={() => {
+              if (!showFullSchedule) {
+                // Require confirmation to view other teams
+                if (!window.confirm('Are you sure you want to view other teams\' schedules?')) return;
+              }
+              const next = !showFullSchedule;
+              setShowFullSchedule(next);
+              if (!next && currentUser.role === 'leader') {
+                // Reset filter back to own team when hiding
+                setScheduleTeamFilter(currentUser.teamCode);
+              } else if (!next && isReferee) {
+                setScheduleTeamFilter('');
+              } else if (next) {
+                // Clear filter to show all teams
+                setScheduleTeamFilter('');
+              }
+            }}
             className="glass-btn"
             style={{
               padding: '8px 16px',
@@ -459,12 +549,12 @@ export default function ScheduleTab({
               transition: 'all 0.2s ease'
             }}
           >
-            {showFullSchedule ? '👁️ Hide Full Schedule' : '👁️ Show Full Schedule'}
+            {showFullSchedule ? '🔒 Show My Schedule Only' : '👁️ Check Other Teams'}
           </button>
         </div>
       )}
 
-      {(!isReferee || showFullSchedule) && (
+      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode)) || showFullSchedule) && (
         <>
           <ScheduleExporter
             scheduleData={campData}
@@ -582,7 +672,7 @@ export default function ScheduleTab({
               >
                 <option value="">All Teams</option>
                 {Object.keys(campData?.teams || {}).map(code => (
-                  <option key={code} value={code}>{code}</option>
+                  <option key={code} value={code}>{(code || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase())}</option>
                 ))}
               </select>
 
@@ -1263,7 +1353,7 @@ export default function ScheduleTab({
         </div>
       )}
 
-      {(!isReferee || showFullSchedule) && (
+      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode)) || showFullSchedule) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredMatchups.length === 0 ? (
             <div className="empty-state">
