@@ -14,23 +14,23 @@ import { ROLES } from '../permissions';
 
 const ROLE_META = [
   {
-    key: ROLES.VIEWER,
-    label: 'Viewer',
+    key: ROLES.VOLUNTEER,
+    label: 'Volunteer',
     icon: Eye,
     desc: 'Watch scores live — no login required',
     color: '#94a3b8',
     needsPasscode: false,
   },
   {
-    key: ROLES.REFEREE,
-    label: 'Referee',
+    key: ROLES.GAME_LEADER,
+    label: 'Game Leader',
     icon: Crosshair,
     desc: 'Enter scores for your assigned games',
     color: '#22d3ee',
     needsPasscode: true,
   },
   {
-    key: ROLES.LEADER,
+    key: ROLES.TEAM_LEADER,
     label: 'Team Leader',
     icon: Users,
     desc: 'Manage deductions & announcements for your team',
@@ -38,8 +38,16 @@ const ROLE_META = [
     needsPasscode: true,
   },
   {
-    key: ROLES.ADMIN,
-    label: 'Admin',
+    key: ROLES.SERVICE_LEADER,
+    label: 'Service Leader',
+    icon: Shield,
+    desc: 'Manage service timeline and pings',
+    color: '#fbbf24',
+    needsPasscode: true,
+  },
+  {
+    key: ROLES.COORDINATOR,
+    label: 'Coordinator',
     icon: Shield,
     desc: 'Full control over config, scores & alerts',
     color: '#f59e0b',
@@ -298,7 +306,6 @@ export default function RoleLogin({
   const [name, setName] = useState('');
   const [passcode, setPasscode] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
 
   // Servants filtered by role prefix
   const refereeServants = useMemo(
@@ -366,11 +373,11 @@ export default function RoleLogin({
     e.preventDefault();
     if (!selectedRole) return;
 
-    // Viewer — instant login, no passcode
-    if (selectedRole === ROLES.VIEWER) {
+    // Volunteer — instant login, no passcode
+    if (selectedRole === ROLES.VOLUNTEER) {
       onLogin({
-        name: 'Guest Viewer',
-        role: ROLES.VIEWER,
+        name: 'Volunteer ' + Math.floor(Math.random() * 100),
+        role: ROLES.VOLUNTEER,
         passcode: '',
         assignedGames: [],
         assignedTeams: [],
@@ -393,13 +400,13 @@ export default function RoleLogin({
       assignedTeams: [],
     };
 
-    // Populate assignments
-    if (selectedRole === ROLES.REFEREE) {
+    // 2. Game Leader Login
+    if (selectedRole === ROLES.GAME_LEADER) {
       const servant = refereeServants.find((s) => s.name === name.trim());
       user.assignedGames = extractAssignedGames(servant, eventConfig);
     }
-
-    if (selectedRole === ROLES.LEADER) {
+    // 3. Team Leader Login
+    if (selectedRole === ROLES.TEAM_LEADER) {
       const servant = leaderServants.find((s) => s.name === name.trim());
       user.assignedTeams = extractAssignedTeams(servant);
     }
@@ -424,9 +431,20 @@ export default function RoleLogin({
         }
       `}</style>
 
+      {/* ── Back to Homepage Button ── */}
+      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <button
+          type="button"
+          onClick={onLogout}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}
+        >
+          ← Back to Homepage
+        </button>
+      </div>
+
       {/* ── Role selector cards ── */}
-      <div style={S.grid}>
-        {ROLE_META.filter(rm => rm.key !== 'admin' || showAdmin).map((rm) => {
+      <div style={S.cardsGrid}>
+        {ROLE_META.map((rm) => {
           const Icon = rm.icon;
           const selected = selectedRole === rm.key;
           return (
@@ -445,36 +463,7 @@ export default function RoleLogin({
           );
         })}
       </div>
-      {/* Coordinator login reveal — visible secondary button */}
-      {!showAdmin && (
-        <button
-          type="button"
-          onClick={() => setShowAdmin(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '11px 16px',
-            marginTop: 4,
-            marginBottom: 4,
-            borderRadius: 12,
-            border: '1px solid rgba(148, 163, 184, 0.18)',
-            background: 'rgba(148, 163, 184, 0.05)',
-            color: '#64748b',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            fontFamily: "'Inter', sans-serif",
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            minHeight: 44,
-          }}
-        >
-          <Shield size={14} />
-          Coordinator / Admin login
-        </button>
-      )}
+
 
       {/* ── Login form (only when a role needing auth is selected) ── */}
       {selectedRole && (
@@ -482,16 +471,22 @@ export default function RoleLogin({
           {/* Error banner */}
           {loginError && <div style={S.error}>{loginError}</div>}
 
-          {/* Viewer — just a button */}
-          {selectedRole === ROLES.VIEWER && (
-            <button type="submit" style={S.submitBtn(activeMeta.color)}>
-              Enter as Viewer
-            </button>
+          {/* Volunteer — just a button */}
+          {selectedRole === ROLES.VOLUNTEER && (
+            <div style={{ textAlign: 'center', marginTop: 24 }}>
+              <div style={S.title}>Welcome to {eventConfig?.eventType === 'service' ? "Service" : "VBT Camp"}!</div>
+              <div style={S.subtitle}>You are signing in as a Volunteer. You will only have view access.</div>
+              <button type="submit" style={S.submitBtn(activeMeta.color)}>
+                Enter Dashboard
+              </button>
+            </div>
           )}
 
-          {/* Referee name dropdown */}
-          {selectedRole === ROLES.REFEREE && (
-            <>
+          {/* Game Leader name dropdown */}
+          {selectedRole === ROLES.GAME_LEADER && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={S.title}>Game Leader Login</div>
+              <div style={S.subtitle}>Enter passcode to manage scores for your games</div>
               <div style={S.formGroup}>
                 <label style={S.label}>Your Name</label>
                 {refereeServants.length > 0 ? (
@@ -540,14 +535,16 @@ export default function RoleLogin({
               </div>
 
               <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Log in as Referee
+                Log in as Game Leader
               </button>
-            </>
+            </div>
           )}
 
-          {/* Leader name dropdown */}
-          {selectedRole === ROLES.LEADER && (
-            <>
+          {/* Team Leader name dropdown */}
+          {selectedRole === ROLES.TEAM_LEADER && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={S.title}>Team Leader Login</div>
+              <div style={S.subtitle}>Select your team and enter passcode to manage deductions</div>
               <div style={S.formGroup}>
                 <label style={S.label}>Your Name</label>
                 {leaderServants.length > 0 ? (
@@ -598,11 +595,11 @@ export default function RoleLogin({
               <button type="submit" style={S.submitBtn(activeMeta.color)}>
                 Log in as Team Leader
               </button>
-            </>
+            </div>
           )}
 
-          {/* Admin free-text name */}
-          {selectedRole === ROLES.ADMIN && (
+          {/* Coordinator free-text name */}
+          {selectedRole === ROLES.COORDINATOR && (
             <>
               <div style={S.formGroup}>
                 <label style={S.label}>Your Name</label>
@@ -643,6 +640,7 @@ export default function RoleLogin({
           )}
         </form>
       )}
+
     </div>
   );
 }

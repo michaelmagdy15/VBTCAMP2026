@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Trophy, 
@@ -75,7 +76,8 @@ import {
   subscribeToWebPush,
   NOTIFY_SERVICE_URL,
   updateScheduleData,
-  updateScheduleMatchupTimes
+  updateScheduleMatchupTimes,
+  auth
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -845,6 +847,21 @@ export default function App() {
         } catch (e) {
           console.error("Error parsing saved user:", e);
         }
+      } else {
+        // Anonymous login for volunteers checking in
+        signInAnonymously(auth).then(() => {
+          const anonUser = {
+            name: 'Anonymous Volunteer',
+            role: ROLES.VOLUNTEER,
+            passcode: '',
+            assignedGames: [],
+            assignedTeams: [],
+          };
+          setCurrentUser(anonUser);
+          if (!isOfflineMode) {
+             addAnnouncement(code, `A volunteer checked in via QR`, 'System', 'system').catch(() => {});
+          }
+        }).catch((err) => console.error("Anonymous auth failed:", err));
       }
     }
   }, []);
@@ -1930,172 +1947,92 @@ export default function App() {
   };
 
   // Login Handler — uses dynamic per-event passcodes from eventConfig
-  const handleLogin = (e) => {
-    e.preventDefault();
-    const normalizedPassword = loginPassword.trim().toUpperCase();
-    
-    // Service Mode Individual Login
-    if (eventConfig.eventType === 'service') {
-      if (!loginName) {
-        setLoginError('Please select your name.');
-        return;
+  const handleLogin = (userAttempt) => {
+    const { role, name, passcode, assignedTeams, assignedGames } = userAttempt;
+    const normalizedPasscode = (passcode || '').trim().toUpperCase();
+
+    let resolvedRole = 'viewer';
+    let teamCode = '';
+    let side = 'System';
+    let grade = 'All';
+
+    if (role === ROLES.VOLUNTEER) {
+      resolvedRole = 'volunteer';
+    } else {
+      if (eventConfig.eventType === 'service') {
+        const servant = globalServants.find(s => s.name === name);
+        if (servant) {
+          if (normalizedPasscode !== (servant.passcode || '').toUpperCase()) {
+            setLoginError('Incorrect passcode for your account.');
+            return;
+          }
+        } else if (role !== ROLES.COORDINATOR) {
+           setLoginError('Account not found.');
+           return;
+        }
       }
-      
-      const servant = globalServants.find(s => s.id === loginName);
-      if (!servant) {
-        setLoginError('Servant not found.');
-        return;
-      }
-      
-      if (normalizedPassword !== (servant.passcode || '').toUpperCase()) {
-        setLoginError('Incorrect passcode.');
-        return;
-      }
-      
-      // Resolve role
-      const roleCode = eventConfig.servantAssignments?.[servant.id] || 'none';
-      let resolvedRole = 'viewer';
-      let teamCode = '';
-      let side = 'System';
-      let grade = 'All';
-      let name = servant.name;
-      
-      if (servant.defaultRole === 'admin' || servant.id === 'michael_mitry') {
-        resolvedRole = 'admin';
-        teamCode = 'ADMIN';
-        name = servant.name || 'Coordinator';
-      } else if (servant.defaultRole === 'coordinator' || roleCode === 'coordinator') {
-        resolvedRole = 'admin';
-        teamCode = 'ADMIN';
-        name = servant.name || 'Coordinator';
-      } else if (servant.defaultRole === 'service_leader' || roleCode === 'service_leader') {
-        resolvedRole = 'service_day_leader';
-        teamCode = 'SERVICE';
-        side = 'System';
-        name = servant.name || 'Service Leader';
-      } else if (roleCode.startsWith('team_')) {
+
+      if (role === ROLES.TEAM_LEADER) {
+        if (eventConfig.eventType !== 'service') {
+          const teamPass = (eventConfig.passcodeTeamLeader || 'VBT2026').toUpperCase();
+          if (normalizedPasscode !== teamPass) {
+            setLoginError('Incorrect Team Leader passcode.');
+            return;
+          }
+        }
         resolvedRole = 'leader';
-        const parts = roleCode.split('_'); // ["team", "white", "1"]
-        const color = parts[1].charAt(0).toUpperCase() + parts[1].slice(1); // "White"
-        const idx = parts[2]; // "1"
-        teamCode = `${color} ${idx}`; // "White 1"
-        side = color;
-        grade = '3/4';
-      } else if (roleCode.startsWith('station_') || roleCode.startsWith('big_game_') || roleCode === 'reflection' || roleCode === 'volunteer') {
+        teamCode = assignedTeams?.[0] || 'Unknown';
+      } else if (role === ROLES.GAME_LEADER) {
+        if (eventConfig.eventType !== 'service') {
+          const gamePass = (eventConfig.passcodeGameLeader || 'VBTREF').toUpperCase();
+          if (normalizedPasscode !== gamePass) {
+            setLoginError('Incorrect Game Leader passcode.');
+            return;
+          }
+        }
         resolvedRole = 'referee';
         teamCode = 'REF';
-        side = 'System';
-      } else if (roleCode === 'media') {
-        resolvedRole = 'referee';
-        teamCode = 'MEDIA';
-        side = 'System';
+      } else if (role === ROLES.COORDINATOR || role === ROLES.SERVICE_LEADER) {
+        if (eventConfig.eventType !== 'service' || !globalServants.find(s => s.name === name)) {
+          const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
+          if (normalizedPasscode !== coordPass) {
+            setLoginError('Incorrect Coordinator passcode.');
+            return;
+          }
+        }
+        resolvedRole = role === ROLES.COORDINATOR ? 'admin' : 'service_day_leader';
+        teamCode = role === ROLES.COORDINATOR ? 'ADMIN' : 'SERVICE';
       }
-      
-      const user = {
-        id: servant.id,
-        role: resolvedRole,
-        name: name,
-        teamCode: teamCode,
-        side: side,
-        grade: grade,
-        roleCode: roleCode,
-        uiMode: servant.uiMode || (loginUseSimpleLayout ? 'dumb' : 'detailed')
-      };
-      
-      setCurrentUser(user);
-      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
-      setLoginError('');
-      setLoginPassword('');
-      
-      if (resolvedRole === 'admin' || resolvedRole === 'service_leader' || resolvedRole === 'referee') {
-        setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
-      } else if (resolvedRole === 'leader') {
-        setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'myteam');
-      } else {
-        setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
-      }
-      
-      if (!isOfflineMode) {
-        const displayRole = roleCode === 'none' ? '' : ` as ${roleCode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
-        addAnnouncement(currentEventCode, `${servant.name} signed in${displayRole}`, 'System', 'system');
-      }
-      return;
     }
 
-    // Original Camp Mode Login
-    const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
-    const gamePass = (eventConfig.passcodeGameLeader || 'VBTREF').toUpperCase();
-    const teamPass = (eventConfig.passcodeTeamLeader || 'VBT2026').toUpperCase();
-
-    if (loginRole === 'leader') {
-      if (!loginName) {
-        setLoginError('Please select your name.');
-        return;
-      }
-      if (normalizedPassword !== teamPass) {
-        setLoginError(`Incorrect passcode for Team Leader.`);
-        return;
-      }
-
-      const leaderObj = leadersList.find(l => l.code === loginName);
-      const user = {
-        role: 'leader',
-        name: leaderObj.fullName.split('/')[0].trim(),
-        teamCode: leaderObj.code,
-        side: leaderObj.side,
-        grade: leaderObj.grade,
-        uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
-      };
-      setCurrentUser(user);
+    const user = {
+      role: resolvedRole,
+      name: name || (resolvedRole === 'admin' ? 'Coordinator' : 'Guest'),
+      teamCode,
+      side,
+      grade,
+      assignedTeams,
+      assignedGames,
+      uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
+    };
+    
+    setCurrentUser(user);
+    if (currentEventCode) {
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
-      setLoginError('');
-      setLoginPassword('');
+    }
+    setLoginError('');
+    setLoginPassword('');
+    
+    if (resolvedRole === 'admin' || resolvedRole === 'service_day_leader' || resolvedRole === 'referee') {
+      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
+    } else if (resolvedRole === 'leader') {
       setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'myteam');
-      if (!isOfflineMode) {
-        addAnnouncement(currentEventCode, `${user.name} logged in as team leader of ${user.teamCode}`, 'System', 'system');
-      }
-    } else if (loginRole === 'admin') {
-      if (normalizedPassword !== coordPass) {
-        setLoginError('Incorrect passcode for Coordinator.');
-        return;
-      }
-      const user = {
-        role: 'admin',
-        name: 'Coordinator',
-        teamCode: 'ADMIN',
-        side: 'System',
-        grade: 'All',
-        uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
-      };
-      setCurrentUser(user);
-      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
-      setLoginError('');
-      setLoginPassword('');
+    } else {
       setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
-      if (!isOfflineMode) {
-        addAnnouncement(currentEventCode, `Coordinator signed in`, 'System', 'system');
-      }
-    } else if (loginRole === 'referee') {
-      if (normalizedPassword !== gamePass) {
-        setLoginError('Incorrect passcode for Game Leader.');
-        return;
-      }
-      const user = {
-        role: 'referee',
-        name: 'Game Leader',
-        teamCode: 'REF',
-        side: 'System',
-        grade: 'All',
-        uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
-      };
-      setCurrentUser(user);
-      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
-      setLoginError('');
-      setLoginPassword('');
-      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
-      if (!isOfflineMode) {
-        addAnnouncement(currentEventCode, `Game Leader signed in`, 'System', 'system');
-      }
+    }
+    
+    if (!isOfflineMode) {
+      addAnnouncement(currentEventCode, `${user.name} signed in`, 'System', 'system');
     }
   };
 
@@ -2141,7 +2078,7 @@ export default function App() {
     e.preventDefault();
     const code = eventJoinInput.trim().toLowerCase().replace(/\s+/g, '_');
     if (!code) { setEventJoinError('Please enter an event code.'); return; }
-    setEventJoinLoading(true);
+    setEventJoinLoading('manual');
     setEventJoinError('');
 
     try {
@@ -2167,7 +2104,7 @@ export default function App() {
   const handleQuickJoin = async (code) => {
     const normalised = code.trim().toLowerCase().replace(/\s+/g, '_');
     if (!normalised) return;
-    setEventJoinLoading(true);
+    setEventJoinLoading(code);
     setEventJoinError('');
     try {
       const exists = await checkEventExists(normalised);
@@ -2538,6 +2475,98 @@ export default function App() {
       alert('Failed to save event config: ' + err.message);
     } finally {
       setSavingEventConfig(false);
+    }
+  };
+
+  const seedJuly6Service = async () => {
+    try {
+      const existingServants = globalServants || [];
+      const newNames = [
+        "Andrew", "Sherry", "Amberto", "Youstina", "Youssef", "Tony", "Seif", "Rougy", "Tony tafaya", "Sandra", "Kirollos", "Martina",
+        "Dani", "Emily", "Maria", "Micho", "Nathalie", "Kiro", "Jessica", "John", "Cinderella", "Patrick", "Joice", "Karim", "Bassem", "Sara",
+        "Michael Mitry", "System Admin", "Amy"
+      ];
+      let updatedServants = [...existingServants];
+      const servantAssignments = {};
+      const activeServants = [];
+
+      newNames.forEach(name => {
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        if (!updatedServants.find(s => s.id === id)) {
+            updatedServants.push({ id, name, passcode: '1234' });
+        }
+        activeServants.push(id);
+      });
+
+      const servantsRef = doc(db, 'vbt_global', 'servants');
+      await setDoc(servantsRef, { list: updatedServants }, { merge: true });
+
+      // Team 1 & 2 -> Red
+      ['andrew', 'sherry'].forEach(id => servantAssignments[id] = 'team_red_1');
+      ['amberto', 'youstina'].forEach(id => servantAssignments[id] = 'team_red_2');
+      // Team 3 & 4 -> White
+      ['youssef', 'tony'].forEach(id => servantAssignments[id] = 'team_white_1');
+      ['seif', 'rougy'].forEach(id => servantAssignments[id] = 'team_white_2');
+      // Team 5 & 6 -> Black
+      ['tony_tafaya', 'sandra'].forEach(id => servantAssignments[id] = 'team_black_1');
+      ['kirollos', 'martina'].forEach(id => servantAssignments[id] = 'team_black_2');
+
+      ['dani', 'emily'].forEach(id => servantAssignments[id] = 'station_1');
+      ['maria', 'micho'].forEach(id => servantAssignments[id] = 'station_2');
+      ['nathalie', 'kiro'].forEach(id => servantAssignments[id] = 'station_3');
+      ['jessica', 'john', 'cinderella', 'patrick'].forEach(id => servantAssignments[id] = 'station_4');
+      ['joice', 'karim'].forEach(id => servantAssignments[id] = 'station_5');
+      ['bassem', 'sara'].forEach(id => servantAssignments[id] = 'station_6');
+      
+      servantAssignments['michael_mitry'] = 'coordinator';
+      servantAssignments['system_admin'] = 'coordinator';
+      servantAssignments['amy'] = 'coordinator';
+
+      const evConfig = {
+          eventName: 'July 6th Service',
+          description: 'July 6th VBT Service: Team Building and Games',
+          eventDate: '2026-07-06',
+          eventType: 'service',
+          daysCount: 1,
+          kidCount: 60,
+          primaryColor: '#a78bfa',
+          logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
+          passcodeCoordinator: 'VBTADMIN',
+          passcodeGameLeader: 'VBTREF',
+          passcodeTeamLeader: 'VBT2026',
+          activeServants,
+          servantAssignments,
+          teamNames: {
+              red: 'Red (Teams 1 & 2)',
+              white: 'White (Teams 3 & 4)',
+              black: 'Black (Teams 5 & 6)',
+              blue: 'Blue (Unused)'
+          },
+          stations: {
+              station_1: { name: 'Blind Builder', location: '', howToPlay: 'One player is blindfolded and given cups to build a pyramid by verbal instructions from teammates. Team with highest number of stacks wins.', lesson: '' },
+              station_2: { name: 'Skee Ball', location: '', howToPlay: 'Each team member gets a try at throwing the ball and dropping it in the holes. Team with highest accumulated score wins.', lesson: '' },
+              station_3: { name: 'Minefield', location: '', howToPlay: 'One player is blindfolded and crosses obstacles guided by team. At the end, places a cone in XO game. Most XO wins receives tokens.', lesson: '' },
+              station_4: { name: 'Helium Stick & Human Chairs', location: '', howToPlay: 'Helium stick: lower broomstick together using two fingers. Human Chairs: build a circle lying on each other, remove chairs.', lesson: '' },
+              station_5: { name: 'Whiffle Ball', location: '', howToPlay: 'Each team member gets one try to throw a colored ball in corresponding hole. Team with most goals wins.', lesson: '' },
+              station_6: { name: 'Blind Shape', location: '', howToPlay: 'Each team is given a rope and blindfolded, told to create a shape. Highest amount of shapes wins.', lesson: '' }
+          },
+          createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'vbt_events', 'jul6_service', 'config', 'main'), evConfig);
+      
+      const regRef = doc(db, 'vbt_event_registry', 'events');
+      const regSnap = await getDoc(regRef);
+      let list = regSnap.exists() ? regSnap.data().list : [];
+      if (!list.find(e => e.code === 'jul6_service')) {
+          list.push({ code: 'jul6_service', name: 'July 6th Service', date: '2026-07-06' });
+          await setDoc(regRef, { list });
+      }
+
+      alert('July 6th Service Created! Refresh the page to see it.');
+    } catch(err) {
+      console.error(err);
+      alert('Error: ' + err.message);
     }
   };
 
@@ -3563,7 +3592,7 @@ export default function App() {
               <div style={{ width: `${preloadProgress}%`, height: '100%', background: 'linear-gradient(90deg, #1441a1 0%, var(--vbt-sky) 50%, #a78bfa 100%)', boxShadow: '0 0 8px var(--vbt-sky)', transition: 'width 0.05s ease-out' }} />
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', width: '240px', fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '240px', fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: '500', color: 'var(--text-muted)' }}>
                 {getPreloadMessage(preloadProgress)}
                 <span className="text-cursor" />
@@ -3683,14 +3712,14 @@ export default function App() {
 
                           <button
                             onClick={() => handleQuickJoin(ev.code)}
-                            disabled={eventJoinLoading}
+                            disabled={eventJoinLoading !== false}
                             style={{
                               width: '100%', padding: '15px', borderRadius: '14px', border: 'none',
                               background: isToday
                                 ? 'linear-gradient(135deg, #166534 0%, #4ade80 100%)'
                                 : 'linear-gradient(135deg, #1441a1 0%, #60a5fa 100%)',
                               color: '#ffffff', fontWeight: '800', fontSize: '1.05rem',
-                              cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
+                              cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
                               boxShadow: isToday ? '0 4px 20px rgba(74,222,128,0.35)' : '0 4px 20px rgba(20,65,161,0.4)',
                               letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
                               justifyContent: 'center', gap: '8px',
@@ -3699,7 +3728,7 @@ export default function App() {
                             onMouseEnter={e => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
                           >
-                            {eventJoinLoading ? (
+                            {eventJoinLoading === ev.code ? (
                               <span>Joining…</span>
                             ) : (
                               <>
@@ -3762,13 +3791,13 @@ export default function App() {
                               <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
                             </div>
                           )}
-                          <button type="submit" disabled={eventJoinLoading}
+                          <button type="submit" disabled={eventJoinLoading !== false}
                             style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-                              background: eventJoinLoading ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
+                              background: eventJoinLoading === 'manual' ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
                               color: '#ffffff', fontWeight: '800', fontSize: '0.95rem',
-                              cursor: eventJoinLoading ? 'not-allowed' : 'pointer',
+                              cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
                               boxShadow: '0 4px 20px rgba(20,65,161,0.4)', letterSpacing: '0.03em' }}>
-                            {eventJoinLoading ? 'Joining...' : 'Enter Service'}
+                            {eventJoinLoading === 'manual' ? 'Joining...' : 'Enter Service'}
                           </button>
                         </form>
                       </div>
@@ -3778,7 +3807,7 @@ export default function App() {
               })()}
 
               {/* Quick stats */}
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {[
                   { icon: '&#128101;', value: '100+', label: 'Kids' },
                   { icon: '&#127918;', value: '6', label: 'Stations' },
@@ -3797,6 +3826,11 @@ export default function App() {
               {/* Coordinator actions */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
+                <button onClick={seedJuly6Service}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
+                    background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
+                  🚀 SETUP JULY 6TH SERVICE (AI)
+                </button>
                 <button onClick={() => setShowCreateEvent(true)}
                   style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
                     background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -3859,7 +3893,7 @@ export default function App() {
 
                 {/* Step Headers */}
                 {newEventType === 'service' && (
-                  <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px', marginBottom: '6px' }}>
                     {['1. Details', '2. Setup Games', '3. Roster & Roles'].map((stepTitle, idx) => {
                       const stepNum = idx + 1;
                       const isActive = creationStep === stepNum;
@@ -4236,7 +4270,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
                       <button
                         type="button"
                         onClick={() => setCreationStep(1)}
@@ -4331,7 +4365,7 @@ export default function App() {
                     {/* Quick Add Servant form */}
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#a78bfa' }}>➕ Add New Servant to Directory</span>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input
                           type="text"
                           value={quickServantName}
@@ -4358,7 +4392,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
                       <button
                         type="button"
                         onClick={() => setCreationStep(2)}
@@ -4585,7 +4619,7 @@ export default function App() {
                           />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
                               START TIME
@@ -4641,7 +4675,7 @@ export default function App() {
                           />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
                               GENDER GRP
@@ -4699,7 +4733,7 @@ export default function App() {
                     {/* STEP 4: Teams & Servants */}
                     {serviceRequestStep === 4 && (
                       <>
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                           <div className="form-group" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
                               ALREADY SPLIT IN TEAMS?
@@ -4737,7 +4771,7 @@ export default function App() {
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                           <div className="form-group" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
                               NEED SPECIFIC NUMBER OF SERVANTS?
@@ -4797,7 +4831,7 @@ export default function App() {
                   </div>
 
                   {/* Navigation Buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '16px' }}>
                     {serviceRequestStep > 1 ? (
                       <button
                         onClick={() => setServiceRequestStep(s => s - 1)}
@@ -4878,252 +4912,16 @@ export default function App() {
   }
 
   if (!currentUser) {
-    const isService = eventConfig.eventType === 'service';
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        background: 'radial-gradient(circle at center, #0d1633 0%, #070a13 100%)'
-      }}>
-        <div className="glass-panel animate-fade" style={{ width: '100%', maxWidth: '400px', padding: '32px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <img 
-              src={eventConfig.logoUrl || '/Final VBT Re-Branding 2026-02 (3).png'}
-              alt="Event Logo" 
-              style={{ width: '120px', height: 'auto', marginBottom: '16px' }} 
-            />
-            <h1 style={{ fontSize: '1.6rem', color: '#ffffff', marginBottom: '4px', fontFamily: 'var(--font-title)' }}>
-              {isService ? "VBT Service Portal" : (eventConfig.eventName || 'VBT SPORTS CAMP')}
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              {isService ? (eventConfig.eventName || "Friend Request") : (eventConfig.description || 'Leader Portal & Live Scoring')}
-            </p>
-            <button
-              type="button"
-              onClick={handleLeaveEvent}
-              style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              ← Back to Homepage
-            </button>
-          </div>
-
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {isService && (
-              <div style={{
-                background: 'rgba(41, 182, 246, 0.1)',
-                border: '1px solid rgba(41, 182, 246, 0.3)',
-                borderRadius: '12px',
-                padding: '14px',
-                color: '#e2e8f0',
-                fontSize: '0.85rem',
-                lineHeight: '1.5'
-              }}>
-                <h3 style={{ color: '#29b6f6', fontWeight: '800', margin: '0 0 6px 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  👴 Sign-In Helper Card
-                </h3>
-                <ol style={{ margin: 0, paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <li>Click <strong>Choose Name</strong> and choose your name.</li>
-                  <li>Click <strong>Passcode</strong> and enter your password.</li>
-                  <li>Click the big blue <strong>Sign In</strong> button below.</li>
-                </ol>
-              </div>
-            )}
-            
-            {loginError && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                padding: '12px',
-                borderRadius: '8px',
-                color: '#ef4444',
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <AlertCircle size={16} />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            {isService ? (
-              // Service mode: Individual servant account login dropdown
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Your Name</label>
-                <select
-                  value={loginName}
-                  onChange={(e) => { setLoginName(e.target.value); setLoginError(''); }}
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '10px',
-                    background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                    color: '#ffffff', fontSize: '0.95rem', outline: 'none', cursor: 'pointer'
-                  }}
-                >
-                  <option value="">-- Choose Name --</option>
-                  {globalServants.sort((a,b) => a.name.localeCompare(b.name)).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              // Original Camp mode: Role selector toggle
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Role</label>
-                <div className="toggle-group" style={{ marginBottom: '4px' }}>
-                  <button 
-                    type="button"
-                    className={`toggle-btn ${loginRole === 'leader' ? 'active' : ''}`}
-                    onClick={() => { setLoginRole('leader'); setLoginError(''); }}
-                  >
-                    Team Leader
-                  </button>
-                  <button 
-                    type="button"
-                    className={`toggle-btn ${loginRole === 'referee' ? 'active' : ''}`}
-                    onClick={() => { setLoginRole('referee'); setLoginError(''); }}
-                  >
-                    Game Leader
-                  </button>
-                  <button 
-                    type="button"
-                    className={`toggle-btn ${loginRole === 'admin' ? 'active' : ''}`}
-                    onClick={() => { setLoginRole('admin'); setLoginError(''); }}
-                  >
-                    Coordinator
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!isService && loginRole === 'leader' && (
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select Team Leader Name</label>
-                {leadersList.length === 0 ? (
-                  <p style={{ fontSize: '0.8rem', color: '#f59e0b', padding: '10px', borderRadius: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                    ⚠️ No leaders set up yet. Ask your coordinator to add names in the Controls tab.
-                  </p>
-                ) : (
-                  <select
-                    value={loginName}
-                    onChange={(e) => setLoginName(e.target.value)}
-                    style={{
-                      width: '100%', padding: '12px', borderRadius: '10px',
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)',
-                      color: '#ffffff', fontSize: '0.95rem', outline: 'none', cursor: 'pointer'
-                    }}
-                  >
-                    <option value="">-- Choose Name --</option>
-                    {leadersList.sort((a,b) => a.fullName.localeCompare(b.fullName)).map((l) => (
-                      <option key={l.code} value={l.code}>
-                        {l.fullName}{l.groupLabel ? ` (${l.groupLabel})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                {isService ? "Private Passcode" : "Camp Passcode"}
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input 
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Enter passcode"
-                  style={{
-                    width: '100%',
-                    padding: '12px 40px 12px 12px',
-                    borderRadius: '10px',
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid var(--border-light)',
-                    color: '#ffffff',
-                    fontSize: '0.95rem',
-                    outline: 'none'
-                  }}
-                />
-                <Lock size={16} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              </div>
-            </div>
-
-            {/* Simple Layout Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', marginBottom: '4px' }}>
-              <input 
-                type="checkbox"
-                id="loginUseSimpleLayout"
-                checked={loginUseSimpleLayout}
-                onChange={(e) => setLoginUseSimpleLayout(e.target.checked)}
-                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-              />
-              <label htmlFor="loginUseSimpleLayout" style={{ fontSize: '0.85rem', color: '#cbd5e1', cursor: 'pointer', userSelect: 'none' }}>
-                Use Simple Layout (Dumb Phone Version)
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-              <button 
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '10px',
-                  background: 'var(--gradient-vbt)',
-                  border: 'none',
-                  color: '#ffffff',
-                  fontFamily: 'var(--font-title)',
-                  fontWeight: '700',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(20, 65, 161, 0.4)'
-                }}
-              >
-                Sign In
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => {
-                  const user = {
-                    id: 'visitor',
-                    role: 'viewer',
-                    name: 'Visitor',
-                    teamCode: 'VISITOR',
-                    side: 'System',
-                    grade: 'All',
-                    roleCode: 'none'
-                  };
-                  setCurrentUser(user);
-                  localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
-                  setCurrentTab('scoreboard');
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#ffffff',
-                  fontWeight: '700',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
-              >
-                👀 View as Visitor (No Passcode Needed)
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+      <RoleLogin 
+        eventConfig={eventConfig} 
+        globalServants={globalServants} 
+        onLogin={handleLogin}
+        onLogout={handleLeaveEvent}
+        currentUser={currentUser}
+        loginError={loginError}
+        setLoginError={setLoginError}
+      />
     );
   }
 
@@ -5330,16 +5128,14 @@ export default function App() {
         />
       </div>
       {/* Header */}
-      <header className="glass-panel" style={{
+      <header style={{
         position: 'sticky',
         top: 0,
-        zIndex: 100,
-        borderRadius: '0 0 16px 16px',
-        borderTop: 'none',
-        borderLeft: 'none',
-        borderRight: 'none',
+        zIndex: 1000,
+        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
         background: '#0d1426',
-        paddingTop: 'env(safe-area-inset-top, 0px)'
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
       }}>
         <div className="header-container" style={{
           maxWidth: '600px',
@@ -5705,7 +5501,7 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="glass-panel" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)' }}>
                     <h3 style={{ fontSize: '0.95rem', color: '#ffffff', marginBottom: '12px', textAlign: 'center' }}>Cumulative Score Progression</h3>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
                         {[0, 0.25, 0.5, 0.75, 1.0].map((ratio, idx) => {
                           const val = Math.round(maxScore * ratio);
@@ -5777,7 +5573,7 @@ export default function App() {
                         })}
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
                       {eventConfig.eventType !== 'normal' ? (
                         ['Red', 'White', 'Black', 'Blue'].map(colorName => {
                           const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
@@ -5876,87 +5672,6 @@ export default function App() {
                             {customColorName} (-{colorDeductions})
                           </h3>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {/* Quick Settings */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }}>
-                {/* Event Mode Badge/Toggle Switch */}
-                {(() => {
-                  const isService = eventConfig.eventType === 'service';
-                  const isAdmin = currentUser?.role === 'admin';
-                  return (
-                    <button
-                      onClick={isAdmin ? handleToggleEventMode : undefined}
-                      disabled={!isAdmin}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.15)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                        border: '1px solid',
-                        borderColor: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.3)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.3)' : 'rgba(34, 197, 94, 0.3)',
-                        color: eventConfig.eventType === 'service' ? '#c4b5fd' : eventConfig.eventType === 'normal' ? '#29b6f6' : '#4ade80',
-                        fontSize: '0.62rem',
-                        fontWeight: '700',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        cursor: isAdmin ? 'pointer' : 'default',
-                        transition: 'all 0.2s ease',
-                        textTransform: 'uppercase',
-                        outline: 'none',
-                        borderStyle: 'solid',
-                        
-                      }}
-                      title={isAdmin ? "Click to change event mode globally" : `${eventConfig.eventType.toUpperCase()} Mode Active`}
-                    >
-                      <span>{eventConfig.eventType === 'service' ? '⛪ Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Camp Mode'}</span>
-                      {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
-                    </button>
-                  );
-                })()}
-                {/* Simple Mode Toggle */}
-            <button
-              onClick={handleToggleUiMode}
-              style={{
-                background: 'rgba(41, 182, 246, 0.15)',
-                border: '1px solid rgba(41, 182, 246, 0.3)',
-                color: '#29b6f6',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                fontSize: '0.65rem',
-                fontWeight: '800',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                minHeight: '28px',
-                textTransform: 'uppercase',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.25)';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.15)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              title="Switch to Simple Mode Dashboard"
-            >
-              <span>✨ Simple UI</span>
-            </button>
-                {/* Dark mode toggle */}
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-                color: 'var(--text-secondary)', fontSize: '1.1rem', borderRadius: '8px',
-                minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}
-              title={isDarkMode ? 'Switch to light' : 'Switch to dark'}
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
-              </div>
                             {colorTeams.length === 0 ? (
                               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', margin: '8px 0' }}>No active teams</p>
                             ) : (
@@ -6230,7 +5945,7 @@ export default function App() {
                                     <div 
                                       key={mIdx} 
                                       style={{
-                                        display: 'flex',
+                                        display: 'flex', alignItems: 'center',
                                         justifyContent: 'space-between',
                                         fontSize: '0.75rem',
                                         padding: '6px 8px',
@@ -6619,85 +6334,91 @@ export default function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {/* Quick Settings */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
                 {/* Event Mode Badge/Toggle Switch */}
                 {(() => {
                   const isService = eventConfig.eventType === 'service';
+                  const isNormal = eventConfig.eventType === 'normal';
                   const isAdmin = currentUser?.role === 'admin';
+                  
                   return (
                     <button
                       onClick={isAdmin ? handleToggleEventMode : undefined}
                       disabled={!isAdmin}
                       style={{
-                        display: 'inline-flex',
+                        display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        background: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.15)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        background: isService ? 'rgba(167, 139, 250, 0.1)' : isNormal ? 'rgba(41, 182, 246, 0.1)' : 'rgba(34, 197, 94, 0.1)',
                         border: '1px solid',
-                        borderColor: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.3)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.3)' : 'rgba(34, 197, 94, 0.3)',
-                        color: eventConfig.eventType === 'service' ? '#c4b5fd' : eventConfig.eventType === 'normal' ? '#29b6f6' : '#4ade80',
-                        fontSize: '0.62rem',
-                        fontWeight: '700',
-                        padding: '2px 8px',
+                        borderColor: isService ? 'rgba(167, 139, 250, 0.2)' : isNormal ? 'rgba(41, 182, 246, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                        color: isService ? '#c4b5fd' : isNormal ? '#29b6f6' : '#4ade80',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        padding: '12px',
                         borderRadius: '12px',
                         cursor: isAdmin ? 'pointer' : 'default',
                         transition: 'all 0.2s ease',
-                        textTransform: 'uppercase',
-                        outline: 'none',
-                        borderStyle: 'solid',
-                        
                       }}
-                      title={isAdmin ? "Click to change event mode globally" : `${eventConfig.eventType.toUpperCase()} Mode Active`}
+                      onMouseOver={isAdmin ? (e) => e.currentTarget.style.background = isService ? 'rgba(167, 139, 250, 0.2)' : isNormal ? 'rgba(41, 182, 246, 0.2)' : 'rgba(34, 197, 94, 0.2)' : undefined}
+                      onMouseOut={isAdmin ? (e) => e.currentTarget.style.background = isService ? 'rgba(167, 139, 250, 0.1)' : isNormal ? 'rgba(41, 182, 246, 0.1)' : 'rgba(34, 197, 94, 0.1)' : undefined}
                     >
-                      <span>{eventConfig.eventType === 'service' ? '⛪ Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Camp Mode'}</span>
-                      {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
+                      {isAdmin && <Settings size={16} opacity={0.7} />}
+                      <span>{isService ? 'Service Mode' : isNormal ? 'Normal Mode' : 'Camp Mode'}</span>
                     </button>
                   );
                 })()}
+
                 {/* Simple Mode Toggle */}
-            <button
-              onClick={handleToggleUiMode}
-              style={{
-                background: 'rgba(41, 182, 246, 0.15)',
-                border: '1px solid rgba(41, 182, 246, 0.3)',
-                color: '#29b6f6',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                fontSize: '0.65rem',
-                fontWeight: '800',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                minHeight: '28px',
-                textTransform: 'uppercase',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.25)';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.15)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              title="Switch to Simple Mode Dashboard"
-            >
-              <span>✨ Simple UI</span>
-            </button>
+                <button
+                  onClick={handleToggleUiMode}
+                  style={{
+                    background: 'rgba(251, 191, 36, 0.1)',
+                    border: '1px solid rgba(251, 191, 36, 0.2)',
+                    color: '#fbbf24',
+                    cursor: 'pointer',
+                    padding: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(251, 191, 36, 0.1)'}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>✨</span>
+                  <span>Simple UI</span>
+                </button>
+
                 {/* Dark mode toggle */}
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-                color: 'var(--text-secondary)', fontSize: '1.1rem', borderRadius: '8px',
-                minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}
-              title={isDarkMode ? 'Switch to light' : 'Switch to dark'}
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    padding: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>{isDarkMode ? '☀️' : '🌙'}</span>
+                  <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
               </div>
               {/* Leader specific: My Team */}
               {currentUser.role === 'leader' && (
@@ -7034,7 +6755,7 @@ export default function App() {
               <div style={{textAlign:'center',padding:'24px 0',fontSize:'2rem',color:'#4ade80'}}>Thanks! &#128591;</div>
             ) : (<>
               {feedbackError && <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'#ef4444',padding:'10px',borderRadius:'8px',marginBottom:'16px',fontSize:'0.85rem',textAlign:'center'}}>{feedbackError}</div>}
-              <div style={{display:'flex',justifyContent:'center',gap:'12px',marginBottom:'20px'}}>
+              <div style={{display: 'flex', alignItems: 'center',justifyContent:'center',gap:'12px',marginBottom:'20px'}}>
                 {[1,2,3,4,5].map(n=>(
                   <button key={n} onClick={()=>setFeedbackRating(n)} style={{fontSize:'2rem',background:'none',border:'none',cursor:'pointer',opacity:feedbackRating>=n?1:0.25,transform:feedbackRating>=n?'scale(1.25)':'scale(1)',transition:'all 0.15s'}}>&#11088;</button>
                 ))}
@@ -7093,7 +6814,7 @@ export default function App() {
           {globalServants.length > 0 && (
             <div style={{padding:'12px 16px 8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
               <p style={{fontSize:'0.7rem',color:'#f59e0b',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'10px'}}>Top Servants</p>
-              <div style={{display:'flex',gap:'8px',overflowX:'auto',paddingBottom:'4px'}}>
+              <div style={{display: 'flex', alignItems: 'center',gap:'8px',overflowX:'auto',paddingBottom:'4px'}}>
                 {[...globalServants].sort((a,b)=>(b.servicesAttended?.length||0)-(a.servicesAttended?.length||0)).slice(0,5).map((s,i)=>(
                   <div key={s.id} style={{minWidth:'76px',textAlign:'center',background:'rgba(255,255,255,0.04)',borderRadius:'12px',padding:'10px 6px',flexShrink:0}}>
                     <div style={{fontSize:'1.1rem',marginBottom:'4px'}}>{['&#127945;','&#129352;','&#129353;','&#127885;','&#127885;'][i]}</div>
@@ -7143,7 +6864,7 @@ export default function App() {
           </div>
           <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',flexDirection:'column',gap:'10px'}}>
             <input value={gamesLibrarySearch} onChange={e=>setGamesLibrarySearch(e.target.value)} placeholder='Search games...' style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 14px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}} />
-            <div style={{display:'flex',gap:'6px'}}>
+            <div style={{display: 'flex', alignItems: 'center',gap:'6px'}}>
               {['all','station','big_game','reflection'].map(f=>(
                 <button key={f} onClick={()=>setGamesLibraryFilter(f)} style={{padding:'6px 12px',borderRadius:'20px',border:'none',background:gamesLibraryFilter===f?'linear-gradient(135deg,#1441a1,#60a5fa)':'rgba(255,255,255,0.07)',color:'#fff',fontWeight:'600',fontSize:'0.75rem',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>{f==='all'?'All':f==='big_game'?'Big Game':f.charAt(0).toUpperCase()+f.slice(1)}</button>
               ))}
@@ -7298,7 +7019,7 @@ export default function App() {
                   </p>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {steps.map((_, i) => (
                         <div key={i} style={{
                           width: '8px', height: '8px', borderRadius: '50%',
@@ -7307,7 +7028,7 @@ export default function App() {
                       ))}
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <button
                         onClick={() => setShowOnboarding(false)}
                         style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600' }}

@@ -287,7 +287,7 @@ export default function ScheduleTab({
       })()}
 
       {isReferee && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '4px' }}>
           <button
             type="button"
             onClick={() => setShowFullSchedule(!showFullSchedule)}
@@ -362,7 +362,7 @@ export default function ScheduleTab({
           {/* Day Selector Segmented Control */}
           {daysCount > 1 && (
             <div className="toggle-group" style={{ 
-              display: 'flex',
+              display: 'flex', alignItems: 'center',
               width: '100%',
               background: 'rgba(0,0,0,0.25)',
               borderRadius: '10px',
@@ -687,7 +687,7 @@ export default function ScheduleTab({
                   {getEffectiveTimeShift() > 0 ? (
                     <span><strong>Schedule Delay:</strong> Matchup times shifted by <strong>+{getEffectiveTimeShift()} mins</strong>.</span>
                   ) : (
-                    <span><strong>On Schedule:</strong> Camp is running exactly on time!</span>
+                    <span><strong>On Schedule:</strong> {eventConfig?.eventType === 'camp' ? 'Camp' : 'Service'} is running exactly on time!</span>
                   )}
                 </span>
               </div>
@@ -797,16 +797,20 @@ export default function ScheduleTab({
           flexDirection: 'column',
           gap: '12px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '1.1rem' }}>📋</span>
-              <h3 style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: '800', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Game Leader Control Panel
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(41, 182, 246, 0.15)', width: '36px', height: '36px', borderRadius: '10px', border: '1px solid rgba(41, 182, 246, 0.3)' }}>
+                <span style={{ fontSize: '1.2rem' }}>📋</span>
+              </div>
+              <h3 style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: '800', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: '1.2' }}>
+                Game Leader<br/>
+                <span style={{ color: 'var(--vbt-sky)', fontSize: '0.75rem', fontWeight: '700' }}>Control Panel</span>
               </h3>
             </div>
-            <span style={{ background: 'var(--vbt-sky)', color: '#ffffff', border: 'none', fontSize: '0.65rem', padding: '2px 8px', fontWeight: '700', borderRadius: '9999px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              ACTIVE GAME
-            </span>
+            <div style={{ background: 'rgba(41, 182, 246, 0.15)', color: '#29b6f6', border: '1px solid rgba(41, 182, 246, 0.4)', fontSize: '0.65rem', padding: '4px 10px', fontWeight: '800', borderRadius: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+               <span style={{width: '6px', height: '6px', background: '#29b6f6', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 8px #29b6f6'}}></span>
+               ACTIVE
+            </div>
           </div>
 
           {/* Game Selection Dropdown */}
@@ -1030,7 +1034,7 @@ export default function ScheduleTab({
 
                         {/* Stopwatch Actions */}
                         {canControlStopwatch(currentUser) && (
-                          <div style={{ display: 'flex', gap: '8px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '4px' }}>
                             {!m.actualStart && (
                               <button
                                 onClick={() => handleStartMatchupTimer(m)}
@@ -1392,7 +1396,7 @@ export default function ScheduleTab({
                             {item.roleName}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                           <span>📍 {item.locationName}</span>
                           {item.teamName !== 'None' && (
                             <span style={{ fontWeight: '700', color: getTeamColorHex(item.teamName.split(' ')[0]) }}>

@@ -390,7 +390,7 @@ const S = {
     margin: '4px 0 10px 0',
   },
   padButtonContainer: {
-    display: 'flex',
+    display: 'flex', alignItems: 'center',
     gap: '8px',
     width: '100%',
   },
@@ -903,10 +903,10 @@ export default function DumbDashboard({
             </span>
           </div>
           <span style={S.profileRole}>
-            {currentUser?.role === 'leader' ? `Team Leader • ${currentUser?.teamCode}` : 'Game Referee'}
+            {currentUser?.role === 'admin' ? 'System Administrator' : currentUser?.role === 'leader' ? `Team Leader • ${currentUser?.teamCode}` : 'Game Referee'}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button style={S.toggleUiBtn} onClick={onToggleUiMode}>
             <span>✨ Detailed UI</span>
           </button>

@@ -592,3 +592,82 @@ def main(request):
     except Exception as e:
         print(f"Error occurred: {e}")
         return (json.dumps({"status": "error", "message": str(e)}), 500, headers)
+
+@functions_framework.http
+def check_service_mode(request):
+    """
+    Cron job triggered every 15 minutes.
+    Checks upcoming services and activates them 2 hours before kickoff.
+    """
+    if request.method == 'OPTIONS':
+        return ('', 204, {'Access-Control-Allow-Origin': '*'})
+    headers = {'Access-Control-Allow-Origin': '*'}
+    
+    try:
+        db = firestore.Client(project="faa-test-guide-v2", database="db-vbt")
+        services_ref = db.collection("vbt_services")
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        two_hours_from_now = now + datetime.timedelta(hours=2)
+        
+        upcoming_services = services_ref.where("status", "==", "upcoming").stream()
+        activated = 0
+        for svc in upcoming_services:
+            data = svc.to_dict()
+            if 'date' in data and data['date']:
+                kickoff = data['date']
+                if kickoff <= two_hours_from_now:
+                    services_ref.document(svc.id).update({"status": "active"})
+                    activated += 1
+                    
+        return (json.dumps({"status": "success", "activated": activated}), 200, headers)
+    except Exception as e:
+        print(f"Error checking service mode: {e}")
+        return (json.dumps({"status": "error", "message": str(e)}), 500, headers)
+
+@functions_framework.http
+def reset_service_timeline(request):
+    """
+    Callable function to globally adjust all subsequent rounds.
+    """
+    if request.method == 'OPTIONS':
+        return ('', 204, {'Access-Control-Allow-Origin': '*'})
+    headers = {'Access-Control-Allow-Origin': '*'}
+    
+    try:
+        req_data = request.get_json(silent=True) or {}
+        service_id = req_data.get('service_id')
+        offset_ms = req_data.get('offset_ms', 0)
+        
+        if not service_id:
+            return (json.dumps({"error": "service_id required"}), 400, headers)
+            
+        db = firestore.Client(project="faa-test-guide-v2", database="db-vbt")
+        svc_ref = db.collection("vbt_services").document(service_id)
+        
+        svc_doc = svc_ref.get()
+        if not svc_doc.exists:
+            return (json.dumps({"error": "Service not found"}), 404, headers)
+            
+        data = svc_doc.to_dict()
+        schedule = data.get('schedule', [])
+        
+        for round in schedule:
+            if 'start_time' in round:
+                round['start_time'] += offset_ms
+                
+        svc_ref.update({"schedule": schedule})
+        
+        # Also log this as an announcement
+        db.collection("vbt_camp_announcements").add({
+            "eventCode": service_id.split('_')[-1].upper(),
+            "message": "Schedule has been updated by the coordinator.",
+            "author": "System",
+            "type": "system",
+            "timestamp": firestore.SERVER_TIMESTAMP
+        })
+        
+        return (json.dumps({"status": "success"}), 200, headers)
+    except Exception as e:
+        print(f"Error resetting timeline: {e}")
+        return (json.dumps({"status": "error", "message": str(e)}), 500, headers)

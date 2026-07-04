@@ -285,7 +285,7 @@ export default function ScoreboardTab({
                 <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{blockTitle}</h3>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                   {eventConfig.eventType !== 'normal' ? (
-                    <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {['Red', 'White', 'Black', 'Blue'].map((c, i) => {
                         const customColorName = eventConfig.teamNames?.[c.toLowerCase()] || c;
                         const colorHex = getTeamColorHex(c);

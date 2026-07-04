@@ -18,6 +18,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
+import { getAuth, signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
 
 // Firebase config — project: crm-production (ID: faa-test-guide-v2)
 // VBT data is isolated in the dedicated 'db-vbt' database.
@@ -40,6 +41,8 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager()
   })
 }, 'db-vbt');
+
+export const auth = getAuth(app);
 
 // ─────────────────────────────────────────────
 // Helper: Build per-event Firestore paths
