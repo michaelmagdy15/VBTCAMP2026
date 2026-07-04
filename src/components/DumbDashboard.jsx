@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import {
   Users,
   Clock,
@@ -19,9 +19,9 @@ import {
   LifeBuoy
 } from 'lucide-react';
 
-import WalkieTalkie from './WalkieTalkie';
-import TimelineFeedTab from './TimelineFeedTab';
-import ScoreboardTab from './ScoreboardTab';
+const WalkieTalkie = lazy(() => import('./WalkieTalkie'));
+const TimelineFeedTab = lazy(() => import('./TimelineFeedTab'));
+const ScoreboardTab = lazy(() => import('./ScoreboardTab'));
 import BlessingBox from './BlessingBox';
 import RulesBooklet from './RulesBooklet';
 import EmergencySOS from './EmergencySOS';
@@ -676,58 +676,64 @@ export default function DumbDashboard({
       {/* Tab: Live Feed */}
       {activeTab === 'feed' && (
         <div className="glass-panel" style={{ padding: '12px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
-          <TimelineFeedTab
-            announcements={announcements}
-            announcementText={propAnnouncementText}
-            uploadImage={uploadImage}
-            fileInputRef={fileInputRef}
-            currentUser={currentUser}
-            currentEventCode={activeEventCode}
-            eventLabels={eventLabels}
-            firebaseConnected={firebaseConnected}
-            setShowFeedbackModal={setShowFeedbackModal}
-            setAnnouncementText={propSetAnnouncementText}
-            setUploadImage={setUploadImage}
-          />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>Loading Feed...</div>}>
+            <TimelineFeedTab
+              announcements={announcements}
+              announcementText={propAnnouncementText}
+              uploadImage={uploadImage}
+              fileInputRef={fileInputRef}
+              currentUser={currentUser}
+              currentEventCode={activeEventCode}
+              eventLabels={eventLabels}
+              firebaseConnected={firebaseConnected}
+              setShowFeedbackModal={setShowFeedbackModal}
+              setAnnouncementText={propSetAnnouncementText}
+              setUploadImage={setUploadImage}
+            />
+          </Suspense>
         </div>
       )}
 
       {/* Tab: Scores */}
       {activeTab === 'scores' && (
         <div className="glass-panel" style={{ padding: '12px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
-          <ScoreboardTab
-            eventConfig={eventConfig}
-            scoreCalculations={standings}
-            campData={campData}
-            campState={campData?.campState}
-            currentUser={currentUser}
-            scoreViewMode={scoreViewMode}
-            expandedBlocks={expandedBlocks}
-            expandedGames={expandedGames}
-            uniqueGames={uniqueGames}
-            side1Name={side1Name}
-            side2Name={side2Name}
-            shakesPercentage={shakesPercentage}
-            friesPercentage={friesPercentage}
-            getTeamColorHex={getTeamColorHex}
-            setScoreViewMode={setScoreViewMode}
-            setExpandedBlocks={setExpandedBlocks}
-            setExpandedGames={setExpandedGames}
-            handleToggleWinner={handleToggleWinner}
-            getEffectiveTimeShift={getEffectiveTimeShift}
-            getShiftedTimeStr={getShiftedTimeStr}
-            isTimeSlotActive={isTimeSlotActive}
-          />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>Loading Scoreboard...</div>}>
+            <ScoreboardTab
+              eventConfig={eventConfig}
+              scoreCalculations={standings}
+              campData={campData}
+              campState={campData?.campState}
+              currentUser={currentUser}
+              scoreViewMode={scoreViewMode}
+              expandedBlocks={expandedBlocks}
+              expandedGames={expandedGames}
+              uniqueGames={uniqueGames}
+              side1Name={side1Name}
+              side2Name={side2Name}
+              shakesPercentage={shakesPercentage}
+              friesPercentage={friesPercentage}
+              getTeamColorHex={getTeamColorHex}
+              setScoreViewMode={setScoreViewMode}
+              setExpandedBlocks={setExpandedBlocks}
+              setExpandedGames={setExpandedGames}
+              handleToggleWinner={handleToggleWinner}
+              getEffectiveTimeShift={getEffectiveTimeShift}
+              getShiftedTimeStr={getShiftedTimeStr}
+              isTimeSlotActive={isTimeSlotActive}
+            />
+          </Suspense>
         </div>
       )}
 
       {/* Tab: Radio */}
       {activeTab === 'radio' && (
         <div className="glass-panel" style={{ padding: '4px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
-          <WalkieTalkie
-            eventCode={activeEventCode}
-            currentUser={currentUser}
-          />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>Connecting Radio...</div>}>
+            <WalkieTalkie
+              eventCode={activeEventCode}
+              currentUser={currentUser}
+            />
+          </Suspense>
         </div>
       )}
 

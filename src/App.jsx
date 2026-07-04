@@ -100,7 +100,7 @@ import { saveAsTemplate, loadTemplates, deleteTemplate, PRESET_TEMPLATES } from 
 import LogisticsPanel from './components/LogisticsPanel';
 import FeedMessage from './components/FeedMessage';
 import ScheduleExporter from './components/ScheduleExporter';
-import WalkieTalkie from './components/WalkieTalkie';
+const WalkieTalkie = React.lazy(() => import('./components/WalkieTalkie'));
 import GPSMap from './components/GPSMap';
 import ScheduleBuilder from './components/ScheduleBuilder';
 import OfflineBackupModal from './components/OfflineBackupModal';
@@ -109,8 +109,8 @@ import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
 // Extracted Tab Components
 import MyTeamTab from './components/MyTeamTab';
-import TimelineFeedTab from './components/TimelineFeedTab';
-import ScoreboardTab from './components/ScoreboardTab';
+const TimelineFeedTab = React.lazy(() => import('./components/TimelineFeedTab'));
+const ScoreboardTab = React.lazy(() => import('./components/ScoreboardTab'));
 import ScheduleTab from './components/ScheduleTab';
 import SettingsTab from './components/SettingsTab';
 import ServiceTab from './components/ServiceTab';
@@ -5514,6 +5514,7 @@ export default function App() {
 
       {/* Content tabs */}
       <main className="content-area animate-fade">
+        <React.Suspense fallback={<div className="skeleton" style={{ height: '80vh', margin: '16px', borderRadius: '12px' }}></div>}>
         {currentUser?.role === 'leader' && (
           <div className="glass-panel animate-fade" style={{
             padding: '24px',
@@ -6444,6 +6445,7 @@ export default function App() {
             handleAddGame={handleAddGame}
           />
         )}
+        </React.Suspense>
       </main>
     </div>
       {/* First-run onboarding tooltip */}

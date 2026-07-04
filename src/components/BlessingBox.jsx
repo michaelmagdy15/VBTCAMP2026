@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Sparkles, Send, CheckCircle2 } from 'lucide-react';
 import { addAnnouncement } from '../firebase';
+import confetti from 'canvas-confetti';
+import { triggerHaptic, hapticPatterns } from '../utils/haptics';
 
 const BLESSING_TAGS = [
   { tag: '🤝 Sportsmanship', label: 'Sportsmanship' },
@@ -61,6 +63,15 @@ export default function BlessingBox({ currentUser, activeEventCode, campData }) 
         null,
         currentUser?.role || 'leader'
       );
+      
+      triggerHaptic('success');
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#fbbf24', '#ffffff', '#34d399']
+      });
+
       setSuccess(true);
       setDescription('');
       setFreeTextRecipient('');

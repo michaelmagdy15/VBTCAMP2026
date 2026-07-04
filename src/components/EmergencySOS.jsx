@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AlertTriangle, MapPin, ShieldAlert, CheckCircle } from 'lucide-react';
 import { addAnnouncement } from '../firebase';
+import { triggerHaptic } from '../utils/haptics';
 
 const STATIONS = [
   'Soccer Field',
@@ -66,6 +67,7 @@ export default function EmergencySOS({ currentUser, activeEventCode, triggerRemo
   const triggerSOS = async () => {
     setSuccess(true);
     setHoldProgress(100);
+    triggerHaptic('heavy');
 
     const location = useCustomLoc ? customLocation.trim() || 'Unspecified location' : selectedStation;
     const alertMsg = `🚨 CRITICAL SOS: [${issueType}] reported by ${currentUser?.name || 'VBT Servant'} at ${location}`;
