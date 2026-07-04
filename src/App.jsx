@@ -2106,6 +2106,24 @@ export default function App() {
     if (currentEventCode) localStorage.removeItem(`vbt_user_${currentEventCode}`);
   };
 
+  const handleToggleUiMode = async () => {
+    if (!currentUser) return;
+    const currentMode = (currentUser.id && globalServants.find(s => s.id === currentUser.id)?.uiMode) || currentUser.uiMode || 'detailed';
+    const newMode = currentMode === 'dumb' ? 'detailed' : 'dumb';
+    const updatedUser = { ...currentUser, uiMode: newMode };
+    setCurrentUser(updatedUser);
+    if (currentEventCode) {
+      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(updatedUser));
+    }
+    if (currentUser.id && !isOfflineMode) {
+      try {
+        await updateServant(currentUser.id, { uiMode: newMode });
+      } catch (err) {
+        console.error("Error updating uiMode in DB:", err);
+      }
+    }
+  };
+
   // Leave Event — returns to event selection screen
   const handleLeaveEvent = () => {
     if (currentUser) handleLogout();
@@ -5131,6 +5149,35 @@ export default function App() {
         announcements={announcements}
         urgentAlert={urgentAlert}
         activePingAlert={activePingAlert}
+        onToggleUiMode={handleToggleUiMode}
+
+        // Feed Tab Props
+        announcementText={announcementText}
+        uploadImage={uploadImage}
+        fileInputRef={fileInputRef}
+        eventLabels={eventLabels}
+        firebaseConnected={firebaseConnected}
+        setShowFeedbackModal={setShowFeedbackModal}
+        setAnnouncementText={setAnnouncementText}
+        setUploadImage={setUploadImage}
+
+        // Scoreboard Tab Props
+        scoreViewMode={scoreViewMode}
+        expandedBlocks={expandedBlocks}
+        expandedGames={expandedGames}
+        uniqueGames={uniqueGames}
+        side1Name={side1Name}
+        side2Name={side2Name}
+        shakesPercentage={shakesPercentage}
+        friesPercentage={friesPercentage}
+        getTeamColorHex={getTeamColorHex}
+        setScoreViewMode={setScoreViewMode}
+        setExpandedBlocks={setExpandedBlocks}
+        setExpandedGames={setExpandedGames}
+        handleToggleWinner={handleToggleWinner}
+        getEffectiveTimeShift={getEffectiveTimeShift}
+        getShiftedTimeStr={getShiftedTimeStr}
+        isTimeSlotActive={isTimeSlotActive}
       />
     );
   }
@@ -5357,6 +5404,38 @@ export default function App() {
           </div>
           
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Simple Mode Toggle */}
+            <button
+              onClick={handleToggleUiMode}
+              style={{
+                background: 'rgba(41, 182, 246, 0.15)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                color: '#29b6f6',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                fontSize: '0.65rem',
+                fontWeight: '800',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                minHeight: '28px',
+                textTransform: 'uppercase',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.25)';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.15)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              title="Switch to Simple Mode Dashboard"
+            >
+              <span>✨ Simple UI</span>
+            </button>
+
             {/* Dark mode toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}

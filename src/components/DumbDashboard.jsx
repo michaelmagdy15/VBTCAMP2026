@@ -11,8 +11,20 @@ import {
   Send,
   MapPin,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  Radio,
+  Compass,
+  ArrowLeft,
+  BookOpen,
+  LifeBuoy
 } from 'lucide-react';
+
+import WalkieTalkie from './WalkieTalkie';
+import TimelineFeedTab from './TimelineFeedTab';
+import ScoreboardTab from './ScoreboardTab';
+import BlessingBox from './BlessingBox';
+import RulesBooklet from './RulesBooklet';
+import EmergencySOS from './EmergencySOS';
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -61,12 +73,45 @@ export default function DumbDashboard({
   onPostAnnouncement,
   announcements = [],
   urgentAlert = { show: false, text: '' },
-  activePingAlert = { show: false, text: '' }
+  activePingAlert = { show: false, text: '' },
+  onToggleUiMode,
+
+  // Feed Tab Props
+  announcementText: propAnnouncementText,
+  uploadImage,
+  fileInputRef,
+  eventLabels,
+  firebaseConnected,
+  setShowFeedbackModal,
+  setAnnouncementText: propSetAnnouncementText,
+  setUploadImage,
+
+  // Scoreboard Tab Props
+  scoreViewMode,
+  expandedBlocks,
+  expandedGames,
+  uniqueGames,
+  side1Name,
+  side2Name,
+  shakesPercentage,
+  friesPercentage,
+  getTeamColorHex,
+  setScoreViewMode,
+  setExpandedBlocks,
+  setExpandedGames,
+  handleToggleWinner,
+  getEffectiveTimeShift,
+  getShiftedTimeStr,
+  isTimeSlotActive,
+
+  // SOS Trigger
+  triggerRemotePushNotification
 }) {
   const isLeader = currentUser?.role === 'leader';
   const isReferee = currentUser?.role === 'referee';
 
   // ─── State ──────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState('actions'); // 'actions' | 'feed' | 'scores' | 'radio' | 'rules' | 'sos'
 
   // Deduction Modal (Leader only)
   const [showDeductModal, setShowDeductModal] = useState(false);
@@ -307,10 +352,15 @@ export default function DumbDashboard({
             {currentUser?.role === 'leader' ? `Team Leader • ${currentUser?.teamCode}` : 'Game Referee'}
           </span>
         </div>
-        <button style={S.logoutBtn} onClick={onLogout}>
-          <LogOut size={16} />
-          <span>Exit</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button style={S.toggleUiBtn} onClick={onToggleUiMode}>
+            <span>✨ Detailed UI</span>
+          </button>
+          <button style={S.logoutBtn} onClick={onLogout}>
+            <LogOut size={16} />
+            <span>Exit</span>
+          </button>
+        </div>
       </header>
 
       {/* ─── Pulsing Alerts Banner ─────────────────────────────── */}
@@ -334,252 +384,414 @@ export default function DumbDashboard({
         </div>
       )}
 
-      {/* ─── Schedule Block (Current & Next) ───────────────────── */}
-      <section style={S.card}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <Clock size={18} style={{ color: 'var(--vbt-sky)' }} />
-          <h3 style={S.sectionTitle}>Timeline & Activity</h3>
-        </div>
-
-        {scheduleSlots.current ? (
-          <div>
-            <div style={S.currentActivityBox}>
-              <span style={S.activityTimeBadge}>
-                {scheduleSlots.current.time || 'NOW'}
-              </span>
-              <h2 style={S.currentActivityName}>{scheduleSlots.current.game || scheduleSlots.current.activity}</h2>
-              {scheduleSlots.current.location && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', color: 'var(--text-secondary)' }}>
-                  <MapPin size={14} style={{ color: 'var(--vbt-sky)' }} />
-                  <span style={{ fontSize: '13px', fontWeight: '500' }}>{scheduleSlots.current.location}</span>
-                </div>
-              )}
-            </div>
-
-            {scheduleSlots.next && (
-              <div style={S.nextActivityBox}>
-                <span style={S.nextLabel}>UP NEXT:</span>
-                <span style={S.nextText}>
-                  {scheduleSlots.next.game || scheduleSlots.next.activity} ({scheduleSlots.next.time})
-                </span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={S.emptyState}>
-            <p>No active schedule item running.</p>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Check back once coordinators publish rounds.</p>
-          </div>
-        )}
-      </section>
-
-      {/* ─── Leader View ───────────────────────────────────────── */}
-      {isLeader && (
+      {/* ─── Tab Content Views ─────────────────────────────────── */}
+      
+      {/* Tab: Actions */}
+      {activeTab === 'actions' && (
         <>
-          {/* Team Score & Deduct Button */}
-          <section style={{ ...S.card, borderLeft: `5px solid ${getSideColor(currentUser?.side)}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  My Team: {currentUser?.teamCode}
-                </h3>
-                <h2 style={{ fontSize: '26px', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)' }}>
-                  {leaderScore} <span style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-muted)' }}>total pts</span>
-                </h2>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Standing</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', color: '#fbbf24', fontWeight: '700' }}>
-                  <Trophy size={16} />
-                  <span>#{leaderRank}</span>
-                </div>
-              </div>
-            </div>
-
-            <button style={S.deductButton} onClick={() => setShowDeductModal(true)}>
-              <span>⚠️ Deduct Points</span>
-            </button>
-          </section>
-
-          {/* Broadcast Announcement */}
+          {/* Schedule Block */}
           <section style={S.card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Bell size={18} style={{ color: 'var(--vbt-sky)' }} />
-              <h3 style={S.sectionTitle}>Broadcast to Camp</h3>
-            </div>
-            <form onSubmit={handlePostAnnouncementSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <textarea
-                value={announcementText}
-                onChange={(e) => setAnnouncementText(e.target.value)}
-                placeholder="Type a quick notice to all camps..."
-                style={S.textarea}
-                rows={3}
-              />
-              <button type="submit" disabled={!announcementText.trim()} style={S.broadcastBtn(announcementText.trim())}>
-                <Send size={16} />
-                <span>Send Broadcast</span>
-              </button>
-              {announcementSuccess && (
-                <div style={S.successText}>
-                  <CheckCircle2 size={14} />
-                  <span>Broadcast Sent!</span>
-                </div>
-              )}
-            </form>
-          </section>
-        </>
-      )}
-
-      {/* ─── Referee View ──────────────────────────────────────── */}
-      {isReferee && (
-        <section style={S.card}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Game / Station Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={S.inputLabel}>REF STATION / GAME</label>
-              {assignedGames.length <= 1 ? (
-                <div style={S.singleGameDisplay}>
-                  <span>{selectedGame || 'No game assigned'}</span>
-                </div>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={selectedGame}
-                    onChange={(e) => setSelectedGame(e.target.value)}
-                    style={S.select}
-                  >
-                    {assignedGames.map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
-                </div>
-              )}
+              <Clock size={18} style={{ color: 'var(--vbt-sky)' }} />
+              <h3 style={S.sectionTitle}>Timeline & Activity</h3>
             </div>
 
-            {/* Matchup Selection */}
-            {gameMatchups.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={S.inputLabel}>CHOOSE MATCHUP TO SCORE</label>
-                  <div style={{ position: 'relative' }}>
-                    <select
-                      value={selectedMatchup ? `${selectedMatchup.block}_${selectedMatchup.round}_${selectedMatchup.game}` : ''}
-                      onChange={(e) => {
-                        const match = gameMatchups.find(m => `${m.block}_${m.round}_${m.game}` === e.target.value);
-                        if (match) setSelectedMatchup(match);
-                      }}
-                      style={S.select}
-                    >
-                      {gameMatchups.map(m => {
-                        const val = `${m.block}_${m.round}_${m.game}`;
-                        const score = getMatchupScoreStatus(m);
-                        const label = `Block ${m.block} • R${m.round}: ${m.teamA} vs ${m.teamB} ${score ? `(${score})` : '[UNSCORED]'}`;
-                        return (
-                          <option key={val} value={val}>{label}</option>
-                        );
-                      })}
-                    </select>
-                    <ChevronDown size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
-                  </div>
+            {scheduleSlots.current ? (
+              <div>
+                <div style={S.currentActivityBox}>
+                  <span style={S.activityTimeBadge}>
+                    {scheduleSlots.current.time || 'NOW'}
+                  </span>
+                  <h2 style={S.currentActivityName}>{scheduleSlots.current.game || scheduleSlots.current.activity}</h2>
+                  {scheduleSlots.current.location && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', color: 'var(--text-secondary)' }}>
+                      <MapPin size={14} style={{ color: 'var(--vbt-sky)' }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500' }}>{scheduleSlots.current.location}</span>
+                    </div>
+                  )}
                 </div>
 
-                {selectedMatchup && (
-                  <div style={S.scoringContainer}>
-                    <div style={S.matchupHeader}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase' }}>
-                        Block {selectedMatchup.block} • Round {selectedMatchup.round}
-                      </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        📍 {selectedMatchup.location}
-                      </span>
-                    </div>
-
-                    {/* Giant Scoring Pads */}
-                    <div style={S.scoringPadsGrid}>
-                      {/* Team A */}
-                      <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}` }}>
-                        <span style={S.scoreTeamName}>{teamA}</span>
-                        <div style={S.scoreNumber}>{scoreA}</div>
-                        <div style={S.padButtonContainer}>
-                          <button style={S.padBtnMinus} onClick={() => setScoreA(prev => Math.max(0, prev - 1))}>
-                            <Minus size={20} />
-                          </button>
-                          <button style={S.padBtnPlus(getSideColor(teamA))} onClick={() => setScoreA(prev => prev + 1)}>
-                            <Plus size={20} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Team B */}
-                      <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}` }}>
-                        <span style={S.scoreTeamName}>{teamB}</span>
-                        <div style={S.scoreNumber}>{scoreB}</div>
-                        <div style={S.padButtonContainer}>
-                          <button style={S.padBtnMinus} onClick={() => setScoreB(prev => Math.max(0, prev - 1))}>
-                            <Minus size={20} />
-                          </button>
-                          <button style={S.padBtnPlus(getSideColor(teamB))} onClick={() => setScoreB(prev => prev + 1)}>
-                            <Plus size={20} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Submit Score Button */}
-                    <button style={S.submitScoreBtn} onClick={handleRefereeScoreSubmit}>
-                      <CheckCircle2 size={18} />
-                      <span>Save & Submit Score</span>
-                    </button>
-
-                    {refSubmitSuccess && (
-                      <div style={S.successText}>
-                        <CheckCircle2 size={14} />
-                        <span>Scores Published Successfully!</span>
-                      </div>
-                    )}
+                {scheduleSlots.next && (
+                  <div style={S.nextActivityBox}>
+                    <span style={S.nextLabel}>UP NEXT:</span>
+                    <span style={S.nextText}>
+                      {scheduleSlots.next.game || scheduleSlots.next.activity} ({scheduleSlots.next.time})
+                    </span>
                   </div>
                 )}
               </div>
             ) : (
               <div style={S.emptyState}>
-                <p>No matchups available for game "{selectedGame || 'assigned game'}".</p>
+                <p>No active schedule item running.</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Check back once coordinators publish rounds.</p>
               </div>
             )}
+          </section>
+
+          {/* Quick Utilities Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <button
+              onClick={() => setActiveTab('rules')}
+              style={{
+                ...S.cardButton,
+                background: 'linear-gradient(135deg, rgba(41, 182, 246, 0.12) 0%, rgba(13, 20, 38, 0.5) 100%)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                color: '#29b6f6'
+              }}
+            >
+              <BookOpen size={20} />
+              <span style={{ fontWeight: '750', fontSize: '12px' }}>Rules Booklet</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('sos')}
+              style={{
+                ...S.cardButton,
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(13, 20, 38, 0.5) 100%)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444'
+              }}
+            >
+              <LifeBuoy size={20} />
+              <span style={{ fontWeight: '750', fontSize: '12px' }}>Emergency SOS</span>
+            </button>
           </div>
-        </section>
+
+          {/* Leader View */}
+          {isLeader && (
+            <>
+              {/* Team Score & Deduct Button */}
+              <section style={{ ...S.card, borderLeft: `5px solid ${getSideColor(currentUser?.side)}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      My Team: {currentUser?.teamCode}
+                    </h3>
+                    <h2 style={{ fontSize: '26px', fontWeight: '800', color: '#ffffff', fontFamily: 'var(--font-title)' }}>
+                      {leaderScore} <span style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-muted)' }}>total pts</span>
+                    </h2>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Standing</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', color: '#fbbf24', fontWeight: '700' }}>
+                      <Trophy size={16} />
+                      <span>#{leaderRank}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button style={S.deductButton} onClick={() => setShowDeductModal(true)}>
+                  <span>⚠️ Deduct Points</span>
+                </button>
+              </section>
+
+              {/* Broadcast Announcement */}
+              <section style={S.card}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <Bell size={18} style={{ color: 'var(--vbt-sky)' }} />
+                  <h3 style={S.sectionTitle}>Broadcast to Camp</h3>
+                </div>
+                <form onSubmit={handlePostAnnouncementSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <textarea
+                    value={announcementText}
+                    onChange={(e) => setAnnouncementText(e.target.value)}
+                    placeholder="Type a quick notice to all camps..."
+                    style={S.textarea}
+                    rows={3}
+                  />
+                  <button type="submit" disabled={!announcementText.trim()} style={S.broadcastBtn(announcementText.trim())}>
+                    <Send size={16} />
+                    <span>Send Broadcast</span>
+                  </button>
+                  {announcementSuccess && (
+                    <div style={S.successText}>
+                      <CheckCircle2 size={14} />
+                      <span>Broadcast Sent!</span>
+                    </div>
+                  )}
+                </form>
+              </section>
+            </>
+          )}
+
+          {/* Referee View */}
+          {isReferee && (
+            <section style={S.card}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Game / Station Selector */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={S.inputLabel}>REF STATION / GAME</label>
+                  {assignedGames.length <= 1 ? (
+                    <div style={S.singleGameDisplay}>
+                      <span>{selectedGame || 'No game assigned'}</span>
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={selectedGame}
+                        onChange={(e) => setSelectedGame(e.target.value)}
+                        style={S.select}
+                      >
+                        {assignedGames.map(g => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Matchup Selection */}
+                {gameMatchups.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={S.inputLabel}>CHOOSE MATCHUP TO SCORE</label>
+                      <div style={{ position: 'relative' }}>
+                        <select
+                          value={selectedMatchup ? `${selectedMatchup.block}_${selectedMatchup.round}_${selectedMatchup.game}` : ''}
+                          onChange={(e) => {
+                            const match = gameMatchups.find(m => `${m.block}_${m.round}_${m.game}` === e.target.value);
+                            if (match) setSelectedMatchup(match);
+                          }}
+                          style={S.select}
+                        >
+                          {gameMatchups.map(m => {
+                            const val = `${m.block}_${m.round}_${m.game}`;
+                            const score = getMatchupScoreStatus(m);
+                            const label = `Block ${m.block} • R${m.round}: ${m.teamA} vs ${m.teamB} ${score ? `(${score})` : '[UNSCORED]'}`;
+                            return (
+                              <option key={val} value={val}>{label}</option>
+                            );
+                          })}
+                        </select>
+                        <ChevronDown size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
+                      </div>
+                    </div>
+
+                    {selectedMatchup && (
+                      <div style={S.scoringContainer}>
+                        <div style={S.matchupHeader}>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase' }}>
+                            Block {selectedMatchup.block} • Round {selectedMatchup.round}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            📍 {selectedMatchup.location}
+                          </span>
+                        </div>
+
+                        {/* Giant Scoring Pads */}
+                        <div style={S.scoringPadsGrid}>
+                          {/* Team A */}
+                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}` }}>
+                            <span style={S.scoreTeamName}>{teamA}</span>
+                            <div style={S.scoreNumber}>{scoreA}</div>
+                            <div style={S.padButtonContainer}>
+                              <button style={S.padBtnMinus} onClick={() => setScoreA(prev => Math.max(0, prev - 1))}>
+                                <Minus size={20} />
+                              </button>
+                              <button style={S.padBtnPlus(getSideColor(teamA))} onClick={() => setScoreA(prev => prev + 1)}>
+                                <Plus size={20} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Team B */}
+                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}` }}>
+                            <span style={S.scoreTeamName}>{teamB}</span>
+                            <div style={S.scoreNumber}>{scoreB}</div>
+                            <div style={S.padButtonContainer}>
+                              <button style={S.padBtnMinus} onClick={() => setScoreB(prev => Math.max(0, prev - 1))}>
+                                <Minus size={20} />
+                              </button>
+                              <button style={S.padBtnPlus(getSideColor(teamB))} onClick={() => setScoreB(prev => prev + 1)}>
+                                <Plus size={20} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Submit Score Button */}
+                        <button style={S.submitScoreBtn} onClick={handleRefereeScoreSubmit}>
+                          <CheckCircle2 size={18} />
+                          <span>Save & Submit Score</span>
+                        </button>
+
+                        {refSubmitSuccess && (
+                          <div style={S.successText}>
+                            <CheckCircle2 size={14} />
+                            <span>Scores Published Successfully!</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={S.emptyState}>
+                    <p>No matchups available for game "{selectedGame || 'assigned game'}".</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Praise & Blessings Box */}
+          <BlessingBox
+            currentUser={currentUser}
+            activeEventCode={activeEventCode}
+            campData={campData}
+          />
+
+          {/* Scrollable Announcements Feed */}
+          <section style={{ ...S.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Bell size={18} style={{ color: 'var(--vbt-sky)' }} />
+              <h3 style={S.sectionTitle}>Announcement Feed</h3>
+            </div>
+
+            <div style={S.feedScrollContainer}>
+              {sortedAnnouncements.length > 0 ? (
+                sortedAnnouncements.map((ann) => (
+                  <div key={ann.id || Math.random()} style={S.feedItem}>
+                    <div style={S.feedMeta}>
+                      <span style={{
+                        ...S.feedSender,
+                        color: ann.senderRole === 'admin' ? '#fbbf24' : getSideColor(ann.senderRole || ann.sender)
+                      }}>
+                        {ann.sender}
+                      </span>
+                      <span style={S.feedTime}>{formatTime(ann.timestamp)}</span>
+                    </div>
+                    <p style={S.feedText}>{ann.text}</p>
+                  </div>
+                ))
+              ) : (
+                <div style={S.noAnnouncements}>
+                  <p>No announcements posted yet.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </>
       )}
 
-      {/* ─── Scrollable Announcements Feed ────────────────────── */}
-      <section style={{ ...S.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <Bell size={18} style={{ color: 'var(--vbt-sky)' }} />
-          <h3 style={S.sectionTitle}>Announcement Feed</h3>
+      {/* Tab: Live Feed */}
+      {activeTab === 'feed' && (
+        <div className="glass-panel" style={{ padding: '12px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
+          <TimelineFeedTab
+            announcements={announcements}
+            announcementText={propAnnouncementText}
+            uploadImage={uploadImage}
+            fileInputRef={fileInputRef}
+            currentUser={currentUser}
+            currentEventCode={activeEventCode}
+            eventLabels={eventLabels}
+            firebaseConnected={firebaseConnected}
+            setShowFeedbackModal={setShowFeedbackModal}
+            setAnnouncementText={propSetAnnouncementText}
+            setUploadImage={setUploadImage}
+          />
         </div>
+      )}
 
-        <div style={S.feedScrollContainer}>
-          {sortedAnnouncements.length > 0 ? (
-            sortedAnnouncements.map((ann) => (
-              <div key={ann.id || Math.random()} style={S.feedItem}>
-                <div style={S.feedMeta}>
-                  <span style={{
-                    ...S.feedSender,
-                    color: ann.senderRole === 'admin' ? '#fbbf24' : getSideColor(ann.senderRole || ann.sender)
-                  }}>
-                    {ann.sender}
-                  </span>
-                  <span style={S.feedTime}>{formatTime(ann.timestamp)}</span>
-                </div>
-                <p style={S.feedText}>{ann.text}</p>
-              </div>
-            ))
-          ) : (
-            <div style={S.noAnnouncements}>
-              <p>No announcements posted yet.</p>
-            </div>
-          )}
+      {/* Tab: Scores */}
+      {activeTab === 'scores' && (
+        <div className="glass-panel" style={{ padding: '12px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
+          <ScoreboardTab
+            eventConfig={eventConfig}
+            scoreCalculations={standings}
+            campData={campData}
+            campState={campData?.campState}
+            currentUser={currentUser}
+            scoreViewMode={scoreViewMode}
+            expandedBlocks={expandedBlocks}
+            expandedGames={expandedGames}
+            uniqueGames={uniqueGames}
+            side1Name={side1Name}
+            side2Name={side2Name}
+            shakesPercentage={shakesPercentage}
+            friesPercentage={friesPercentage}
+            getTeamColorHex={getTeamColorHex}
+            setScoreViewMode={setScoreViewMode}
+            setExpandedBlocks={setExpandedBlocks}
+            setExpandedGames={setExpandedGames}
+            handleToggleWinner={handleToggleWinner}
+            getEffectiveTimeShift={getEffectiveTimeShift}
+            getShiftedTimeStr={getShiftedTimeStr}
+            isTimeSlotActive={isTimeSlotActive}
+          />
         </div>
-      </section>
+      )}
+
+      {/* Tab: Radio */}
+      {activeTab === 'radio' && (
+        <div className="glass-panel" style={{ padding: '4px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
+          <WalkieTalkie
+            eventCode={activeEventCode}
+            currentUser={currentUser}
+          />
+        </div>
+      )}
+
+      {/* View: Game Rules Booklet */}
+      {activeTab === 'rules' && (
+        <div>
+          <button type="button" onClick={() => setActiveTab('actions')} style={S.backBtn}>
+            <ArrowLeft size={16} />
+            <span>Back to Actions</span>
+          </button>
+          <RulesBooklet campData={campData} />
+        </div>
+      )}
+
+      {/* View: Emergency SOS */}
+      {activeTab === 'sos' && (
+        <div>
+          <button type="button" onClick={() => setActiveTab('actions')} style={S.backBtn}>
+            <ArrowLeft size={16} />
+            <span>Back to Actions</span>
+          </button>
+          <EmergencySOS
+            currentUser={currentUser}
+            activeEventCode={activeEventCode}
+            triggerRemotePushNotification={triggerRemotePushNotification}
+          />
+        </div>
+      )}
+
+      {/* Bottom Navigation Bar */}
+      <nav style={S.bottomNav}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('actions')}
+          style={S.navTab(activeTab === 'actions' || activeTab === 'rules' || activeTab === 'sos')}
+        >
+          <Compass size={18} />
+          <span style={S.navLabel}>Actions</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('feed')}
+          style={S.navTab(activeTab === 'feed')}
+        >
+          <Bell size={18} />
+          <span style={S.navLabel}>Feed</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('scores')}
+          style={S.navTab(activeTab === 'scores')}
+        >
+          <Trophy size={18} />
+          <span style={S.navLabel}>Scores</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('radio')}
+          style={S.navTab(activeTab === 'radio')}
+        >
+          <Radio size={18} />
+          <span style={S.navLabel}>Radio</span>
+        </button>
+      </nav>
 
       {/* ─── Point Deduction Popup Modal ─────────────────────── */}
       {showDeductModal && (
@@ -666,13 +878,89 @@ const S = {
     background: 'var(--bg-primary)',
     color: 'var(--text-primary)',
     fontFamily: "var(--font-body)",
-    padding: '16px',
+    padding: '16px 16px 80px 16px',
     boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
     position: 'relative',
     overflowX: 'hidden',
+  },
+  toggleUiBtn: {
+    background: 'rgba(41, 182, 246, 0.15)',
+    border: '1px solid rgba(41, 182, 246, 0.3)',
+    borderRadius: '8px',
+    color: '#29b6f6',
+    fontSize: '11px',
+    fontWeight: '800',
+    padding: '6px 12px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    outline: 'none',
+    transition: 'all 0.2s ease',
+  },
+  bottomNav: {
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '64px',
+    background: 'rgba(10, 16, 32, 0.95)',
+    backdropFilter: 'blur(20px)',
+    borderTop: '1px solid var(--border-light)',
+    display: 'flex',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    zIndex: 100
+  },
+  navTab: (active) => ({
+    background: 'none',
+    border: 'none',
+    color: active ? 'var(--vbt-sky)' : 'var(--text-muted)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    cursor: 'pointer',
+    outline: 'none',
+    transition: 'color 0.2s ease',
+    flex: 1
+  }),
+  navLabel: {
+    fontSize: '11px',
+    fontWeight: '700'
+  },
+  cardButton: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '16px',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    outline: 'none',
+    transition: 'all 0.2s ease',
+    textAlign: 'center'
+  },
+  backBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: '700',
+    padding: '8px 14px',
+    cursor: 'pointer',
+    marginBottom: '12px',
+    outline: 'none',
+    transition: 'background 0.2s ease'
   },
   header: {
     display: 'flex',

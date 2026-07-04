@@ -86,15 +86,20 @@ function FeedMessage({ message, currentUser, onReact }) {
   /* ── Ping (urgent) wrapper colours ───────────────────────── */
   const isPing = type === 'ping';
   const isScoreUpdate = type === 'score_update';
+  const isBlessing = type === 'blessing';
 
   const cardBorder = isPing
     ? '1px solid rgba(239,68,68,0.45)'
     : isScoreUpdate
     ? '1px solid rgba(41,182,246,0.3)'
+    : isBlessing
+    ? '2px solid rgba(251,191,36,0.5)'
     : '1px solid rgba(41,182,246,0.15)';
 
   const cardBg = isPing
     ? 'rgba(239,68,68,0.08)'
+    : isBlessing
+    ? 'linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(13,20,38,0.65) 100%)'
     : 'rgba(13,20,38,0.55)';
 
   /* ── Handlers ────────────────────────────────────────────── */
@@ -264,6 +269,30 @@ function FeedMessage({ message, currentUser, onReact }) {
             >
               <MessageCircle size={13} color="#29b6f6" strokeWidth={2.5} />
               Score Update
+            </div>
+          )}
+
+          {/* Blessing praise badge */}
+          {isBlessing && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 10px',
+                marginBottom: 8,
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: "'Outfit', sans-serif",
+                color: '#fbbf24',
+                background: 'rgba(251,191,36,0.12)',
+                border: '1px solid rgba(251,191,36,0.25)',
+                letterSpacing: 0.6,
+                textTransform: 'uppercase',
+              }}
+            >
+              <span>🌟 Value Blessing</span>
             </div>
           )}
 
