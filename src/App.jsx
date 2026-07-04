@@ -5367,90 +5367,39 @@ export default function App() {
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Syncing</span>
                 </div>
                 
-                {/* Event Mode Badge/Toggle Switch */}
-                {(() => {
-                  const isService = eventConfig.eventType === 'service';
-                  const isAdmin = currentUser?.role === 'admin';
-                  return (
-                    <button
-                      onClick={isAdmin ? handleToggleEventMode : undefined}
-                      disabled={!isAdmin}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.15)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                        border: '1px solid',
-                        borderColor: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.3)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.3)' : 'rgba(34, 197, 94, 0.3)',
-                        color: eventConfig.eventType === 'service' ? '#c4b5fd' : eventConfig.eventType === 'normal' ? '#29b6f6' : '#4ade80',
-                        fontSize: '0.62rem',
-                        fontWeight: '700',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        cursor: isAdmin ? 'pointer' : 'default',
-                        transition: 'all 0.2s ease',
-                        textTransform: 'uppercase',
-                        outline: 'none',
-                        borderStyle: 'solid',
-                        alignSelf: 'center'
-                      }}
-                      title={isAdmin ? "Click to change event mode globally" : `${eventConfig.eventType.toUpperCase()} Mode Active`}
-                    >
-                      <span>{eventConfig.eventType === 'service' ? '⛪ Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Camp Mode'}</span>
-                      {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
-                    </button>
-                  );
-                })()}
+                
               </div>
             </div>
           </div>
           
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Simple Mode Toggle */}
-            <button
-              onClick={handleToggleUiMode}
-              style={{
-                background: 'rgba(41, 182, 246, 0.15)',
-                border: '1px solid rgba(41, 182, 246, 0.3)',
-                color: '#29b6f6',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                fontSize: '0.65rem',
-                fontWeight: '800',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                minHeight: '28px',
-                textTransform: 'uppercase',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.25)';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.15)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              title="Switch to Simple Mode Dashboard"
-            >
-              <span>✨ Simple UI</span>
-            </button>
 
-            {/* Dark mode toggle */}
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-                color: 'var(--text-secondary)', fontSize: '1.1rem', borderRadius: '8px',
-                minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}
-              title={isDarkMode ? 'Switch to light' : 'Switch to dark'}
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
+              {/* User Avatar */}
+              <button
+                onClick={() => setShowMoreDrawer(true)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--vbt-sky) 0%, var(--vbt-blue) 100%)',
+                  border: 'none',
+                  color: '#fff',
+                  fontWeight: '700',
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(41, 182, 246, 0.3)',
+                  transition: 'transform 0.2s'
+                }}
+              >
+                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </button>
+
+            
+
+            
             {/* Notification Permission Request */}
             {('Notification' in window) && (
               <button
@@ -5490,26 +5439,7 @@ export default function App() {
                 <Bell size={16} style={Notification.permission === 'granted' ? {} : { animation: 'pulse-glow 1.5s infinite' }} />
               </button>
             )}
-            <div className="header-user-info" style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: '600' }}>{currentUser.name}</p>
-              <p style={{ fontSize: '0.65rem', color: getTeamColorHex(currentUser.side), fontWeight: '700' }}>
-                {(eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side).toUpperCase()} ({currentUser.teamCode})
-              </p>
-            </div>
-            <button 
-              onClick={handleLogout} 
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
-                padding: '6px',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-              aria-label="Log out"
-            >
-              <LogOut size={16} />
-            </button>
+            
           </div>
         </div>
       </header>
@@ -5946,6 +5876,87 @@ export default function App() {
                             {customColorName} (-{colorDeductions})
                           </h3>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Quick Settings */}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Event Mode Badge/Toggle Switch */}
+                {(() => {
+                  const isService = eventConfig.eventType === 'service';
+                  const isAdmin = currentUser?.role === 'admin';
+                  return (
+                    <button
+                      onClick={isAdmin ? handleToggleEventMode : undefined}
+                      disabled={!isAdmin}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.15)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        border: '1px solid',
+                        borderColor: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.3)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.3)' : 'rgba(34, 197, 94, 0.3)',
+                        color: eventConfig.eventType === 'service' ? '#c4b5fd' : eventConfig.eventType === 'normal' ? '#29b6f6' : '#4ade80',
+                        fontSize: '0.62rem',
+                        fontWeight: '700',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        cursor: isAdmin ? 'pointer' : 'default',
+                        transition: 'all 0.2s ease',
+                        textTransform: 'uppercase',
+                        outline: 'none',
+                        borderStyle: 'solid',
+                        
+                      }}
+                      title={isAdmin ? "Click to change event mode globally" : `${eventConfig.eventType.toUpperCase()} Mode Active`}
+                    >
+                      <span>{eventConfig.eventType === 'service' ? '⛪ Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Camp Mode'}</span>
+                      {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
+                    </button>
+                  );
+                })()}
+                {/* Simple Mode Toggle */}
+            <button
+              onClick={handleToggleUiMode}
+              style={{
+                background: 'rgba(41, 182, 246, 0.15)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                color: '#29b6f6',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                fontSize: '0.65rem',
+                fontWeight: '800',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                minHeight: '28px',
+                textTransform: 'uppercase',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.25)';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.15)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              title="Switch to Simple Mode Dashboard"
+            >
+              <span>✨ Simple UI</span>
+            </button>
+                {/* Dark mode toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+                color: 'var(--text-secondary)', fontSize: '1.1rem', borderRadius: '8px',
+                minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+              title={isDarkMode ? 'Switch to light' : 'Switch to dark'}
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+              </div>
                             {colorTeams.length === 0 ? (
                               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', margin: '8px 0' }}>No active teams</p>
                             ) : (
@@ -6607,6 +6618,87 @@ export default function App() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Quick Settings */}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Event Mode Badge/Toggle Switch */}
+                {(() => {
+                  const isService = eventConfig.eventType === 'service';
+                  const isAdmin = currentUser?.role === 'admin';
+                  return (
+                    <button
+                      onClick={isAdmin ? handleToggleEventMode : undefined}
+                      disabled={!isAdmin}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.15)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        border: '1px solid',
+                        borderColor: eventConfig.eventType === 'service' ? 'rgba(167, 139, 250, 0.3)' : eventConfig.eventType === 'normal' ? 'rgba(41, 182, 246, 0.3)' : 'rgba(34, 197, 94, 0.3)',
+                        color: eventConfig.eventType === 'service' ? '#c4b5fd' : eventConfig.eventType === 'normal' ? '#29b6f6' : '#4ade80',
+                        fontSize: '0.62rem',
+                        fontWeight: '700',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        cursor: isAdmin ? 'pointer' : 'default',
+                        transition: 'all 0.2s ease',
+                        textTransform: 'uppercase',
+                        outline: 'none',
+                        borderStyle: 'solid',
+                        
+                      }}
+                      title={isAdmin ? "Click to change event mode globally" : `${eventConfig.eventType.toUpperCase()} Mode Active`}
+                    >
+                      <span>{eventConfig.eventType === 'service' ? '⛪ Service Mode' : eventConfig.eventType === 'normal' ? '🏀 Normal Mode' : '🏕️ Camp Mode'}</span>
+                      {isAdmin && <span style={{ fontSize: '0.55rem', opacity: 0.75 }}>⚙️</span>}
+                    </button>
+                  );
+                })()}
+                {/* Simple Mode Toggle */}
+            <button
+              onClick={handleToggleUiMode}
+              style={{
+                background: 'rgba(41, 182, 246, 0.15)',
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                color: '#29b6f6',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                fontSize: '0.65rem',
+                fontWeight: '800',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                minHeight: '28px',
+                textTransform: 'uppercase',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.25)';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(41, 182, 246, 0.15)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              title="Switch to Simple Mode Dashboard"
+            >
+              <span>✨ Simple UI</span>
+            </button>
+                {/* Dark mode toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+                color: 'var(--text-secondary)', fontSize: '1.1rem', borderRadius: '8px',
+                minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+              title={isDarkMode ? 'Switch to light' : 'Switch to dark'}
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+              </div>
               {/* Leader specific: My Team */}
               {currentUser.role === 'leader' && (
                 <button
