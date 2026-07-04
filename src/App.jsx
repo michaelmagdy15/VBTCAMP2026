@@ -5333,12 +5333,12 @@ export default function App() {
       <header className="glass-panel" style={{
         position: 'sticky',
         top: 0,
-        zIndex: 50,
+        zIndex: 100,
         borderRadius: '0 0 16px 16px',
         borderTop: 'none',
         borderLeft: 'none',
         borderRight: 'none',
-        background: 'rgba(13, 20, 38, 0.8)',
+        background: '#0d1426',
         paddingTop: 'env(safe-area-inset-top, 0px)'
       }}>
         <div className="header-container" style={{
