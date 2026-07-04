@@ -33,6 +33,8 @@ self.addEventListener('push', (event) => {
         icon  : '/vbt-icon-192.png',
         badge : '/vbt-icon-192.png',
         tag   : 'vbt-' + Date.now(),
+        vibrate: [200, 100, 200], // Short double vibration
+        silent: false, // Ensure standard notification ping sound plays
         data  : { url: (data.data && data.data.url) || '/', type },
       };
 
