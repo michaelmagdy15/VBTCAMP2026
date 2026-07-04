@@ -45,15 +45,16 @@ const ROLE_META = [
     color: '#fbbf24',
     needsPasscode: true,
   },
-  {
-    key: ROLES.COORDINATOR,
-    label: 'Coordinator',
-    icon: Shield,
-    desc: 'Full control over config, scores & alerts',
-    color: '#f59e0b',
-    needsPasscode: true,
-  },
 ];
+
+const COORDINATOR_META = {
+  key: ROLES.COORDINATOR,
+  label: 'Coordinator',
+  icon: Shield,
+  desc: 'Full control over config, scores & alerts',
+  color: '#f59e0b',
+  needsPasscode: true,
+};
 
 // ─── Inline Styles (dark glassmorphism) ──────────────────────
 
@@ -306,6 +307,21 @@ export default function RoleLogin({
   const [name, setName] = useState('');
   const [passcode, setPasscode] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const stealthTimerRef = React.useRef(null);
+
+  const handleStealthPressIn = () => {
+    stealthTimerRef.current = setTimeout(() => {
+      setSelectedRole(ROLES.COORDINATOR);
+      setName('');
+      setPasscode('');
+    }, 2000);
+  };
+
+  const handleStealthPressOut = () => {
+    if (stealthTimerRef.current) {
+      clearTimeout(stealthTimerRef.current);
+    }
+  };
 
   // Servants filtered by role prefix
   const refereeServants = useMemo(
@@ -319,7 +335,9 @@ export default function RoleLogin({
 
   // ── Logged-in view ─────────────────────────────────────────
   if (currentUser) {
-    const meta = ROLE_META.find((r) => r.key === currentUser.role) || ROLE_META[0];
+    const meta = currentUser.role === ROLES.COORDINATOR 
+      ? COORDINATOR_META 
+      : ROLE_META.find((r) => r.key === currentUser.role) || ROLE_META[0];
     const assignments = [];
     if (currentUser.assignedTeams?.length) {
       assignments.push(`Teams: ${currentUser.assignedTeams.join(', ')}`);
@@ -415,7 +433,9 @@ export default function RoleLogin({
   };
 
   // ── Active role meta ───────────────────────────────────────
-  const activeMeta = ROLE_META.find((r) => r.key === selectedRole);
+  const activeMeta = selectedRole === ROLES.COORDINATOR 
+    ? COORDINATOR_META 
+    : ROLE_META.find((r) => r.key === selectedRole);
 
   // ── Render ─────────────────────────────────────────────────
   return (
@@ -432,6 +452,22 @@ export default function RoleLogin({
       `}</style>
 
       {/* ── Back to Homepage Button ── */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: 80,
+          height: 80,
+          opacity: 0,
+          cursor: 'default',
+          zIndex: 9999,
+        }}
+        onPointerDown={handleStealthPressIn}
+        onPointerUp={handleStealthPressOut}
+        onPointerLeave={handleStealthPressOut}
+      />
+
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
         <button
           type="button"
@@ -598,27 +634,29 @@ export default function RoleLogin({
             </div>
           )}
 
-          {/* Coordinator free-text name */}
+          {/* Coordinator Email/Password Login */}
           {selectedRole === ROLES.COORDINATOR && (
             <>
+              <div style={S.title}>Coordinator Login</div>
+              <div style={S.subtitle}>Stealth Mode Activated</div>
               <div style={S.formGroup}>
-                <label style={S.label}>Your Name</label>
+                <label style={S.label}>Email</label>
                 <input
                   style={S.input}
-                  type="text"
-                  placeholder="Enter your name"
+                  type="email"
+                  placeholder="Enter coordinator email"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
 
               <div style={S.formGroup}>
-                <label style={S.label}>Passcode</label>
+                <label style={S.label}>Password</label>
                 <div style={S.passwordWrap}>
                   <input
                     style={S.input}
                     type={showPass ? 'text' : 'password'}
-                    placeholder="Enter coordinator passcode"
+                    placeholder="Enter coordinator password"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                   />
@@ -626,14 +664,14 @@ export default function RoleLogin({
                     type="button"
                     style={S.toggleEye}
                     onClick={() => setShowPass((v) => !v)}
-                    aria-label={showPass ? 'Hide passcode' : 'Show passcode'}
+                    aria-label={showPass ? 'Hide password' : 'Show password'}
                   >
                     {showPass ? <Unlock size={16} /> : <Lock size={16} />}
                   </button>
                 </div>
               </div>
 
-              <button type="submit" style={S.submitBtn(activeMeta.color)}>
+              <button type="submit" style={S.submitBtn(activeMeta?.color || '#f59e0b')}>
                 Log in as Admin
               </button>
             </>
