@@ -479,6 +479,7 @@ body {
 }
 
 .content-area {
+  flex: 1;
   padding: 12px 16px;
   /* Bottom clears iOS tab bar (49px) + home indicator (~34px) + breathing room */
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));

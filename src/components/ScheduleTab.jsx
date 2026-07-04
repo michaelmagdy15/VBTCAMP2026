@@ -645,15 +645,17 @@ export default function ScheduleTab({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <h2 style={{ fontSize: '1.2rem', color: '#ffffff' }}>Matchups & Locations</h2>
             </div>
-            <div className="filter-chips">
-              {['All', 'Today', 'Tomorrow', 'This Week'].map(f => (
-                <button
-                  key={f}
-                  className={`filter-chip${scheduleFilter === f ? ' active' : ''}`}
-                  onClick={() => setScheduleFilter(f)}
-                >{f}</button>
-              ))}
-            </div>
+            {eventConfig.eventType === 'camp' && daysCount > 1 && (
+              <div className="filter-chips">
+                {['All', 'Today', 'Tomorrow', 'This Week'].map(f => (
+                  <button
+                    key={f}
+                    className={`filter-chip${scheduleFilter === f ? ' active' : ''}`}
+                    onClick={() => setScheduleFilter(f)}
+                  >{f}</button>
+                ))}
+              </div>
+            )}
             <div className="schedule-filter-dropdowns" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               
               <select 
