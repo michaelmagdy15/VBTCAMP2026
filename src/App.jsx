@@ -1,3 +1,4 @@
+import { useServiceTimer } from './utils/useServiceTimer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
@@ -986,6 +987,33 @@ export default function App() {
   const [editRoster, setEditRoster] = useState([]);
   const [rosterEditMode, setRosterEditMode] = useState(false);
   const [savingRoster, setSavingRoster] = useState(false);
+
+  // --- FALLBACK TRACKER FOR OFFLINE MODE ---
+  const fallbackSchedule = useMemo(() => {
+    if (!campData || !campData.matchups) return [];
+    const today = new Date();
+    const datePrefix = ${today.getMonth() + 1}// ;
+    
+    const uniqueTimes = [];
+    campData.matchups.forEach(m => {
+      if (!uniqueTimes.find(t => t.time === m.time)) {
+        uniqueTimes.push(m);
+      }
+    });
+
+    return uniqueTimes.map((m, i) => {
+      const startTime = new Date(datePrefix + m.time).getTime();
+      return {
+        round_number: i + 1,
+        start_time: startTime,
+        duration_mins: m.duration || timerDurationMin
+      };
+    });
+  }, [campData, timerDurationMin]);
+
+  const { currentRoundIndex, timeRemainingSecs, isStaticFallbackMode } = useServiceTimer(fallbackSchedule, !isOnline);
+  // -----------------------------------------
+
 
   // Sync live updates (scores, tokens, deductions) back to the Google Sheet
   const syncToGoogleSheet = async (updateData) => {

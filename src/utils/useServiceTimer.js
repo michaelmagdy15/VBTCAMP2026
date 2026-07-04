@@ -54,13 +54,13 @@ export function useServiceTimer(schedule, isOffline) {
       if (activeIndex !== -1 && remainingSecs === 60) {
         // 1 minute remaining alert
         triggerHaptic('warning');
-        playChime('chime_3');
+        playChime('countdown');
       }
       
       if (activeIndex !== -1 && remainingSecs === 0) {
         // Round ended alert
         triggerHaptic('success');
-        playChime('chime_1');
+        playChime('round_start');
       }
 
       setCurrentRoundIndex(activeIndex);
