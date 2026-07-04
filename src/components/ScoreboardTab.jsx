@@ -322,7 +322,7 @@ export default function ScoreboardTab({
                         {roundMatches.map((m, idx) => {
                           const key = `${m.block}_${m.round}_${m.game}`;
                           const winner = (campState.blockScores || {})[key] || 'NA';
-                          const pts = campData.gamePoints[m.game];
+                          const pts = campData?.gamePoints?.[m.game] || 1;
                           const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
                           const isActive = isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
                           
@@ -441,7 +441,7 @@ export default function ScoreboardTab({
       {effectiveViewMode === 'game' && uniqueGames.map((gameName) => {
         const isOpen = expandedGames[gameName];
         const gameMatches = campData.matchups.filter(m => m.game === gameName);
-        const pts = campData.gamePoints[gameName] || 0;
+        const pts = campData?.gamePoints?.[gameName] || 0;
         
         const completedCount = gameMatches.filter(m => {
           const key = `${m.block}_${m.round}_${m.game}`;

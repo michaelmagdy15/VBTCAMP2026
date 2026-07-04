@@ -3,7 +3,7 @@ import { Trophy, Users, Calendar, MapPin, Clock, Clock3 } from 'lucide-react';
 import ScheduleExporter from './ScheduleExporter';
 
 // Localized Stopwatch & Timer Components to Optimize Render Performance
-function MatchupStopwatch({ actualStart, actualEnd }) {
+function MatchupStopwatch({ actualStart, actualEnd, scheduledMinutes }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (actualStart && !actualEnd) {
@@ -34,7 +34,7 @@ function MatchupStopwatch({ actualStart, actualEnd }) {
       </span>
     );
   }
-  return <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> Scheduled: 30m</span>;
+  return <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> Scheduled: {scheduledMinutes || 30}m</span>;
 }
 
 function MatchupRunningStopwatch({ actualStart }) {
@@ -139,6 +139,153 @@ function ScheduleTimelineTrackerCard({
   );
 }
 
+// ── Live Service Countdown Banner ──
+function ServiceCountdown({ eventConfig }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Parse service date from description or use today
+  const startHour = parseInt((eventConfig.startTime || '20:00').split(':')[0]);
+  const startMin = parseInt((eventConfig.startTime || '20:00').split(':')[1] || '0');
+  const totalMinutes = (eventConfig.roundDurationMinutes || 10) * 6 + (eventConfig.breakMinutes || 5) * 5;
+  
+  // Try to extract date from description
+  let serviceDate = null;
+  const descMatch = (eventConfig.description || '').match(/(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+  if (descMatch) {
+    const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const day = parseInt(descMatch[1]);
+    const month = monthNames.indexOf(descMatch[2].toLowerCase());
+    if (month !== -1) {
+      serviceDate = new Date(new Date().getFullYear(), month, day, startHour, startMin, 0);
+    }
+  }
+  if (!serviceDate) {
+    // Fallback: use today's date
+    const today = new Date();
+    serviceDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMin, 0);
+  }
+
+  const startMs = serviceDate.getTime();
+  const endMs = startMs + totalMinutes * 60 * 1000;
+  const diff = startMs - now;
+  const diffEnd = endMs - now;
+
+  const formatCountdown = (ms) => {
+    const totalSecs = Math.max(0, Math.floor(ms / 1000));
+    const days = Math.floor(totalSecs / 86400);
+    const hours = Math.floor((totalSecs % 86400) / 3600);
+    const minutes = Math.floor((totalSecs % 3600) / 60);
+    const seconds = totalSecs % 60;
+    if (days > 0) return { days, hours, minutes, seconds, label: `${days}d ${hours}h ${minutes}m ${seconds}s` };
+    if (hours > 0) return { days: 0, hours, minutes, seconds, label: `${hours}h ${minutes}m ${seconds}s` };
+    return { days: 0, hours: 0, minutes, seconds, label: `${minutes}m ${seconds}s` };
+  };
+
+  // Service already ended
+  if (diffEnd <= 0) {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1))',
+        border: '1px solid rgba(34, 197, 94, 0.3)',
+        borderRadius: '16px', padding: '16px', textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#4ade80' }}>✅ Service Completed!</div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Great work everyone! God bless 🙏</div>
+      </div>
+    );
+  }
+
+  // Service is LIVE
+  if (diff <= 0 && diffEnd > 0) {
+    const cd = formatCountdown(diffEnd);
+    const progress = ((now - startMs) / (endMs - startMs)) * 100;
+    const currentShift = Math.min(6, Math.floor((now - startMs) / ((eventConfig.roundDurationMinutes || 10) + (eventConfig.breakMinutes || 5)) / 60000) + 1);
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(249, 115, 22, 0.08))',
+        border: '1px solid rgba(239, 68, 68, 0.35)',
+        borderRadius: '16px', padding: '16px', position: 'relative', overflow: 'hidden'
+      }}>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, height: '100%',
+          width: `${progress}%`, background: 'rgba(239, 68, 68, 0.06)',
+          transition: 'width 1s linear'
+        }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse-glow 1s infinite' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🔴 LIVE — Shift {currentShift}/6</span>
+            </div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '600' }}>{Math.round(progress)}% done</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+            {[
+              { val: cd.hours, lbl: 'HR' },
+              { val: cd.minutes, lbl: 'MIN' },
+              { val: cd.seconds, lbl: 'SEC' }
+            ].map(t => (
+              <div key={t.lbl} style={{
+                background: 'rgba(0,0,0,0.3)', borderRadius: '10px', padding: '8px 14px',
+                textAlign: 'center', minWidth: '52px', border: '1px solid rgba(239, 68, 68, 0.2)'
+              }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#ffffff', fontFamily: 'monospace', lineHeight: 1 }}>
+                  {String(t.val).padStart(2, '0')}
+                </div>
+                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: '700', letterSpacing: '0.1em', marginTop: '2px' }}>{t.lbl}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#fca5a5', textAlign: 'center', fontWeight: '600' }}>⏱️ Service ends in {cd.label}</div>
+          {/* Progress bar */}
+          <div style={{ marginTop: '10px', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #ef4444, #f97316)', borderRadius: '4px', transition: 'width 1s linear' }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Countdown to start
+  const cd = formatCountdown(diff);
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08))',
+      border: '1px solid rgba(99, 102, 241, 0.3)',
+      borderRadius: '16px', padding: '16px', textAlign: 'center'
+    }}>
+      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+        ⏳ Service starts in
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+        {[
+          ...(cd.days > 0 ? [{ val: cd.days, lbl: 'DAY' }] : []),
+          { val: cd.hours, lbl: 'HR' },
+          { val: cd.minutes, lbl: 'MIN' },
+          { val: cd.seconds, lbl: 'SEC' }
+        ].map(t => (
+          <div key={t.lbl} style={{
+            background: 'rgba(0,0,0,0.3)', borderRadius: '10px', padding: '8px 14px',
+            textAlign: 'center', minWidth: '52px', border: '1px solid rgba(99, 102, 241, 0.2)'
+          }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#ffffff', fontFamily: 'monospace', lineHeight: 1 }}>
+              {String(t.val).padStart(2, '0')}
+            </div>
+            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: '700', letterSpacing: '0.1em', marginTop: '2px' }}>{t.lbl}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: '0.72rem', color: '#c4b5fd', fontWeight: '600' }}>
+        📅 {serviceDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {serviceDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+      </div>
+    </div>
+  );
+}
+
 export default function ScheduleTab({
   currentUser,
   eventConfig,
@@ -197,6 +344,11 @@ export default function ScheduleTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+      {/* ── Live Countdown Banner for Service Events ── */}
+      {eventConfig.eventType === 'service' && (
+        <ServiceCountdown eventConfig={eventConfig} />
+      )}
 
       {/* ── MY ASSIGNMENT HERO CARD (referee / leader roles) ── */}
       {currentUser && (currentUser.role === 'referee' || currentUser.role === 'leader') && (() => {
@@ -347,7 +499,10 @@ export default function ScheduleTab({
                 👴 Schedule Helper Card
               </h3>
               <p style={{ margin: 0 }}>
-                Find your team name (e.g., <strong>Falcons 1</strong> or <strong>Eagles 2</strong>) in the matchups below. For each Round, it shows which station game you play, where it is located, and what time it starts.
+                {eventConfig.eventType === 'service'
+                  ? <>Find your group (e.g., <strong>Red 1</strong> or <strong>White 2</strong>) in the matchups below. For each Round, it shows which station you serve at, where it is located, and what time it starts.</>
+                  : <>Find your team name (e.g., <strong>Falcons 1</strong> or <strong>Eagles 2</strong>) in the matchups below. For each Round, it shows which station game you play, where it is located, and what time it starts.</>
+                }
               </p>
             </div>
           ) : (
@@ -914,7 +1069,7 @@ export default function ScheduleTab({
                         <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>
-                              {eventConfig.eventType === 'service' ? `Round ${m.round}` : `Round ${m.round} (Block ${m.block})`}
+                              {eventConfig.eventType === 'service' ? `Shift ${m.block}` : `Round ${m.round} (Block ${m.block})`}
                             </span>
                             {isMatchActive && (
                               <span style={{ 
@@ -937,32 +1092,37 @@ export default function ScheduleTab({
                         </div>
 
                         {/* Simple point adjuster logic */}
-                        <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', padding: '8px 12px', borderRadius: '6px' }}>
+                        {/* Scoring Section */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                           {/* teamA side */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
-                            <span style={{ fontSize: '0.7rem', color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
-                              {m.teamA || m.shakes}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
+                            <span style={{ fontSize: '0.72rem', color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '800', textAlign: 'center' }}>
+                              {(m.teamA || m.shakes || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase()) || 'Team A'}
                             </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <button
                                 onClick={() => handleUpdateMatchupScore(m, 'teamA', -1)}
                                 style={{
-                                  width: '26px', height: '26px', borderRadius: '50%',
-                                  color: '#ffffff', fontWeight: '800', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem'
+                                  width: '34px', height: '34px', borderRadius: '50%',
+                                  background: 'rgba(239, 68, 68, 0.25)', border: '2px solid rgba(239, 68, 68, 0.5)',
+                                  color: '#f87171', fontWeight: '900', cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
-                                -
+                                −
                               </button>
-                              <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
+                              <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#ffffff', minWidth: '28px', textAlign: 'center', fontFamily: 'monospace' }}>
                                 {m.teamAScore || m.shakesScore || 0}
                               </span>
                               <button
                                 onClick={() => handleUpdateMatchupScore(m, 'teamA', 1)}
                                 style={{
-                                  width: '26px', height: '26px', borderRadius: '50%',
-                                  color: '#ffffff', fontWeight: '800', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem'
+                                  width: '34px', height: '34px', borderRadius: '50%',
+                                  background: 'rgba(74, 222, 128, 0.25)', border: '2px solid rgba(74, 222, 128, 0.5)',
+                                  color: '#4ade80', fontWeight: '900', cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
                                 +
@@ -970,40 +1130,52 @@ export default function ScheduleTab({
                             </div>
                           </div>
 
-                          {/* Divider */}
-                          <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(255,255,255,0.08)', margin: '0 8px' }} />
+                          {/* teamB side - only show if there's an opposing team */}
+                          {(m.teamB || m.fries) && (
+                            <>
+                              {/* Divider */}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', margin: '0 6px' }}>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700' }}>VS</span>
+                                <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.1)' }} />
+                              </div>
 
-                          {/* teamB side */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 }}>
-                            <span style={{ fontSize: '0.7rem', color: getTeamColorHex(m.teamB || m.fries), fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }}>
-                              {m.teamB || m.fries}
-                            </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <button
-                                onClick={() => handleUpdateMatchupScore(m, 'teamB', -1)}
-                                style={{
-                                  width: '26px', height: '26px', borderRadius: '50%',
-                                  color: '#ffffff', fontWeight: '800', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem'
-                                }}
-                              >
-                                -
-                              </button>
-                              <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', minWidth: '20px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                {m.teamBScore || m.friesScore || 0}
-                              </span>
-                              <button
-                                onClick={() => handleUpdateMatchupScore(m, 'teamB', 1)}
-                                style={{
-                                  width: '26px', height: '26px', borderRadius: '50%',
-                                  color: '#ffffff', fontWeight: '800', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem'
-                                }}
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
+                              {/* teamB */}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                <span style={{ fontSize: '0.72rem', color: getTeamColorHex(m.teamB || m.fries), fontWeight: '800', textAlign: 'center' }}>
+                                  {(m.teamB || m.fries || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase()) || 'Team B'}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <button
+                                    onClick={() => handleUpdateMatchupScore(m, 'teamB', -1)}
+                                    style={{
+                                      width: '34px', height: '34px', borderRadius: '50%',
+                                      background: 'rgba(239, 68, 68, 0.25)', border: '2px solid rgba(239, 68, 68, 0.5)',
+                                      color: '#f87171', fontWeight: '900', cursor: 'pointer',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    −
+                                  </button>
+                                  <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#ffffff', minWidth: '28px', textAlign: 'center', fontFamily: 'monospace' }}>
+                                    {m.teamBScore || m.friesScore || 0}
+                                  </span>
+                                  <button
+                                    onClick={() => handleUpdateMatchupScore(m, 'teamB', 1)}
+                                    style={{
+                                      width: '34px', height: '34px', borderRadius: '50%',
+                                      background: 'rgba(74, 222, 128, 0.25)', border: '2px solid rgba(74, 222, 128, 0.5)',
+                                      color: '#4ade80', fontWeight: '900', cursor: 'pointer',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         {/* Winner Indicator / Live Timer controls */}
@@ -1028,7 +1200,7 @@ export default function ScheduleTab({
 
                           {/* Timer / Duration tracker */}
                           <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                            <MatchupStopwatch actualStart={m.actualStart} actualEnd={m.actualEnd} />
+                            <MatchupStopwatch actualStart={m.actualStart} actualEnd={m.actualEnd} scheduledMinutes={eventConfig.roundDurationMinutes || 30} />
                           </div>
                         </div>
 
@@ -1193,11 +1365,17 @@ export default function ScheduleTab({
                       })()}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
-                        <span style={{ color: 'var(--color-shakes)', fontWeight: '700' }}>{m.teamA || m.shakes}</span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>vs</span>
-                        <span style={{ color: 'var(--color-fries)', fontWeight: '700' }}>{m.teamB || m.fries}</span>
-                      </div>
+                      {(m.teamB || m.fries) ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
+                          <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '700' }}>{(m.teamA || m.shakes || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>vs</span>
+                          <span style={{ color: getTeamColorHex(m.teamB || m.fries), fontWeight: '700' }}>{(m.teamB || m.fries || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
+                          <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '700' }}>{(m.teamA || m.shakes || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                        </div>
+                      )}
                       {((m.teamAScore !== undefined && m.teamAScore !== null) || (m.teamBScore !== undefined && m.teamBScore !== null) || (m.shakesScore !== undefined && m.shakesScore !== null) || (m.friesScore !== undefined && m.friesScore !== null)) && (
                         <div style={{ fontSize: '0.8rem', fontWeight: '800', color: '#ffffff', marginTop: '4px', textAlign: 'center', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
                           {m.teamAScore !== undefined ? m.teamAScore : m.shakesScore || 0} - {m.teamBScore !== undefined ? m.teamBScore : m.friesScore || 0}

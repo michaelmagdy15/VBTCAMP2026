@@ -257,7 +257,7 @@ const triggerRemotePushNotification = async (title, body, targetUrl = '/') => {
 };
 
 // ─── Localized Stopwatch & Timer Components to Optimize Render Performance ───
-function MatchupStopwatch({ actualStart, actualEnd }) {
+function MatchupStopwatch({ actualStart, actualEnd, scheduledMinutes }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (actualStart && !actualEnd) {
@@ -288,7 +288,7 @@ function MatchupStopwatch({ actualStart, actualEnd }) {
       </span>
     );
   }
-  return <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> Scheduled: 30m</span>;
+  return <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> Scheduled: {scheduledMinutes || 30}m</span>;
 }
 
 function MatchupRunningStopwatch({ actualStart }) {
@@ -1187,7 +1187,7 @@ export default function App() {
       const shift = getEffectiveTimeShift(now);
       const shiftedEventTime = new Date(eventTime.getTime() + shift * 60 * 1000);
 
-      const durationMs = 30 * 60 * 1000;
+      const durationMs = (eventConfig.roundDurationMinutes || 30) * 60 * 1000;
       const diff = now.getTime() - shiftedEventTime.getTime();
 
       return diff >= 0 && diff < durationMs;
@@ -2075,6 +2075,10 @@ export default function App() {
       setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
     } else if (resolvedRole === 'leader') {
       setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'myteam');
+      // Auto-filter schedule to show only this leader's team
+      if (teamCode && teamCode !== 'Unknown') {
+        setScheduleTeamFilter(teamCode);
+      }
     } else {
       setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
     }
@@ -2551,7 +2555,7 @@ export default function App() {
       const newNames = [
         "Andrew", "Sherry", "Amberto", "Youstina", "Youssef", "Tony", "Seif", "Rougy", "Tony tafaya", "Sandra", "Kirollos", "Martina",
         "Dani", "Emily", "Maria", "Micho", "Nathalie", "Kiro", "Jessica", "John", "Cinderella", "Patrick", "Joice", "Karim", "Bassem", "Sara",
-        "Michael Mitry", "System Admin", "Amy"
+        "Michael Mitry", "System Admin", "Amy", "Michel Ghobrial"
       ];
       
       const servantAssignments = {};
@@ -2577,6 +2581,7 @@ export default function App() {
       servantAssignments['michael_mitry'] = 'coordinator';
       servantAssignments['system_admin'] = 'coordinator';
       servantAssignments['amy'] = 'coordinator';
+      servantAssignments['michel_ghobrial'] = 'service_day_leader';
 
       for (let name of newNames) {
         const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -2592,6 +2597,10 @@ export default function App() {
 
       const evConfigUpdates = {
           eventType: 'service',
+          roundDurationMinutes: 10,
+          breakMinutes: 5,
+          startTime: '20:00',
+          passcodeServiceLeader: 'VBTADMIN',
           description: 'Date: Monday 6th July | Time: 8:00pm-9:30pm | Meet up: 6 at our church | Location: Ard el Golf | Children: 120 boys and girls (Grade 9-10) | Theme: Team Building and Trust | Notes: 6 Games / no big game / no opposing teams / each game groups play as one team | Wear our VBT Shirts',
           daysCount: 1,
           kidCount: 120,
@@ -2607,7 +2616,7 @@ export default function App() {
               station_1: { name: 'Blind Builder', location: '', howToPlay: 'One player is blindfolded and given cups to build a pyramid by verbal instructions from teammates. Team with highest number of stacks wins.', lesson: '' },
               station_2: { name: 'Skee Ball', location: '', howToPlay: 'Each team member gets a try at throwing the ball and dropping it in the holes. Team with highest accumulated score wins.', lesson: '' },
               station_3: { name: 'Minefield', location: '', howToPlay: 'One player is blindfolded and crosses obstacles guided by team. At the end, places a cone in XO game. Most XO wins receives tokens.', lesson: '' },
-              station_4: { name: 'Helium Stick & Human Chairs', location: '', howToPlay: 'Helium stick: lower broomstick together using two fingers. Human Chairs: build a circle lying on each other, remove chairs.', lesson: '' },
+              station_4: { name: 'Helium Stick & Human Chairs', location: '', howToPlay: 'Each team of 10 splits into 3 groups: (1) 4 boys or 4 girls → Human Chairs: stand in a circle, sit on each other\'s laps, remove chairs. (2) Group of 3 → Helium Stick: lower a broomstick together using only two fingers each. (3) Group of 3 → Helium Stick (second round). Game leaders rotate between Helium Stick and Human Chairs for each team.', lesson: '' },
               station_5: { name: 'Whiffle Ball', location: '', howToPlay: 'Each team member gets one try to throw a colored ball in corresponding hole. Team with most goals wins.', lesson: '' },
               station_6: { name: 'Blind Shape', location: '', howToPlay: 'Each team is given a rope and blindfolded, told to create a shape. Highest amount of shapes wins.', lesson: '' }
           }
@@ -2642,7 +2651,31 @@ export default function App() {
         }
       }
       
-      await updateScheduleData(targetEventCode, { matchups: generatedMatchups });
+      // Build teams map so scoring can aggregate by color side
+      const teamsMap = {
+        'team_red_1':   { code: 'team_red_1',   name: 'Red 1',   leaders: 'Andrew, Sherry',    side: 'Red',   kidCount: 20 },
+        'team_red_2':   { code: 'team_red_2',   name: 'Red 2',   leaders: 'Amberto, Youstina', side: 'Red',   kidCount: 20 },
+        'team_white_1': { code: 'team_white_1', name: 'White 1', leaders: 'Youssef, Tony',     side: 'White', kidCount: 20 },
+        'team_white_2': { code: 'team_white_2', name: 'White 2', leaders: 'Seif, Rougy',       side: 'White', kidCount: 20 },
+        'team_black_1': { code: 'team_black_1', name: 'Black 1', leaders: 'Tony Tafaya, Sandra',side: 'Black', kidCount: 20 },
+        'team_black_2': { code: 'team_black_2', name: 'Black 2', leaders: 'Kirollos, Martina', side: 'Black', kidCount: 20 }
+      };
+
+      // Points per game station
+      const gamePointsMap = {
+        'Blind Builder': 15,
+        'Skee Ball': 15,
+        'Minefield': 15,
+        'Helium Stick & Human Chairs': 15,
+        'Whiffle Ball': 15,
+        'Blind Shape': 15
+      };
+
+      await updateScheduleData(targetEventCode, { 
+        matchups: generatedMatchups, 
+        teams: teamsMap,
+        gamePoints: gamePointsMap
+      });
       
       alert(`July 6th data merged into ${targetEventCode} successfully! Refresh the page to see changes.`);
     } catch(err) {
@@ -3083,6 +3116,8 @@ export default function App() {
       const b2 = getBlockPointsService(2);
       const b3 = getBlockPointsService(3);
       const b4 = getBlockPointsService(4);
+      const b5 = getBlockPointsService(5);
+      const b6 = getBlockPointsService(6);
 
       return {
         isService: true,
@@ -3092,7 +3127,7 @@ export default function App() {
         tokensCount,
         finalScores,
         leadColor,
-        b1, b2, b3, b4,
+        b1, b2, b3, b4, b5, b6,
         // Legacy fallbacks to avoid crashes
         shakesFinal: finalScores['Red'] || 0,
         friesFinal: finalScores['White'] || 0,
@@ -3905,7 +3940,8 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Coordinator actions */}
+              {/* Coordinator actions - only visible to admins */}
+              {currentUser && currentUser.role === 'admin' && (
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
                 <button onClick={seedJuly6Service}
@@ -3931,6 +3967,7 @@ export default function App() {
                   &#9962; Request VBT Service
                 </button>
               </div>
+              )}
 
               {/* Bottom safe area spacer */}
               <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
@@ -5375,7 +5412,7 @@ export default function App() {
                 letterSpacing: '-0.02em',
                 lineHeight: '1.2'
               }}>
-                {eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side}
+                {currentUser.name || 'Team Leader'}
               </h1>
               <span style={{
                 display: 'inline-block',
@@ -5390,7 +5427,7 @@ export default function App() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
               }}>
-                {currentUser.teamCode}
+                {(currentUser.teamCode || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </span>
             </div>
           </div>
