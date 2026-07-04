@@ -105,6 +105,7 @@ import GPSMap from './components/GPSMap';
 import ScheduleBuilder from './components/ScheduleBuilder';
 import OfflineBackupModal from './components/OfflineBackupModal';
 import { playChime, unlockAudioContext, getSharedAudioContext } from './chimes';
+import { triggerHaptic } from './utils/haptics';
 import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
 // Extracted Tab Components
@@ -188,17 +189,17 @@ function playLoudDoubleChime() {
   playChime('round_start'); // → Loud horn/siren sound (same as start/end rounds)
 }
 
-// Vibration helper — works on Android Chrome; silently ignored on iOS
-function vibrate(pattern) {
+// Vibration helper — uses Capacitor Haptics for native iOS/Android feel
+function vibrate(patternType) {
   try {
-    if ('vibrate' in navigator) navigator.vibrate(pattern);
+    triggerHaptic(patternType);
   } catch (_) {}
 }
 
 // Vibration patterns
-const VIBRATE_URGENT       = [200, 80, 200, 80, 400]; // urgent / ping
-const VIBRATE_ANNOUNCEMENT = [150, 60, 150];           // regular announcement
-const VIBRATE_NOTIFICATION = [100];                    // subtle feed item
+const VIBRATE_URGENT       = 'heavy';  // urgent / ping
+const VIBRATE_ANNOUNCEMENT = 'medium'; // regular announcement
+const VIBRATE_NOTIFICATION = 'light';  // subtle feed item
 
 // Request notification permission
 async function requestNotificationPermission() {
