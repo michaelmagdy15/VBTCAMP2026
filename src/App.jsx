@@ -5127,6 +5127,28 @@ export default function App() {
     );
   }
 
+  // Central mode-aware label map
+  // All user-visible naming derives from eventConfig.eventType so it stays
+  // consistent across tabs, headings, and the More drawer.
+  const eventType = eventConfig?.eventType || 'camp';
+  const eventLabels = {
+    // Prefix used in compound names: 'Camp ', 'Service ', or ''
+    prefix: eventType === 'camp' ? 'Camp ' : eventType === 'service' ? 'Service ' : '',
+    // Nav / tab bar labels
+    scores:    eventType === 'camp' ? 'Camp Scores'    : eventType === 'service' ? 'Service Scores'    : 'Scores',
+    schedule:  eventType === 'camp' ? 'Schedule'       : eventType === 'service' ? 'Schedule'          : 'Schedule',
+    feed:      eventType === 'camp' ? 'Camp Feed'      : eventType === 'service' ? 'Service Feed'      : 'Feed',
+    // Short tab label (fits on nav bar)
+    scoresShort:   eventType === 'camp' ? 'Scores'  : eventType === 'service' ? 'Scores'  : 'Scores',
+    scheduleShort: 'Schedule',
+    feedShort:     eventType === 'camp' ? 'Feed'    : eventType === 'service' ? 'Feed'    : 'Feed',
+    // Section headings (used inside tab content)
+    scoreboardHeading: eventType === 'camp' ? 'Camp Scoreboard'    : eventType === 'service' ? 'Service Scoreboard'    : 'Scoreboard',
+    feedHeading:       eventType === 'camp' ? 'Live Camp Feed'     : eventType === 'service' ? 'Live Service Feed'     : 'Live Feed',
+    // Misc
+    rateBtn:   eventType === 'service' ? "Rate Today's Service" : eventType === 'camp' ? "Rate Today's Camp" : 'Share Feedback',
+  };
+
   const activeUiMode = (currentUser?.id && globalServants.find(s => s.id === currentUser.id)?.uiMode) || currentUser?.uiMode || 'detailed';
 
   if (currentUser && (currentUser.uiMode === 'dumb' || activeUiMode === 'dumb')) {
@@ -5183,27 +5205,6 @@ export default function App() {
     );
   }
 
-  // Central mode-aware label map
-  // All user-visible naming derives from eventConfig.eventType so it stays
-  // consistent across tabs, headings, and the More drawer.
-  const eventType = eventConfig?.eventType || 'camp';
-  const eventLabels = {
-    // Prefix used in compound names: 'Camp ', 'Service ', or ''
-    prefix: eventType === 'camp' ? 'Camp ' : eventType === 'service' ? 'Service ' : '',
-    // Nav / tab bar labels
-    scores:    eventType === 'camp' ? 'Camp Scores'    : eventType === 'service' ? 'Service Scores'    : 'Scores',
-    schedule:  eventType === 'camp' ? 'Schedule'       : eventType === 'service' ? 'Schedule'          : 'Schedule',
-    feed:      eventType === 'camp' ? 'Camp Feed'      : eventType === 'service' ? 'Service Feed'      : 'Feed',
-    // Short tab label (fits on nav bar)
-    scoresShort:   eventType === 'camp' ? 'Scores'  : eventType === 'service' ? 'Scores'  : 'Scores',
-    scheduleShort: 'Schedule',
-    feedShort:     eventType === 'camp' ? 'Feed'    : eventType === 'service' ? 'Feed'    : 'Feed',
-    // Section headings (used inside tab content)
-    scoreboardHeading: eventType === 'camp' ? 'Camp Scoreboard'    : eventType === 'service' ? 'Service Scoreboard'    : 'Scoreboard',
-    feedHeading:       eventType === 'camp' ? 'Live Camp Feed'     : eventType === 'service' ? 'Live Service Feed'     : 'Live Feed',
-    // Misc
-    rateBtn:   eventType === 'service' ? "Rate Today's Service" : eventType === 'camp' ? "Rate Today's Camp" : 'Share Feedback',
-  };
 
   const getActiveTabs = () => {
     if (!currentUser) return [];
