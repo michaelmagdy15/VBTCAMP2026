@@ -5820,8 +5820,8 @@ export default function App() {
                       <h3 style={{ fontSize: '0.85rem', color: 'var(--color-shakes)', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid rgba(0, 176, 255, 0.2)', paddingBottom: '6px' }}>
                         {side1Name} (-{scoreCalculations.shakesDeductions})
                       </h3>
-                      {Object.keys(campData.teams).filter(code => campData.teams[code].side === 'Shakes').map(code => {
-                        const team = campData.teams[code];
+                      {Object.keys(campData?.teams || {}).filter(code => campData?.teams?.[code]?.side === 'Shakes').map(code => {
+                        const team = campData?.teams?.[code] || {};
                         const dVal = (campState.teamDeductions || {})[code] || 0;
                         const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
                         return (
@@ -5829,7 +5829,7 @@ export default function App() {
                             <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
                                 <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>{code}</p>
-                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders.split('/')[0]}</p>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders ? team.leaders.split('/')[0] : ''}</p>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
@@ -5879,8 +5879,8 @@ export default function App() {
                       <h3 style={{ fontSize: '0.85rem', color: 'var(--color-fries)', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '6px' }}>
                         {side2Name} (-{scoreCalculations.friesDeductions})
                       </h3>
-                      {Object.keys(campData.teams).filter(code => campData.teams[code].side === 'Fries').map(code => {
-                        const team = campData.teams[code];
+                      {Object.keys(campData?.teams || {}).filter(code => campData?.teams?.[code]?.side === 'Fries').map(code => {
+                        const team = campData?.teams?.[code] || {};
                         const dVal = (campState.teamDeductions || {})[code] || 0;
                         const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
                         return (
@@ -5888,7 +5888,7 @@ export default function App() {
                             <div style={{ display: 'flex', justify: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
                                 <p style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>{code}</p>
-                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders.split('/')[0]}</p>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80px' }}>{team.leaders ? team.leaders.split('/')[0] : ''}</p>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ fontSize: '0.9rem', fontWeight: '800', color: dVal > 0 ? '#ef4444' : 'var(--text-muted)' }}>
