@@ -28,7 +28,7 @@ export default function BlessingBox({ currentUser, activeEventCode, campData }) 
       return campData.teams.map(t => typeof t === 'object' ? (t.code || t.name || t.teamCode) : t).filter(Boolean);
     }
     if (typeof campData.teams === 'object') {
-      return Object.keys(campData.teams);
+      return Object.keys(campData?.teams || {});
     }
     return [];
   }, [campData]);

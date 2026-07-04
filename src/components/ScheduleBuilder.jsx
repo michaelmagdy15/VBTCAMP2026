@@ -362,7 +362,7 @@ export default function ScheduleBuilder({
       if (Array.isArray(campData.teams)) {
         return campData.teams.map((t) => (typeof t === 'object' ? t.name : t));
       }
-      return Object.keys(campData.teams);
+      return Object.keys(campData?.teams || {});
     }
     return [];
   }, [eventConfig, campData]);

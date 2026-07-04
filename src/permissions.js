@@ -143,7 +143,7 @@ export function getEditableTeams(user, campData) {
       return campData.teams.map((t) => t.code || t.teamCode).filter(Boolean);
     }
     if (campData?.teams && typeof campData.teams === 'object') {
-      return Object.keys(campData.teams);
+      return Object.keys(campData?.teams || {});
     }
     return [];
   }
@@ -170,7 +170,7 @@ export function getEditableGames(user, campData) {
       return campData.games.map((g) => g.name || g.game).filter(Boolean);
     }
     if (campData?.games && typeof campData.games === 'object') {
-      return Object.keys(campData.games);
+      return Object.keys(campData?.games || {});
     }
     return [];
   }

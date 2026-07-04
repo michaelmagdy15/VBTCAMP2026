@@ -2964,8 +2964,8 @@ export default function App() {
 
       const finalScores = {};
       Object.keys(campData?.teams || {}).forEach(teamCode => {
-        const team = campData.teams[teamCode];
-        const sideTokens = tokens[team.side?.toLowerCase()] || 0;
+        const team = campData?.teams?.[teamCode];
+        const sideTokens = tokens[team?.side?.toLowerCase()] || 0;
         const tok = teamTokens[teamCode] || sideTokens;
         finalScores[teamCode] = teamScores[teamCode] + (tok * 2) - teamDeductionsList[teamCode];
       });
@@ -3023,7 +3023,7 @@ export default function App() {
         });
       }
 
-      Object.entries(teamDeductions).forEach(([teamCode, val]) => {
+      Object.entries(teamDeductions || {}).forEach(([teamCode, val]) => {
         const team = campData?.teams?.[teamCode];
         if (team && colors.includes(team.side)) {
           deductions[team.side] += val;
@@ -3136,7 +3136,7 @@ export default function App() {
 
     let shakesDeductions = 0;
     let friesDeductions = 0;
-    Object.entries(teamDeductions).forEach(([teamCode, val]) => {
+    Object.entries(teamDeductions || {}).forEach(([teamCode, val]) => {
       const team = campData?.teams?.[teamCode];
       if (team) {
         if (team.side === 'Shakes') {
@@ -5574,7 +5574,7 @@ export default function App() {
                 .map(([code, val]) => ({
                   code,
                   val,
-                  side: campData.teams[code]?.side || 'Shakes'
+                  side: campData?.teams?.[code]?.side || 'Shakes'
                 }))
                 .filter(t => t.val > 0)
                 .sort((a, b) => b.val - a.val);
@@ -5746,7 +5746,7 @@ export default function App() {
                       const colorHex = getTeamColorHex(colorName);
                       const customColorName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
                       const colorDeductions = scoreCalculations.deductions[colorName] || 0;
-                      const colorTeams = Object.keys(campData.teams || {}).filter(code => campData.teams[code].side === colorName);
+                      const colorTeams = Object.keys(campData?.teams || {}).filter(code => campData?.teams?.[code]?.side === colorName);
                       
                       return (
                         <div key={colorName} className="glass-panel" style={{ padding: '12px', background: 'rgba(0,0,0,0.25)', borderLeft: `4px solid ${colorHex}`, display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -5758,7 +5758,7 @@ export default function App() {
                               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', margin: '8px 0' }}>No active teams</p>
                             ) : (
                               colorTeams.map(code => {
-                                const team = campData.teams[code];
+                                const team = campData?.teams?.[code] || {};
                                 const dVal = (campState.teamDeductions || {})[code] || 0;
                                 const canEdit = currentUser.role === 'admin' || (currentUser.role === 'leader' && currentUser.teamCode === code);
                                 return (

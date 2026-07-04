@@ -426,7 +426,7 @@ export default function ScheduleTab({
                 }}
               >
                 <option value="">All Teams</option>
-                {Object.keys(campData.teams).map(code => (
+                {Object.keys(campData?.teams || {}).map(code => (
                   <option key={code} value={code}>{code}</option>
                 ))}
               </select>
