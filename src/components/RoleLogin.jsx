@@ -18,7 +18,7 @@ const ROLE_META = [
     label: 'Volunteer',
     icon: Eye,
     desc: 'Watch scores live — no login required',
-    color: '#94a3b8',
+    color: '#64748b',
     needsPasscode: false,
   },
   {
@@ -26,7 +26,7 @@ const ROLE_META = [
     label: 'Game Leader',
     icon: Crosshair,
     desc: 'Enter scores for your assigned games',
-    color: '#22d3ee',
+    color: '#60a5fa',
     needsPasscode: true,
   },
   {
@@ -34,15 +34,15 @@ const ROLE_META = [
     label: 'Team Leader',
     icon: Users,
     desc: 'Manage deductions & announcements for your team',
-    color: '#a78bfa',
-    needsPasscode: true,
+    color: '#3b82f6',
+    needsPasscode: false,
   },
   {
     key: ROLES.SERVICE_LEADER,
     label: 'Service Leader',
     icon: Shield,
     desc: 'Manage service timeline and pings',
-    color: '#fbbf24',
+    color: '#2563eb',
     needsPasscode: true,
   },
 ];
@@ -52,7 +52,7 @@ const COORDINATOR_META = {
   label: 'Coordinator',
   icon: Shield,
   desc: 'Full control over config, scores & alerts',
-  color: '#f59e0b',
+  color: '#1441a1',
   needsPasscode: true,
 };
 
@@ -63,7 +63,7 @@ const S = {
     width: '100%',
     maxWidth: 520,
     margin: '0 auto',
-    fontFamily: "'Inter', system-ui, sans-serif",
+    fontFamily: 'var(--font-body)',
   },
 
   /* ── Logged-in badge ── */
@@ -88,7 +88,7 @@ const S = {
     fontSize: 18,
     fontWeight: 700,
     color: '#f8fafc',
-    fontFamily: "'Outfit', sans-serif",
+    fontFamily: 'var(--font-title)',
   },
   badgeRole: (color) => ({
     display: 'inline-block',
@@ -132,9 +132,9 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 12,
-    padding: '24px 16px',
-    borderRadius: 20,
+    gap: 4,
+    padding: '12px 8px',
+    borderRadius: 16,
     cursor: 'pointer',
     textAlign: 'center',
     background: selected
@@ -151,7 +151,7 @@ const S = {
     fontSize: 15,
     fontWeight: 700,
     color: '#f8fafc',
-    fontFamily: "'Outfit', sans-serif",
+    fontFamily: 'var(--font-title)',
   },
   cardDesc: {
     fontSize: 12,
@@ -160,8 +160,23 @@ const S = {
   },
 
   /* ── Form fields ── */
+  title: {
+    fontSize: 22,
+    fontWeight: 800,
+    color: '#fff',
+    fontFamily: 'var(--font-title)',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 1.4,
+  },
   formGroup: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   label: {
     display: 'block',
@@ -174,8 +189,8 @@ const S = {
   },
   input: {
     width: '100%',
-    padding: '16px',
-    borderRadius: 14,
+    padding: '12px 16px',
+    borderRadius: 12,
     border: '2px solid rgba(148, 163, 184, 0.15)',
     background: 'rgba(15, 23, 42, 0.6)',
     color: '#f8fafc',
@@ -186,8 +201,8 @@ const S = {
   },
   select: {
     width: '100%',
-    padding: '16px',
-    borderRadius: 14,
+    padding: '12px 16px',
+    borderRadius: 12,
     border: '2px solid rgba(148, 163, 184, 0.15)',
     background: 'rgba(15, 23, 42, 0.85)',
     color: '#f8fafc',
@@ -214,18 +229,19 @@ const S = {
   },
   submitBtn: (color) => ({
     width: '100%',
-    padding: '18px 0',
-    borderRadius: 14,
+    padding: '14px 0',
+    borderRadius: 12,
     border: 'none',
     background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-    color: '#0f172a',
-    fontSize: 17,
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 800,
-    fontFamily: "'Outfit', sans-serif",
+    fontFamily: 'var(--font-title)',
     cursor: 'pointer',
     letterSpacing: '0.02em',
     transition: 'transform .1s, opacity .2s',
-    marginTop: 10,
+    marginTop: 20,
+    marginBottom: 8,
   }),
   error: {
     padding: '14px',
@@ -307,20 +323,12 @@ export default function RoleLogin({
   const [name, setName] = useState('');
   const [passcode, setPasscode] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const stealthTimerRef = React.useRef(null);
-
-  const handleStealthPressIn = () => {
-    stealthTimerRef.current = setTimeout(() => {
-      setSelectedRole(ROLES.COORDINATOR);
-      setName('');
-      setPasscode('');
-    }, 2000);
-  };
-
-  const handleStealthPressOut = () => {
-    if (stealthTimerRef.current) {
-      clearTimeout(stealthTimerRef.current);
-    }
+  const handleCoordinatorClick = () => {
+    setSelectedRole(ROLES.COORDINATOR);
+    setName('');
+    setPasscode('');
+    setShowPass(false);
+    if (setLoginError) setLoginError('');
   };
 
   // Servants filtered by role prefix
@@ -332,6 +340,21 @@ export default function RoleLogin({
     () => filterServants(globalServants, 'team_'),
     [globalServants],
   );
+  const serviceLeaderServants = useMemo(
+    () => filterServants(globalServants, ['service_leader', 'admin']),
+    [globalServants],
+  );
+
+  const coordinatorServants = useMemo(() => {
+    const coords = filterServants(globalServants, ['coordinator']);
+    const defaults = ['Michael Mitry', 'Andrew Rafik', 'Michael Nakhla', 'Yohanna', 'Anthony', 'Rita Ghaly'];
+    defaults.forEach(name => {
+      if (!coords.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+        coords.push({ name, role: 'coordinator' });
+      }
+    });
+    return coords.sort((a,b) => a.name.localeCompare(b.name));
+  }, [globalServants]);
 
   // ── Logged-in view ─────────────────────────────────────────
   if (currentUser) {
@@ -428,6 +451,10 @@ export default function RoleLogin({
       const servant = leaderServants.find((s) => s.name === name.trim());
       user.assignedTeams = extractAssignedTeams(servant);
     }
+    // 4. Service Leader Login
+    if (selectedRole === ROLES.SERVICE_LEADER) {
+      user.role = ROLES.SERVICE_LEADER;
+    }
 
     onLogin(user);
   };
@@ -451,22 +478,23 @@ export default function RoleLogin({
         }
       `}</style>
 
-      {/* ── Back to Homepage Button ── */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          width: 80,
-          height: 80,
-          opacity: 0,
-          cursor: 'default',
-          zIndex: 9999,
-        }}
-        onPointerDown={handleStealthPressIn}
-        onPointerUp={handleStealthPressOut}
-        onPointerLeave={handleStealthPressOut}
-      />
+      {/* ── Coordinator Subtle Login Button ── */}
+      <div style={{ position: 'absolute', bottom: 12, right: 16 }}>
+        <button
+          type="button"
+          onClick={handleCoordinatorClick}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'rgba(148, 163, 184, 0.4)', // subtle
+            fontSize: '0.75rem',
+            cursor: 'pointer',
+            padding: 8
+          }}
+        >
+          Coordinator Access
+        </button>
+      </div>
 
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
         <button
@@ -479,7 +507,7 @@ export default function RoleLogin({
       </div>
 
       {/* ── Role selector cards ── */}
-      <div style={S.cardsGrid}>
+      <div style={S.grid}>
         {ROLE_META.map((rm) => {
           const Icon = rm.icon;
           const selected = selectedRole === rm.key;
@@ -607,13 +635,50 @@ export default function RoleLogin({
                 )}
               </div>
 
+              <button type="submit" style={S.submitBtn(activeMeta.color)}>
+                Log in as Team Leader
+              </button>
+            </div>
+          )}
+
+          {/* Service Leader name dropdown */}
+          {selectedRole === ROLES.SERVICE_LEADER && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={S.title}>Service Leader Login</div>
+              <div style={S.subtitle}>Select your name and enter passcode to manage timeline and pings</div>
+              <div style={S.formGroup}>
+                <label style={S.label}>Your Name</label>
+                {serviceLeaderServants.length > 0 ? (
+                  <select
+                    style={S.select}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  >
+                    <option value="">Select your name…</option>
+                    {serviceLeaderServants.map((s) => (
+                      <option key={s.name} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    style={S.input}
+                    type="text"
+                    placeholder="Enter your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                )}
+              </div>
+
               <div style={S.formGroup}>
                 <label style={S.label}>Passcode</label>
                 <div style={S.passwordWrap}>
                   <input
                     style={S.input}
                     type={showPass ? 'text' : 'password'}
-                    placeholder="Enter team leader passcode"
+                    placeholder="Enter service leader passcode"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                   />
@@ -629,34 +694,49 @@ export default function RoleLogin({
               </div>
 
               <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Log in as Team Leader
+                Log in as Service Leader
               </button>
             </div>
           )}
 
-          {/* Coordinator Email/Password Login */}
+          {/* Coordinator Name Dropdown Login */}
           {selectedRole === ROLES.COORDINATOR && (
-            <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={S.title}>Coordinator Login</div>
-              <div style={S.subtitle}>Stealth Mode Activated</div>
+              <div style={S.subtitle}>Select your name and enter passcode for full control</div>
               <div style={S.formGroup}>
-                <label style={S.label}>Email</label>
-                <input
-                  style={S.input}
-                  type="email"
-                  placeholder="Enter coordinator email"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <label style={S.label}>Your Name</label>
+                {coordinatorServants.length > 0 ? (
+                  <select
+                    style={S.select}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  >
+                    <option value="">Select your name…</option>
+                    {coordinatorServants.map((s) => (
+                      <option key={s.name} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    style={S.input}
+                    type="text"
+                    placeholder="Enter coordinator name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                )}
               </div>
 
               <div style={S.formGroup}>
-                <label style={S.label}>Password</label>
+                <label style={S.label}>Passcode</label>
                 <div style={S.passwordWrap}>
                   <input
                     style={S.input}
                     type={showPass ? 'text' : 'password'}
-                    placeholder="Enter coordinator password"
+                    placeholder="Enter coordinator passcode"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                   />
@@ -664,17 +744,17 @@ export default function RoleLogin({
                     type="button"
                     style={S.toggleEye}
                     onClick={() => setShowPass((v) => !v)}
-                    aria-label={showPass ? 'Hide password' : 'Show password'}
+                    aria-label={showPass ? 'Hide passcode' : 'Show passcode'}
                   >
                     {showPass ? <Unlock size={16} /> : <Lock size={16} />}
                   </button>
                 </div>
               </div>
 
-              <button type="submit" style={S.submitBtn(activeMeta?.color || '#f59e0b')}>
-                Log in as Admin
+              <button type="submit" style={S.submitBtn(activeMeta.color)}>
+                Log in as Coordinator
               </button>
-            </>
+            </div>
           )}
         </form>
       )}

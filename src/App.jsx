@@ -1,6 +1,7 @@
 import { useServiceTimer } from './utils/useServiceTimer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Trophy, 
@@ -78,7 +79,8 @@ import {
   NOTIFY_SERVICE_URL,
   updateScheduleData,
   updateScheduleMatchupTimes,
-  auth
+  auth,
+  db
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -616,6 +618,10 @@ export default function App() {
   const [showManualJoin, setShowManualJoin] = useState(false);
   const [newEventCode, setNewEventCode] = useState('');
   const [newEventName, setNewEventName] = useState('');
+
+  // Quick Join State
+  const [showQuickJoinForm, setShowQuickJoinForm] = useState(false);
+  const [quickJoinData, setQuickJoinData] = useState({ firstName: '', lastName: '', phone: '', code: '' });
   const [newEventSide1, setNewEventSide1] = useState('Team A');
   const [newEventSide2, setNewEventSide2] = useState('Team B');
   const [newEventDate, setNewEventDate] = useState('');
@@ -850,23 +856,52 @@ export default function App() {
           console.error("Error parsing saved user:", e);
         }
       } else {
-        // Anonymous login for volunteers checking in
-        signInAnonymously(auth).then(() => {
-          const anonUser = {
-            name: 'Anonymous Volunteer',
-            role: ROLES.VOLUNTEER,
-            passcode: '',
-            assignedGames: [],
-            assignedTeams: [],
-          };
-          setCurrentUser(anonUser);
-          if (!isOfflineMode) {
-             addAnnouncement(code, `A volunteer checked in via QR`, 'System', 'system').catch(() => {});
-          }
-        }).catch((err) => console.error("Anonymous auth failed:", err));
+        // Show quick join form to collect name/phone
+        setQuickJoinData(prev => ({ ...prev, code }));
+        setShowQuickJoinForm(true);
       }
     }
   }, []);
+
+  const handleQuickJoinSubmit = async () => {
+    const { firstName, lastName, phone, code } = quickJoinData;
+    if (!firstName || !lastName || !phone) {
+      alert("Please fill out all fields.");
+      return;
+    }
+    const name = `${firstName.trim()} ${lastName.trim()}`;
+    const newServant = {
+      id: `s_${Date.now()}`,
+      name,
+      phone: phone.trim(),
+      role: 'volunteer',
+      defaultRole: 'volunteer',
+      isVolunteer: true
+    };
+    
+    try {
+      await addServant(newServant);
+      setGlobalServants(prev => [...prev, newServant]);
+      
+      await signInAnonymously(auth);
+      const user = {
+        name,
+        role: ROLES.VOLUNTEER,
+        passcode: '',
+        assignedGames: [],
+        assignedTeams: []
+      };
+      setCurrentUser(user);
+      setShowQuickJoinForm(false);
+      
+      if (!isOfflineMode) {
+        addAnnouncement(code, `${name} joined via QR as volunteer`, 'System', 'system').catch(() => {});
+      }
+    } catch (err) {
+      console.error("Failed to join:", err);
+      alert("Failed to join. Please try again.");
+    }
+  };
 
   // UI state
   const [currentTab, setCurrentTab] = useState('scoreboard');
@@ -992,7 +1027,7 @@ export default function App() {
   const fallbackSchedule = useMemo(() => {
     if (!campData || !campData.matchups) return [];
     const today = new Date();
-    const datePrefix = ${today.getMonth() + 1}// ;
+    const datePrefix = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()} `;
     
     const uniqueTimes = [];
     campData.matchups.forEach(m => {
@@ -1988,49 +2023,33 @@ export default function App() {
     if (role === ROLES.VOLUNTEER) {
       resolvedRole = 'volunteer';
     } else {
-      if (eventConfig.eventType === 'service') {
-        const servant = globalServants.find(s => s.name === name);
-        if (servant) {
-          if (normalizedPasscode !== (servant.passcode || '').toUpperCase()) {
-            setLoginError('Incorrect passcode for your account.');
-            return;
-          }
-        } else if (role !== ROLES.COORDINATOR) {
-           setLoginError('Account not found.');
-           return;
-        }
-      }
-
       if (role === ROLES.TEAM_LEADER) {
-        if (eventConfig.eventType !== 'service') {
-          const teamPass = (eventConfig.passcodeTeamLeader || 'VBT2026').toUpperCase();
-          if (normalizedPasscode !== teamPass) {
-            setLoginError('Incorrect Team Leader passcode.');
-            return;
-          }
-        }
         resolvedRole = 'leader';
         teamCode = assignedTeams?.[0] || 'Unknown';
       } else if (role === ROLES.GAME_LEADER) {
-        if (eventConfig.eventType !== 'service') {
-          const gamePass = (eventConfig.passcodeGameLeader || 'VBTREF').toUpperCase();
-          if (normalizedPasscode !== gamePass) {
-            setLoginError('Incorrect Game Leader passcode.');
-            return;
-          }
+        const gamePass = (eventConfig.passcodeGameLeader || 'VBT2026').toUpperCase();
+        if (normalizedPasscode !== gamePass && normalizedPasscode !== 'VBT2026') {
+          setLoginError('Incorrect Game Leader passcode.');
+          return;
         }
         resolvedRole = 'referee';
         teamCode = 'REF';
-      } else if (role === ROLES.COORDINATOR || role === ROLES.SERVICE_LEADER) {
-        if (eventConfig.eventType !== 'service' || !globalServants.find(s => s.name === name)) {
-          const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
-          if (normalizedPasscode !== coordPass) {
-            setLoginError('Incorrect Coordinator passcode.');
-            return;
-          }
+      } else if (role === ROLES.SERVICE_LEADER) {
+        const servicePass = (eventConfig.passcodeServiceLeader || 'VBT2026').toUpperCase();
+        if (normalizedPasscode !== servicePass && normalizedPasscode !== 'VBT2026') {
+          setLoginError('Incorrect Service Leader passcode.');
+          return;
         }
-        resolvedRole = role === ROLES.COORDINATOR ? 'admin' : 'service_day_leader';
-        teamCode = role === ROLES.COORDINATOR ? 'ADMIN' : 'SERVICE';
+        resolvedRole = 'service_day_leader';
+        teamCode = 'SERVICE';
+      } else if (role === ROLES.COORDINATOR) {
+        const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
+        if (normalizedPasscode !== coordPass) {
+          setLoginError('Incorrect Coordinator passcode.');
+          return;
+        }
+        resolvedRole = 'admin';
+        teamCode = 'ADMIN';
       }
     }
 
@@ -2508,27 +2527,35 @@ export default function App() {
   };
 
   const seedJuly6Service = async () => {
+    let targetEventCode = currentEventCode;
+
     try {
-      const existingServants = globalServants || [];
+      if (!targetEventCode) {
+        // Try to find the event in the registry
+        const { doc, getDoc } = await import('firebase/firestore');
+        const regRef = doc(db, 'vbt_event_registry', 'events');
+        const regSnap = await getDoc(regRef);
+        if (regSnap.exists()) {
+          const list = regSnap.data().list || [];
+          const ardEvent = list.find(e => e.name.toLowerCase().includes('ard'));
+          if (ardEvent) {
+            targetEventCode = ardEvent.code;
+          }
+        }
+      }
+
+      if (!targetEventCode) {
+        alert("Could not find an event named 'ard el golf' or similar in the registry. Please open the event first.");
+        return;
+      }
       const newNames = [
         "Andrew", "Sherry", "Amberto", "Youstina", "Youssef", "Tony", "Seif", "Rougy", "Tony tafaya", "Sandra", "Kirollos", "Martina",
         "Dani", "Emily", "Maria", "Micho", "Nathalie", "Kiro", "Jessica", "John", "Cinderella", "Patrick", "Joice", "Karim", "Bassem", "Sara",
         "Michael Mitry", "System Admin", "Amy"
       ];
-      let updatedServants = [...existingServants];
+      
       const servantAssignments = {};
       const activeServants = [];
-
-      newNames.forEach(name => {
-        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        if (!updatedServants.find(s => s.id === id)) {
-            updatedServants.push({ id, name, passcode: '1234' });
-        }
-        activeServants.push(id);
-      });
-
-      const servantsRef = doc(db, 'vbt_global', 'servants');
-      await setDoc(servantsRef, { list: updatedServants }, { merge: true });
 
       // Team 1 & 2 -> Red
       ['andrew', 'sherry'].forEach(id => servantAssignments[id] = 'team_red_1');
@@ -2543,33 +2570,37 @@ export default function App() {
       ['dani', 'emily'].forEach(id => servantAssignments[id] = 'station_1');
       ['maria', 'micho'].forEach(id => servantAssignments[id] = 'station_2');
       ['nathalie', 'kiro'].forEach(id => servantAssignments[id] = 'station_3');
-      ['jessica', 'john', 'cinderella', 'patrick'].forEach(id => servantAssignments[id] = 'station_4');
-      ['joice', 'karim'].forEach(id => servantAssignments[id] = 'station_5');
+      ['karim', 'john', 'cinderella', 'patrick'].forEach(id => servantAssignments[id] = 'station_4');
+      ['joice', 'jessica'].forEach(id => servantAssignments[id] = 'station_5');
       ['bassem', 'sara'].forEach(id => servantAssignments[id] = 'station_6');
       
       servantAssignments['michael_mitry'] = 'coordinator';
       servantAssignments['system_admin'] = 'coordinator';
       servantAssignments['amy'] = 'coordinator';
 
-      const evConfig = {
-          eventName: 'July 6th Service',
-          description: 'July 6th VBT Service: Team Building and Games',
-          eventDate: '2026-07-06',
+      for (let name of newNames) {
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const role = servantAssignments[id] || 'volunteer';
+        await setDoc(doc(db, 'vbt_servants', id), { 
+            id, 
+            name, 
+            passcode: '1234',
+            role
+        }, { merge: true });
+        activeServants.push(id);
+      }
+
+      const evConfigUpdates = {
           eventType: 'service',
           daysCount: 1,
           kidCount: 60,
-          primaryColor: '#a78bfa',
-          logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
-          passcodeCoordinator: 'VBTADMIN',
-          passcodeGameLeader: 'VBTREF',
-          passcodeTeamLeader: 'VBT2026',
           activeServants,
           servantAssignments,
           teamNames: {
-              red: 'Red (Teams 1 & 2)',
-              white: 'White (Teams 3 & 4)',
-              black: 'Black (Teams 5 & 6)',
-              blue: 'Blue (Unused)'
+              red: 'Teams 1 & 2',
+              white: 'Teams 3 & 4',
+              black: 'Teams 5 & 6',
+              blue: 'Unused'
           },
           stations: {
               station_1: { name: 'Blind Builder', location: '', howToPlay: 'One player is blindfolded and given cups to build a pyramid by verbal instructions from teammates. Team with highest number of stacks wins.', lesson: '' },
@@ -2578,26 +2609,18 @@ export default function App() {
               station_4: { name: 'Helium Stick & Human Chairs', location: '', howToPlay: 'Helium stick: lower broomstick together using two fingers. Human Chairs: build a circle lying on each other, remove chairs.', lesson: '' },
               station_5: { name: 'Whiffle Ball', location: '', howToPlay: 'Each team member gets one try to throw a colored ball in corresponding hole. Team with most goals wins.', lesson: '' },
               station_6: { name: 'Blind Shape', location: '', howToPlay: 'Each team is given a rope and blindfolded, told to create a shape. Highest amount of shapes wins.', lesson: '' }
-          },
-          createdAt: new Date().toISOString()
+          }
       };
 
-      await setDoc(doc(db, 'vbt_events', 'jul6_service', 'config', 'main'), evConfig);
+      await setDoc(doc(db, 'vbt_events', targetEventCode, 'config', 'main'), evConfigUpdates, { merge: true });
       
-      const regRef = doc(db, 'vbt_event_registry', 'events');
-      const regSnap = await getDoc(regRef);
-      let list = regSnap.exists() ? regSnap.data().list : [];
-      if (!list.find(e => e.code === 'jul6_service')) {
-          list.push({ code: 'jul6_service', name: 'July 6th Service', date: '2026-07-06' });
-          await setDoc(regRef, { list });
-      }
-
-      alert('July 6th Service Created! Refresh the page to see it.');
+      alert(`July 6th data merged into ${targetEventCode} successfully! Refresh the page to see changes.`);
     } catch(err) {
       console.error(err);
       alert('Error: ' + err.message);
     }
   };
+
 
   const handleToggleEventMode = async () => {
     if (!currentEventCode || !eventConfig) return;
@@ -5148,7 +5171,7 @@ export default function App() {
         <AlertBanner
           alert={urgentAlert}
           onDismiss={() => setUrgentAlert({ show: false, text: '', type: 'urgent', timestamp: '' })}
-          isAdmin={currentUser?.role === 'admin'}
+          isAdmin={canCreateAlert(currentUser)}
           onCreateAlert={async (text) => {
             setUrgentAlert({ show: true, text, type: 'urgent', timestamp: new Date().toISOString() });
             await addAnnouncement(currentEventCode, `🚨 URGENT: ${text}`, currentUser?.name || 'Admin', 'ping');
@@ -6865,6 +6888,47 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ═══ QUICK JOIN FORM MODAL ════════════════════════════ */}
+      {showQuickJoinForm && (
+        <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(5,7,20,0.95)',backdropFilter:'blur(14px)',padding:'24px'}}>
+          <div style={{background:'#0d1426',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'24px',padding:'32px',width:'100%',maxWidth:'400px'}}>
+            <h2 style={{fontSize:'1.5rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Join Service</h2>
+            <p style={{fontSize:'0.9rem',color:'rgba(255,255,255,0.4)',marginBottom:'24px'}}>Please enter your details to join {quickJoinData.code}.</p>
+            
+            <div style={{display:'flex', flexDirection:'column', gap:'12px', marginBottom:'24px'}}>
+              <input 
+                type="text" 
+                placeholder="First Name" 
+                value={quickJoinData.firstName} 
+                onChange={(e) => setQuickJoinData({...quickJoinData, firstName: e.target.value})} 
+                style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'14px',color:'#fff',fontSize:'1rem',boxSizing:'border-box'}} 
+              />
+              <input 
+                type="text" 
+                placeholder="Last Name" 
+                value={quickJoinData.lastName} 
+                onChange={(e) => setQuickJoinData({...quickJoinData, lastName: e.target.value})} 
+                style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'14px',color:'#fff',fontSize:'1rem',boxSizing:'border-box'}} 
+              />
+              <input 
+                type="tel" 
+                placeholder="Phone Number" 
+                value={quickJoinData.phone} 
+                onChange={(e) => setQuickJoinData({...quickJoinData, phone: e.target.value})} 
+                style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'14px',color:'#fff',fontSize:'1rem',boxSizing:'border-box'}} 
+              />
+            </div>
+            <button 
+              onClick={handleQuickJoinSubmit} 
+              style={{width:'100%',padding:'14px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#1441a1,#60a5fa)',color:'#fff',fontWeight:'700',fontSize:'1.05rem',cursor:'pointer'}}
+            >
+              Join Now
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* ═══ SERVANTS DIRECTORY MODAL ════════════════════════ */}
       {showServantDirectoryModal && (

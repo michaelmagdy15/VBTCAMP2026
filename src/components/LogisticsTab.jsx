@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { Package, Plus, Trash2 } from 'lucide-react';
@@ -80,12 +80,12 @@ const thStyle = {
   textTransform: 'uppercase',
   color: T.textSecondary,
   fontFamily: T.fontBody,
-  borderBottom: \1px solid \\,
+  borderBottom: '1px solid #eee',
 };
 
 const tdStyle = {
   padding: '12px 14px',
-  borderBottom: \1px solid \\,
+  borderBottom: '1px solid #eee',
   verticalAlign: 'middle',
 };
 
