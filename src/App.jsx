@@ -5149,6 +5149,10 @@ export default function App() {
     rateBtn:   eventType === 'service' ? "Rate Today's Service" : eventType === 'camp' ? "Rate Today's Camp" : 'Share Feedback',
   };
 
+  const totalBothSides = scoreCalculations.shakesFinal + scoreCalculations.friesFinal;
+  const shakesPercentage = totalBothSides > 0 ? (scoreCalculations.shakesFinal / totalBothSides) * 100 : 50;
+  const friesPercentage = totalBothSides > 0 ? (scoreCalculations.friesFinal / totalBothSides) * 100 : 50;
+
   const activeUiMode = (currentUser?.id && globalServants.find(s => s.id === currentUser.id)?.uiMode) || currentUser?.uiMode || 'detailed';
 
   if (currentUser && (currentUser.uiMode === 'dumb' || activeUiMode === 'dumb')) {
@@ -5260,10 +5264,6 @@ export default function App() {
       { id: 'more', label: 'More', icon: MoreHorizontal },
     ];
   };
-
-  const totalBothSides = scoreCalculations.shakesFinal + scoreCalculations.friesFinal;
-  const shakesPercentage = totalBothSides > 0 ? (scoreCalculations.shakesFinal / totalBothSides) * 100 : 50;
-  const friesPercentage = totalBothSides > 0 ? (scoreCalculations.friesFinal / totalBothSides) * 100 : 50;
 
   const isReferee = currentUser && currentUser.role === 'referee';
   const getRefereeAssignedGame = () => {
