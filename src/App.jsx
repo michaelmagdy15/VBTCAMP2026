@@ -2592,8 +2592,9 @@ export default function App() {
 
       const evConfigUpdates = {
           eventType: 'service',
+          description: 'Date: Monday 6th July | Time: 8:00pm-9:30pm | Meet up: 6 at our church | Location: Ard el Golf | Children: 120 boys and girls (Grade 9-10) | Theme: Team Building and Trust | Notes: 6 Games / no big game / no opposing teams / each game groups play as one team | Wear our VBT Shirts',
           daysCount: 1,
-          kidCount: 60,
+          kidCount: 120,
           activeServants,
           servantAssignments,
           teamNames: {
@@ -2613,6 +2614,35 @@ export default function App() {
       };
 
       await setDoc(doc(db, 'vbt_events', targetEventCode, 'config', 'main'), evConfigUpdates, { merge: true });
+      
+      // Generate 6x6 Schedule Matchups
+      const generatedMatchups = [];
+      const teams = ['team_red_1', 'team_red_2', 'team_white_1', 'team_white_2', 'team_black_1', 'team_black_2'];
+      const games = [
+        'Blind Builder', 'Skee Ball', 'Minefield', 'Helium Stick & Human Chairs', 'Whiffle Ball', 'Blind Shape'
+      ];
+      const times = ['8:00 PM', '8:15 PM', '8:30 PM', '8:45 PM', '9:00 PM', '9:15 PM'];
+
+      for (let block = 1; block <= 6; block++) {
+        for (let station = 1; station <= 6; station++) {
+          let teamIdx = (station - 1 - (block - 1)) % 6;
+          if (teamIdx < 0) teamIdx += 6;
+          
+          generatedMatchups.push({
+            id: `b${block}_s${station}_${Date.now()}`,
+            block: block,
+            day: 1,
+            round: 1,
+            time: times[block - 1],
+            location: `Station ${station}`,
+            game: games[station - 1],
+            teamA: teams[teamIdx],
+            teamB: ''
+          });
+        }
+      }
+      
+      await updateScheduleData(targetEventCode, { matchups: generatedMatchups });
       
       alert(`July 6th data merged into ${targetEventCode} successfully! Refresh the page to see changes.`);
     } catch(err) {
@@ -3712,7 +3742,7 @@ export default function App() {
 
               {/* ── QUICK JOIN (active events from registry) ── */}
               {(() => {
-                const activeEvents = eventRegistry.filter(e => e.active !== false && !e.expired);
+                const activeEvents = eventRegistry.filter(e => e.active !== false && !e.expired && e.code !== 'june26');
                 if (activeEvents.length === 0) return null;
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -3878,11 +3908,6 @@ export default function App() {
               {/* Coordinator actions */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
-                <button onClick={seedJuly6Service}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
-                    background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
-                  🚀 SETUP JULY 6TH SERVICE (AI)
-                </button>
                 <button onClick={() => setShowCreateEvent(true)}
                   style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
                     background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
