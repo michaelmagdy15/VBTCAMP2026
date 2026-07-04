@@ -100,6 +100,7 @@ import { saveAsTemplate, loadTemplates, deleteTemplate, PRESET_TEMPLATES } from 
 
 // VBT Phase 3 Operations & Logistics Components
 import LogisticsPanel from './components/LogisticsPanel';
+import LogisticsTab from './components/LogisticsTab';
 import FeedMessage from './components/FeedMessage';
 import ScheduleExporter from './components/ScheduleExporter';
 const WalkieTalkie = React.lazy(() => import('./components/WalkieTalkie'));
@@ -6043,6 +6044,13 @@ export default function App() {
           />
         )}
 
+        {currentTab === 'station_logistics' && (
+          <LogisticsTab
+            eventCode={currentEventCode}
+            currentUser={currentUser}
+          />
+        )}
+
         {/* Tab 7: Settings */}
         {currentTab === 'settings' && currentUser && currentUser.role === 'admin' && (
           <SettingsTab
@@ -6477,6 +6485,36 @@ export default function App() {
                   }}
                 >
                   <Settings size={18} color="var(--vbt-sky)" /> Coordinator Controls
+                </button>
+              )}
+
+              {/* Admin specific: Station Logistics */}
+              {currentUser.role === 'admin' && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('station_logistics');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Package size={18} color="var(--vbt-sky)" /> Station Logistics
                 </button>
               )}
 
