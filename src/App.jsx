@@ -6346,6 +6346,7 @@ export default function App() {
             updateServant={updateServant}
             handleLiveAutoAssign={handleLiveAutoAssign}
             getTeamColorHex={getTeamColorHex}
+            seedJuly6Service={seedJuly6Service}
           />
         )}
         {/* Tab: Service */}

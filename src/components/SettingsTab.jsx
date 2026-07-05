@@ -96,7 +96,8 @@ export default function SettingsTab({
   handleSaveAndRegenerateSchedule,
   updateServant,
   handleLiveAutoAssign,
-  getTeamColorHex
+  getTeamColorHex,
+  seedJuly6Service
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -344,6 +345,36 @@ export default function SettingsTab({
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {eventConfig.eventType === 'service' && seedJuly6Service && (
+              <div className="glass-panel" style={{ padding: '16px', marginTop: '12px', border: '1px solid rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.03)' }}>
+                <h3 style={{ fontSize: '0.9rem', color: '#4ade80', fontWeight: '800', marginBottom: '8px' }}>🚀 VBT Service Quick Setup</h3>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  Seed today's real roles, game details, and timings into this event automatically.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("This will overwrite the current roles and schedule with today's official July 6th Ard el Golf details. Proceed?")) {
+                      await seedJuly6Service();
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    background: '#4ade80',
+                    color: '#000',
+                    fontWeight: '800',
+                    fontSize: '0.85rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🚀 Setup July 6th Service Data (AI)
+                </button>
               </div>
             )}
 
