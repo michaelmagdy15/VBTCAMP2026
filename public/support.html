@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VBT Sports Camp - Operational Support & Contact</title>
+  
+  <!-- Font Links -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --vbt-blue: #3B82F6;
+      --vbt-sky: #60A5FA;
+      --vbt-cta: #F97316;
+      --bg-dark: #070A13;
+      --bg-surface: rgba(30, 41, 59, 0.45);
+      --bg-card: rgba(28, 28, 30, 0.7);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(235, 235, 245, 0.6);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --radius-lg: 16px;
+      --font-title: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      background-image: 
+        radial-gradient(ellipse at 20% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(249, 115, 22, 0.04) 0px, transparent 50%);
+      background-attachment: fixed;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding-bottom: 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      margin-top: 20px;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--vbt-blue), var(--vbt-sky));
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+      font-family: var(--font-title);
+      font-weight: 900;
+      font-size: 24px;
+      color: white;
+    }
+
+    h1 {
+      font-family: var(--font-title);
+      font-weight: 900;
+      font-size: 2.25rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h2 {
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: -0.01em;
+      margin-top: 32px;
+      margin-bottom: 16px;
+      color: var(--vbt-sky);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.15rem;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .support-box {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--vbt-blue);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 12px 24px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      font-family: var(--font-body);
+    }
+
+    .btn:hover {
+      background: var(--vbt-sky);
+      transform: translateY(-1px);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    .footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin: 0 8px;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="logo-container">VBT</div>
+      <h1>VBT App Support Portal</h1>
+      <p>App Store Submission Contact & Technical Support Hub</p>
+    </header>
+
+    <div class="card support-box">
+      <h2>✉️ App Support Contact</h2>
+      <p>
+        If you are a camp participant, coordinator, or app reviewer and need technical support, please contact our support team. We monitor requests daily and respond to all inquiries within 24 hours.
+      </p>
+      <p style="margin-bottom: 24px;">
+        For account inquiries, database configurations, platform issues, or general support questions:
+      </p>
+      <a href="mailto:support@mitrixo.com" class="btn">✉️ Contact Technical Support</a>
+    </div>
+
+    <div class="card">
+      <h2>💡 Common Troubleshooting Guides</h2>
+      
+      <h3>1. Push Notification Issues</h3>
+      <p>
+        Ensure notifications are enabled on your device. On iOS standalone apps, go to your iPhone Settings -> Safari -> Page Settings and verify that "Notifications" are set to Allow. Inside the app, click the Bell icon in the header to resubscribe.
+      </p>
+
+      <h3>2. Offline Mode Syncing</h3>
+      <p>
+        If you are operating in a remote area with poor cell coverage, all scores and deductions remain saved locally in the browser/app cache. Do not clear your browser history or app storage. The data will upload automatically once your device reconnects to a cellular or Wi-Fi network.
+      </p>
+
+      <h3>3. Live Audio/Walkie-Talkie Failures</h3>
+      <p>
+        Our Walkie-Talkie requires microphone access permission. If you block microphone access, WebRTC calls will fail. Go to your browser or system permissions and ensure microphone access is granted for the app.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>🔒 Data Privacy & Policy</h2>
+      <p>
+        We respect user privacy. The VBT Sports Camp Portal does not require user registration with personal email or passwords for general users, and uses anonymous token authentication. No user data is tracked, sold, or shared with third parties.
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>
+        &copy; 2026 VBT Sports Camp. All rights reserved.
+        <a href="/help.html">Documentation</a> | 
+        <a href="/support.html">Support</a> | 
+        <a href="https://vbt.mitrixo.com">Home</a>
+      </p>
+    </div>
+  </div>
+
+</body>
+</html>

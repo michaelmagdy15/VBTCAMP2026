@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VBT Sports Camp Portal - Complete Feature Guide & Technical Documentation</title>
+  
+  <!-- Font Links -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --vbt-blue: #3B82F6;
+      --vbt-sky: #60A5FA;
+      --vbt-cta: #F97316;
+      --bg-dark: #070A13;
+      --bg-surface: rgba(28, 28, 30, 0.7);
+      --bg-card: rgba(30, 41, 59, 0.45);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(235, 235, 245, 0.6);
+      --text-muted: rgba(235, 235, 245, 0.35);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --radius-lg: 16px;
+      --font-title: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      
+      /* Role Colors */
+      --color-volunteer: #00b0ff;
+      --color-referee: #3b82f6;
+      --color-servant: #ff9100;
+      --color-leader: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      background-image: 
+        radial-gradient(ellipse at 20% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(249, 115, 22, 0.04) 0px, transparent 50%);
+      background-attachment: fixed;
+      padding: 32px 16px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding-bottom: 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+      margin-top: 20px;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, var(--vbt-blue), var(--vbt-sky));
+      margin-bottom: 18px;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
+      font-family: var(--font-title);
+      font-weight: 900;
+      font-size: 28px;
+      color: white;
+    }
+
+    h1 {
+      font-family: var(--font-title);
+      font-weight: 900;
+      font-size: 2.5rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h2 {
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.65rem;
+      letter-spacing: -0.02em;
+      margin-top: 40px;
+      margin-bottom: 20px;
+      color: var(--vbt-sky);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 10px;
+    }
+
+    h3 {
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin-top: 24px;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      font-size: 0.98rem;
+    }
+
+    ul, ol {
+      margin-left: 24px;
+      margin-bottom: 20px;
+      color: var(--text-secondary);
+      font-size: 0.98rem;
+    }
+
+    li {
+      margin-bottom: 10px;
+    }
+
+    code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: #cbd5e1;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+
+    .toc {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 32px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .toc-title {
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .toc-list {
+      list-style-type: none;
+      margin-left: 0;
+      margin-bottom: 0;
+    }
+
+    .toc-list li {
+      margin-bottom: 6px;
+    }
+
+    .toc-list a {
+      color: var(--vbt-sky);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .toc-list a:hover {
+      text-decoration: underline;
+    }
+
+    .role-section {
+      border-left: 4px solid #ccc;
+      padding-left: 20px;
+      margin-bottom: 24px;
+    }
+
+    .role-section.volunteer { border-color: var(--color-volunteer); }
+    .role-section.referee { border-color: var(--color-referee); }
+    .role-section.servant { border-color: var(--color-servant); }
+    .role-section.leader { border-color: var(--color-leader); }
+
+    .role-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 4px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+
+    .badge-volunteer { background: rgba(0, 176, 255, 0.15); color: #00b0ff; border: 1px solid rgba(0, 176, 255, 0.3); }
+    .badge-referee { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-servant { background: rgba(255, 145, 0, 0.15); color: #ff9100; border: 1px solid rgba(255, 145, 0, 0.3); }
+    .badge-leader { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+    .feature-tag {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: inline-block;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    .support-box {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--vbt-blue);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 12px 28px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+
+    .btn:hover {
+      background: var(--vbt-sky);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 60px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-light);
+      padding-top: 24px;
+    }
+
+    .footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin: 0 10px;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .pwa-guide-box {
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.01);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="logo-container">VBT</div>
+      <h1>VBT Sports Camp Portal</h1>
+      <p>App Store Documentation, Operations Manual & Technical Help Guide</p>
+    </header>
+
+    <!-- Table of Contents -->
+    <div class="toc">
+      <div class="toc-title">📋 Table of Contents</div>
+      <ul class="toc-list">
+        <li><a href="#overview">1. Platform Overview</a></li>
+        <li><a href="#pwa-install">2. iOS PWA Installation Guide</a></li>
+        <li><a href="#roles">3. Role-by-Role Operations Guide</a></li>
+        <li><a href="#features">4. Comprehensive Feature Breakdown</a></li>
+        <li><a href="#connectivity">5. Localized Connectivity & Optimization</a></li>
+        <li><a href="#offline">6. Offline Architecture & Caching</a></li>
+        <li><a href="#trouble">7. Troubleshooting & FAQs</a></li>
+        <li><a href="#appstore">8. App Store Reviewer Information</a></li>
+      </ul>
+    </div>
+
+    <!-- 1. Platform Overview -->
+    <div id="overview" class="card">
+      <h2>1. Platform Overview</h2>
+      <p>
+        The <strong>VBT Sports Camp Portal</strong> (served at <code>https://vbt.mitrixo.com</code>) is a custom, real-time gamified camp management platform. Built to support massive youth sports events, it provides coordinators, team leaders, game referees, and volunteers with instant access to scoreboards, live timeline updates, push announcements, and localized maps.
+      </p>
+      <p>
+        To accommodate remote locations (like valley camps or desert retreats in Egypt), the app utilizes strict <strong>offline-first development architectures</strong>. This allows servants to record scores, check layouts, and coordinate activities even when the network drops to zero, queuing database operations to sync automatically upon reconnection.
+      </p>
+    </div>
+
+    <!-- 2. iOS PWA Installation Guide -->
+    <div id="pwa-install" class="card">
+      <h2>2. iOS PWA Installation Guide</h2>
+      <p>
+        To submit this application for App Store deployment or run it like a native iOS App on iPhone, it is compiled as a Progressive Web Application (PWA). Follow these simple steps:
+      </p>
+      <div class="pwa-guide-box">
+        <ol>
+          <li>Open Safari on your iPhone and navigate to <strong>https://vbt.mitrixo.com</strong>.</li>
+          <li>Tap the <strong>Share</strong> button (the square icon with an arrow pointing up at the bottom screen menu).</li>
+          <li>Scroll down the list of options and select <strong>Add to Home Screen</strong>.</li>
+          <li>Confirm the app name "VBT Camp" and tap <strong>Add</strong> in the top-right corner.</li>
+          <li>The VBT App icon will now appear on your home screen, launching in an immersive, full-screen wrapper with native device gestures and haptic feedback enabled.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- 3. Role-by-Role Operations Guide -->
+    <div id="roles" class="card">
+      <h2>3. Role-by-Role Operations Guide</h2>
+      <p>The platform separates access permissions to maintain data security during active competition:</p>
+      
+      <!-- Volunteer -->
+      <div class="role-section volunteer">
+        <div class="role-badge badge-volunteer">Volunteer / Viewer</div>
+        <p>
+          <strong>Description:</strong> General public mode designed for participants and parents. No authorization passcodes are required.
+        </p>
+        <ul>
+          <li><strong>Scoreboard:</strong> Watch point aggregates update live as courts record matches. Includes a dynamic "Tug-of-War" progress bar showing the point distribution balance.</li>
+          <li><strong>Schedule:</strong> Check full event matches, daily timelines, and stations.</li>
+          <li><strong>Emergency Alert Feed:</strong> Receives SOS reports and critical event announcements.</li>
+        </ul>
+      </div>
+
+      <!-- Game Leader -->
+      <div class="role-section referee">
+        <div class="role-badge badge-referee">Game Leader / Referee</div>
+        <p>
+          <strong>Description:</strong> Access portal for referees managing courts, sports activities, and matches. Protected via passcode.
+        </p>
+        <ul>
+          <li><strong>Score Adjustment:</strong> Increase or decrease game scoring points directly on the court.</li>
+          <li><strong>Match Completion:</strong> Tap the completion toggle to submit final match results to the server, instantly recalculating scoreboard aggregates.</li>
+          <li><strong>Assigned Matches View:</strong> Filter scoreboard timelines to show only the court matches assigned to your referee account.</li>
+        </ul>
+      </div>
+
+      <!-- Team Leader -->
+      <div class="role-section servant">
+        <div class="role-badge badge-servant">Team Leader / Servant</div>
+        <p>
+          <strong>Description:</strong> Dedicated view for team-specific leaders. Access is granted by matching the leader's name from the official servant roster.
+        </p>
+        <ul>
+          <li><strong>Personalized Schedules:</strong> View your assigned team's specific timeline, locations, and match slots (e.g. "Red 1"). Underscores are automatically stripped, displaying formatted titles.</li>
+          <li><strong>Point Deductions:</strong> Report points deductions for sportsmanship violations or rule infractions. Includes pre-set infraction options (e.g. safety warning) and customizable reason logs.</li>
+        </ul>
+      </div>
+
+      <!-- Service Leader / Coordinator -->
+      <div class="role-section leader">
+        <div class="role-badge badge-leader">Service Leader / Coordinator</div>
+        <p>
+          <strong>Description:</strong> Full administrative privileges. Passcode protected.
+        </p>
+        <ul>
+          <li><strong>Timeline Shift:</strong> Advance or delay the event timeline blocks dynamically, shifting schedule times across the entire camp instantly.</li>
+          <li><strong>Emergency Pings:</strong> Send system-wide, high-priority notification broadcasts and audio-visual alert triggers to all active screens.</li>
+          <li><strong>Event Setup:</strong> Customize camp configurations, games, teams, and preset emergency stations.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 4. Comprehensive Feature Breakdown -->
+    <div id="features" class="card">
+      <h2>4. Comprehensive Feature Breakdown</h2>
+      <p>Here is an explanation of every feature available inside the VBT Sports Camp Portal:</p>
+
+      <h3>📊 1. Live Scoreboard & Tug-of-War Bar</h3>
+      <p>
+        Calculates and shows real-time scores compiled across all camp activities.
+      </p>
+      <ul>
+        <li><strong>Tug-of-War Bar:</strong> A visual progress bar positioned at the top of the scoreboard. It maps the points ratio of Shakes (blue) vs. Fries (orange), demonstrating which team currently leads the camp.</li>
+        <li><strong>Interactive Accordions:</strong> Let users expand or collapse specific daily blocks or sports matches to see details (which referees submitted scores, completion timestamps, etc.).</li>
+        <li><strong>Score Mode Switch:</strong> Referees and Admins can toggle between a Detailed UI (showing breakdowns, weights, deductions) and a Simple UI (compact scoreboard for quick glance updates).</li>
+      </ul>
+
+      <h3>📅 2. Filterable Event Timeline & Schedule</h3>
+      <p>
+        Displays the entire schedule of games, meals, reflections, and sports sessions.
+      </p>
+      <ul>
+        <li><strong>Filters:</strong> Users can filter schedule entries by Day, Time Block, or specific Teams.</li>
+        <li><strong>Active Highlights:</strong> Current active schedule slots are highlighted in bright borders to keep servants synchronized with the timeline.</li>
+      </ul>
+
+      <h3>🎧 3. Walkie-Talkie Radio Channels</h3>
+      <p>
+        Bidirectional voice walkie-talkie powered by WebRTC.
+      </p>
+      <ul>
+        <li><strong>Channels list:</strong> Standard communication groups: <em>General, Logistics, Referee, SOS</em>.</li>
+        <li><strong>PTT (Push-To-Talk):</strong> Staff hold down the record button, broadcast voice messages to the channel, and play incoming broadcasts instantly.</li>
+      </ul>
+
+      <h3>📍 4. Interactive Safety GPS Map</h3>
+      <p>
+        Visualizes the camp campus coordinates, stations, and safety markers.
+      </p>
+      <ul>
+        <li><strong>GPS Tracking:</strong> Captures and uploads device locations (when permitted) so camp coordinators can locate lost participants.</li>
+        <li><strong>Offline Pre-caching:</strong> Service workers automatically cache map regions so tiles load even in internet dead-zones.</li>
+      </ul>
+
+      <h3>📝 5. Point Deduction Logging</h3>
+      <p>
+        Enables Team Leaders to report sportsmanship deductions directly into Firestore.
+      </p>
+      <ul>
+        <li><strong>Infraction Presets:</strong> Pre-programmed deduction quantities for quick logging (e.g., cell phone usage, safety warnings).</li>
+        <li><strong>Custom Values:</strong> Custom inputs to log custom points and text reasons for irregular rule violations.</li>
+      </ul>
+
+      <h3>🚨 6. Emergency SOS Trigger</h3>
+      <p>
+        A high-priority emergency mechanism to request immediate assistance.
+      </p>
+      <ul>
+        <li><strong>Dynamic Stations:</strong> Builds location choices dynamically based on the active event's stations (e.g. Soccer Court, Dining Hall) from database configurations.</li>
+        <li><strong>Broadcasting:</strong> Broadcasts an SOS event containing GPS coordinates and timestamps to the coordinator's dashboard and alerts the device with vibration haptics.</li>
+      </ul>
+
+      <h3>⚙️ 7. Terminology Shifts (Camp vs. Service Mode)</h3>
+      <p>
+        Allows churches to reuse the app for spiritual services rather than sports camps. If the active event type is shifted to "Service Mode" in Firestore:
+      </p>
+      <ul>
+        <li>Terminologies automatically update across all buttons, tabs, headers, and logs (e.g. "Camp" becomes "Service", "Games" becomes "Logistics", "Teams" becomes "Servants").</li>
+      </ul>
+    </div>
+
+    <!-- 5. Localized Connectivity & Optimization -->
+    <div id="connectivity" class="card">
+      <h2>5. Localized Connectivity & Optimization</h2>
+      <p>
+        To ensure stable operation on carrier networks in Egypt (Vodafone, Orange, WE, Etisalat), the platform implements specific network optimizations:
+      </p>
+      <ul>
+        <li><strong>8kHz Audio Compression:</strong> Downsamples mic recordings to 8kHz mono, reducing WebRTC audio package files by 50% to save cellular bandwidth.</li>
+        <li><strong>WebRTC TCP Cloud Proxy:</strong> Enforces Agora cloud proxy settings (<code>startProxyServer(3)</code>) to route VoIP packets through standard TCP ports, successfully bypassing carrier port blocks.</li>
+        <li><strong>Low-Data Street Tiles:</strong> Uses CartoDB Voyager street maps which consume up to 90% less data than satellite imagery, allowing maps to load over weak 3G signals.</li>
+      </ul>
+    </div>
+
+    <!-- 6. Offline Architecture & Caching -->
+    <div id="offline" class="card">
+      <h2>6. Offline Architecture & Caching</h2>
+      <p>
+        The portal is designed as an offline-first system:
+      </p>
+      <ul>
+        <li><strong>Workbox Caching:</strong> Pre-caches the React HTML shell, Outift/Inter local fonts, icons, and stylesheets.</li>
+        <li><strong>Tile Caching:</strong> Stores up to 500 Leaflet map tiles. Coordinates scrolled through while connected remain fully functional when offline.</li>
+        <li><strong>IndexedDB Queue:</strong> Uses Firestore local cache databases. Data writes are saved locally and synced automatically once internet connectivity is restored.</li>
+      </ul>
+    </div>
+
+    <!-- 7. Troubleshooting & FAQs -->
+    <div id="trouble" class="card">
+      <h2>7. Troubleshooting & FAQs</h2>
+      <h3>Q: Walkie-Talkie microphone fails to connect?</h3>
+      <p>
+        Go to your browser or device app settings and allow microphone permissions for <code>https://vbt.mitrixo.com</code>.
+      </p>
+      <h3>Q: Why is the map showing blank white tiles?</h3>
+      <p>
+        You have scrolled to a region that was not pre-cached while connected. Toggle from Satellite to Street Map mode, which consumes less data, to load tiles over cellular connections.
+      </p>
+      <h3>Q: How do I enable notifications on my iPhone?</h3>
+      <p>
+        For iOS standalone apps, go to iPhone Settings -> Safari -> Page Settings -> Allow Notifications. Then click the Bell icon in the app header to resubscribe.
+      </p>
+    </div>
+
+    <!-- 8. App Store Reviewer Information -->
+    <div id="appstore" class="card">
+      <h2>8. App Store Reviewer Information</h2>
+      <p>
+        This section contains required metadata compliance policies for Apple App Store reviewers:
+      </p>
+      <ul>
+        <li><strong>Privacy Policy:</strong> The app does not track, collect, or share user personal information. Users login anonymously via Firebase, and account entries on the roster correspond to event organizational roles.</li>
+        <li><strong>Account Deletion:</strong> The app operates on anonymous sessions. Deleting local storage or uninstalling the app automatically destroys all session tokens. If a coordinator needs to remove a servant from the database roster, they can contact <code>support@mitrixo.com</code>.</li>
+        <li><strong>Third-Party Dependencies:</strong> Built using Capacitor PWA wraps. The notifications service uses standard web push payloads. WebRTC audio is powered by Agora.</li>
+      </ul>
+    </div>
+
+    <div class="card support-box">
+      <h2>🛠️ Need Direct Support?</h2>
+      <p>
+        Our operations helpdesk is ready to assist. Reach out to register a new church event, request coordinate configurations, or report general app issues.
+      </p>
+      <p style="margin-bottom: 20px;">
+        Click below to contact our developer desk directly:
+      </p>
+      <a href="mailto:support@mitrixo.com" class="btn">✉️ Contact VBT Support</a>
+    </div>
+
+    <div class="footer">
+      <p>
+        &copy; 2026 VBT Sports Camp. All rights reserved.
+        <a href="/help.html">Documentation</a> | 
+        <a href="/support.html">Support</a> | 
+        <a href="https://vbt.mitrixo.com">Home</a>
+      </p>
+    </div>
+  </div>
+
+</body>
+</html>
