@@ -633,20 +633,8 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     return s ? s.name : "Unassigned";
   };
 
-  const getLeaderNamesForBigGame = () => {
-    const leaders = [];
-    Object.entries(configData.servantAssignments || {}).forEach(([sId, rCode]) => {
-      if (activeServantsList.includes(sId) && (rCode === 'big_game_1' || rCode === 'big_game_2' || rCode === 'referee' || sId === 'daniel_el_masry')) {
-        const s = globalServants.find(serv => serv.id === sId);
-        if (s) leaders.push(s.name);
-      }
-    });
-    return leaders.length > 0 ? leaders.join(', ') : "Referees";
-  };
-
-  // 1. Determine active team leaders and sub-teams
-  const customColors = configData.teamNames || { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' };
   const getCustomColorName = (colorKey) => {
+    const customColors = configData.teamNames || { red: 'Red', white: 'White', black: 'Black', blue: 'Blue' };
     const key = colorKey.toLowerCase();
     const custom = customColors[key];
     if (custom && custom.trim()) return custom.trim();
@@ -658,7 +646,6 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
 
   const roleMapping = configData.servantAssignments || {};
   Object.entries(roleMapping).forEach(([servantId, roleCode]) => {
-    // Must be attending/active
     if (!activeServantsList.includes(servantId)) return;
 
     if (roleCode.startsWith('team_')) {
@@ -668,7 +655,7 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
         const colorKey = parts[1]; // "white"
         const colorName = getCustomColorName(colorKey);
         const idx = parts[2]; // "1"
-        const teamName = `${colorName} ${idx}`; // "White 1"
+        const teamName = colorName + ' ' + idx; // "White 1"
         activeSubTeams.push(teamName);
         teamLeaders[teamName] = servant.name;
       }
@@ -679,7 +666,7 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     throw new Error("Please assign at least one servant as a Team Leader (Red 1, White 1, etc.) before generating schedule.");
   }
 
-  // Sort sub-teams for predictable pairings (Red, White, Black, Blue order)
+  // Sort sub-teams predictably
   activeSubTeams.sort((a, b) => {
     const aColor = a.split(' ').slice(0, -1).join(' ');
     const bColor = b.split(' ').slice(0, -1).join(' ');
@@ -698,9 +685,7 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     const aIdx = parseInt(a.split(' ').pop(), 10) || 1;
     const bIdx = parseInt(b.split(' ').pop(), 10) || 1;
     
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder;
-    }
+    if (aOrder !== bOrder) return aOrder - bOrder;
     return aIdx - bIdx;
   });
 
@@ -726,52 +711,45 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     };
   });
 
-  // Pair up teams
-  const teamListForPairs = [...activeSubTeams];
-  if (T % 2 !== 0) {
-    teamListForPairs.push("Servants");
-    teams["Servants"] = {
-      code: "Servants",
-      name: "Servants Team",
-      leaders: "Volunteers / Refs",
-      side: "System",
-      kidCount: 0
+  const getStationInfo = (stKey, defaultName) => {
+    const st = configData.stations?.[stKey];
+    return {
+      name: st?.name || defaultName,
+      location: st?.location || ('Station ' + stKey.replace('station_', '')),
+      howToPlay: st?.howToPlay || '',
+      lesson: st?.lesson || ''
     };
-  }
-
-  const P = teamListForPairs.length / 2;
-
-  if (configData.randomizeMatchups) {
-    const subTeamsPart = teamListForPairs.filter(t => t !== 'Servants');
-    for (let i = subTeamsPart.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [subTeamsPart[i], subTeamsPart[j]] = [subTeamsPart[j], subTeamsPart[i]];
-    }
-    if (T % 2 !== 0) {
-      subTeamsPart.push("Servants");
-    }
-    for (let i = 0; i < teamListForPairs.length; i++) {
-      teamListForPairs[i] = subTeamsPart[i];
-    }
-  }
-
-  const matchups = [];
-
-  const stations = configData.stations || {
-    station_1: { name: "Commitment", location: "Football Field", howToPlay: "", lesson: "" },
-    station_2: { name: "Knock & Unlock", location: "Terrace", howToPlay: "", lesson: "" },
-    station_3: { name: "Trust", location: "Court", howToPlay: "", lesson: "" },
-    station_4: { name: "Communication", location: "Pool", howToPlay: "", lesson: "" }
   };
 
-  const bigGameName = configData.bigGameName || "Loyalty (Big Game)";
-  const bigGameLoc = configData.bigGameLocation || "Football Field";
-  const reflectionName = configData.reflectionName || "Reflection";
-  const reflectionLoc = configData.reflectionLocation || "Main Hall";
+  const stationData = {
+    station_1: getStationInfo('station_1', 'Blind Builder'),
+    station_2: getStationInfo('station_2', 'Skee Ball'),
+    station_3: getStationInfo('station_3', 'Minefield'),
+    station_4: getStationInfo('station_4', 'Helium Stick & Human Chairs'),
+    station_5: getStationInfo('station_5', 'Whiffle Ball'),
+    station_6: getStationInfo('station_6', 'Blind Shape')
+  };
 
-  const startTimeStr = configData.startTime || '15:15';
-  const roundDur = Number(configData.roundDurationMinutes) || 20;
-  const breakDur = configData.breakMinutes !== undefined ? Number(configData.breakMinutes) : 0;
+  const gamesList = [
+    stationData.station_1.name,
+    stationData.station_2.name,
+    stationData.station_3.name,
+    stationData.station_4.name,
+    stationData.station_5.name,
+    stationData.station_6.name
+  ];
+  const locationsList = [
+    stationData.station_1.location,
+    stationData.station_2.location,
+    stationData.station_3.location,
+    stationData.station_4.location,
+    stationData.station_5.location,
+    stationData.station_6.location
+  ];
+
+  const startTimeStr = configData.startTime || '20:00';
+  const roundDur = Number(configData.roundDurationMinutes) || 10;
+  const breakDur = configData.breakMinutes !== undefined ? Number(configData.breakMinutes) : 5;
   const [startHours, startMins] = startTimeStr.split(':').map(Number);
 
   const getShiftedTime = (minsOffset) => {
@@ -784,182 +762,48 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     hours = hours ? hours : 12;
     const strMinutes = minutes < 10 ? '0' + minutes : minutes;
     const strHours = hours < 10 ? '0' + hours : hours;
-    return `${strHours}:${strMinutes} ${ampm}`;
+    return strHours + ':' + strMinutes + ' ' + ampm;
   };
 
-  const roundTimes = {
-    1: getShiftedTime(0),
-    2: getShiftedTime(1 * (roundDur + breakDur)),
-    3: getShiftedTime(2 * (roundDur + breakDur)),
-    4: getShiftedTime(3 * (roundDur + breakDur))
-  };
-
-  const bigGameTime = getShiftedTime(4 * roundDur + 3 * breakDur);
-  const reflectionTime = getShiftedTime(4 * roundDur + 3 * breakDur + 35);
-
-  // ─── Matchup Generator with Same-Color Prevention ──────────────────
-  // Helper to extract base color (e.g. "Red 1" -> "Red")
-  const getBaseColor = (name) => {
-    const parts = name.split(' ');
-    if (parts.length > 1) {
-      return parts.slice(0, -1).join(' ');
-    }
-    return name;
-  };
-
-  // Backtracking solver to generate 4 rounds of collision-free matchups
-  const generateFourRoundMatchups = (teamList) => {
-    const T_size = teamList.length;
-    const P_size = T_size / 2;
-    const rounds = [];
-    const playedPairs = new Set();
-    const getPairKey = (tA, tB) => [tA, tB].sort().join('||');
-
-    const solveRound = (roundIdx, currentRoundPairs, usedInRound, depth = 0) => {
-      if (currentRoundPairs.length === P_size) return true;
-      if (depth > 200) return false; // Fail-safe recursion guard
-
-      let firstUnused = -1;
-      for (let i = 0; i < T_size; i++) {
-        if (!usedInRound.has(teamList[i])) {
-          firstUnused = i;
-          break;
-        }
-      }
-      if (firstUnused === -1) return false;
-
-      const teamA = teamList[firstUnused];
-      const colorA = getBaseColor(teamA);
-
-      for (let j = firstUnused + 1; j < T_size; j++) {
-        const teamB = teamList[j];
-        if (usedInRound.has(teamB)) continue;
-
-        // Constraint: Red only plays Blue, White only plays Black, same-color matches are forbidden.
-        if (teamA !== 'Servants' && teamB !== 'Servants') {
-          const sideA = teams[teamA]?.side;
-          const sideB = teams[teamB]?.side;
-          const isValidColorMatch = 
-            (sideA === 'Red' && sideB === 'Blue') ||
-            (sideA === 'Blue' && sideB === 'Red') ||
-            (sideA === 'White' && sideB === 'Black') ||
-            (sideA === 'Black' && sideB === 'White');
-          if (!isValidColorMatch) continue;
-        }
-
-        const pairKey = getPairKey(teamA, teamB);
-        const isDuplicate = playedPairs.has(pairKey);
-
-        usedInRound.add(teamA);
-        usedInRound.add(teamB);
-        currentRoundPairs.push([teamA, teamB]);
-        if (!isDuplicate) playedPairs.add(pairKey);
-
-        if (solveRound(roundIdx, currentRoundPairs, usedInRound, depth + 1)) {
-          return true;
-        }
-
-        if (!isDuplicate) playedPairs.delete(pairKey);
-        currentRoundPairs.pop();
-        usedInRound.delete(teamA);
-        usedInRound.delete(teamB);
-      }
-      return false;
-    };
-
-    for (let r = 0; r < 4; r++) {
-      const currentRoundPairs = [];
-      const usedInRound = new Set();
-      let success = solveRound(r, currentRoundPairs, usedInRound, 0);
-      if (!success) {
-        // Relax duplicate opponent constraint if we run out of unique matchups, but keep same-color restriction
-        playedPairs.clear();
-        solveRound(r, currentRoundPairs, usedInRound, 0);
-      }
-      rounds.push(currentRoundPairs);
-      currentRoundPairs.forEach(([tA, tB]) => playedPairs.add(getPairKey(tA, tB)));
-    }
-    return rounds;
-  };
-
-  const numLocations = Math.max(4, P);
-  const daysCount = configData.daysCount || 1;
-
-  for (let d = 1; d <= daysCount; d++) {
-    // Generate fresh pairings for the 4 rounds of this day
-    const dayPairings = generateFourRoundMatchups(teamListForPairs);
-
-    for (let r = 1; r <= 4; r++) {
-      const roundPairs = dayPairings[r - 1] || [];
-
-      for (let p = 0; p < P; p++) {
-        const pair = roundPairs[p] || [teamListForPairs[2 * p], teamListForPairs[2 * p + 1]];
-        const teamA = pair[0];
-        const teamB = pair[1];
-
-        // Station index: circular shift per round to prevent collisions
-        const stationIdx = (p + r - 1) % numLocations;
-
-        let gameName = "Rest & Quiz";
-        let locName = "Rest Area";
-
-        if (stationIdx < 4) {
-          const stKey = `station_${stationIdx + 1}`;
-          gameName = stations[stKey].name;
-          locName = stations[stKey].location;
-        }
-
-        matchups.push({
-          day: d,
-          block: 1, // block 1 is rotational rounds
-          round: r,
-          game: gameName,
-          time: roundTimes[r],
-          teamA: teamA,
-          teamB: teamB,
-          location: locName
-        });
-      }
-    }
-
-    // Add Big Game (Block 2)
-    matchups.push({
-      day: d,
-      block: 2,
-      round: 1,
-      game: bigGameName,
-      time: bigGameTime,
-      teamA: "All Teams",
-      teamB: "Referees",
-      location: bigGameLoc
-    });
-
-    // Add Reflection (Block 3)
-    matchups.push({
-      day: d,
-      block: 3,
-      round: 1,
-      game: reflectionName,
-      time: reflectionTime,
-      teamA: "All Teams",
-      teamB: "Bible Discussion",
-      location: reflectionLoc
-    });
+  const numBlocks = Math.max(6, T);
+  const times = [];
+  for (let block = 0; block < numBlocks; block++) {
+    times.push(getShiftedTime(block * (roundDur + breakDur)));
   }
+
+  const matchups = [];
+  let idx = 0;
+  for (let block = 1; block <= numBlocks; block++) {
+    for (let station = 1; station <= 6; station++) {
+      let teamIdx = (station - 1 - (block - 1)) % T;
+      if (teamIdx < 0) teamIdx += T;
+
+      const teamName = activeSubTeams[teamIdx];
+
+      matchups.push({
+        id: 'b' + block + '_s' + station + '_' + Date.now() + '_' + (idx++),
+        day: 1,
+        block: block,
+        round: 1,
+        time: times[block - 1],
+        location: locationsList[station - 1] || ('Station ' + station),
+        game: gamesList[station - 1],
+        teamA: teamName,
+        teamB: ''
+      });
+    }
+  }
+
+  const gamePoints = {};
+  gamesList.forEach(gName => {
+    gamePoints[gName] = 15;
+  });
 
   // Construct schedule data payload
   const scheduleData = {
     teams,
     matchups,
-    gamePoints: {
-      [stations.station_1.name]: 15,
-      [stations.station_2.name]: 15,
-      [stations.station_3.name]: 15,
-      [stations.station_4.name]: 15,
-      "Rest & Quiz": 0,
-      [bigGameName]: 30,
-      [reflectionName]: 0
-    }
+    gamePoints
   };
 
   // Write to Firestore docs
@@ -970,48 +814,48 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
   await setDoc(configDocRef, configData);
 
   // Form group breakdowns and games list for service_data
-  const groups = activeSubTeams.map((teamName, idx) => {
+  const groups = activeSubTeams.map((teamName) => {
     return {
-      leaderName: `${teamName} (${teamLeaders[teamName] || 'Unassigned'})`,
+      leaderName: teamName + ' (' + (teamLeaders[teamName] || 'Unassigned') + ')',
       kidCount: teams[teamName].kidCount
     };
   });
 
   const games = [
     {
-      name: `${stations.station_1.name} (Station 1 - ${getLeaderNameForRole('station_1')})`,
-      howToPlay: stations.station_1.howToPlay || "No rules provided.",
-      lesson: stations.station_1.lesson || "No lesson details provided."
+      name: stationData.station_1.name + ' (Station 1 - ' + getLeaderNameForRole('station_1') + ')',
+      howToPlay: stationData.station_1.howToPlay || "No rules provided.",
+      lesson: stationData.station_1.lesson || "No lesson details provided."
     },
     {
-      name: `${stations.station_2.name} (Station 2 - ${getLeaderNameForRole('station_2')})`,
-      howToPlay: stations.station_2.howToPlay || "No rules provided.",
-      lesson: stations.station_2.lesson || "No lesson details provided."
+      name: stationData.station_2.name + ' (Station 2 - ' + getLeaderNameForRole('station_2') + ')',
+      howToPlay: stationData.station_2.howToPlay || "No rules provided.",
+      lesson: stationData.station_2.lesson || "No lesson details provided."
     },
     {
-      name: `${stations.station_3.name} (Station 3 - ${getLeaderNameForRole('station_3')})`,
-      howToPlay: stations.station_3.howToPlay || "No rules provided.",
-      lesson: stations.station_3.lesson || "No lesson details provided."
+      name: stationData.station_3.name + ' (Station 3 - ' + getLeaderNameForRole('station_3') + ')',
+      howToPlay: stationData.station_3.howToPlay || "No rules provided.",
+      lesson: stationData.station_3.lesson || "No lesson details provided."
     },
     {
-      name: `${stations.station_4.name} (Station 4 - ${getLeaderNameForRole('station_4')})`,
-      howToPlay: stations.station_4.howToPlay || "No rules provided.",
-      lesson: stations.station_4.lesson || "No lesson details provided."
+      name: stationData.station_4.name + ' (Station 4 - ' + getLeaderNameForRole('station_4') + ')',
+      howToPlay: stationData.station_4.howToPlay || "No rules provided.",
+      lesson: stationData.station_4.lesson || "No lesson details provided."
     },
     {
-      name: `Big Game: ${bigGameName} (Led by ${getLeaderNamesForBigGame()})`,
-      howToPlay: configData.bigGameHowToPlay || "No rules provided.",
-      lesson: configData.bigGameLesson || "No lesson details provided."
+      name: stationData.station_5.name + ' (Station 5 - ' + getLeaderNameForRole('station_5') + ')',
+      howToPlay: stationData.station_5.howToPlay || "No rules provided.",
+      lesson: stationData.station_5.lesson || "No lesson details provided."
     },
     {
-      name: `Reflection: ${reflectionName}`,
-      howToPlay: configData.reflectionHowToPlay || "No rules provided.",
-      lesson: configData.reflectionLesson || "No lesson details provided."
+      name: stationData.station_6.name + ' (Station 6 - ' + getLeaderNameForRole('station_6') + ')',
+      howToPlay: stationData.station_6.howToPlay || "No rules provided.",
+      lesson: stationData.station_6.lesson || "No lesson details provided."
     }
   ];
 
   const serviceBrief = configData.description || "";
-  const serviceDataDocRef = doc(db, `vbt_events/${targetEventCode}/service_data/main`);
+  const serviceDataDocRef = doc(db, 'vbt_events/' + targetEventCode + '/service_data/main');
   await setDoc(serviceDataDocRef, {
     serviceBrief,
     groups,
@@ -1020,11 +864,6 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
   });
 }
 
-/**
- * Updates the schedule data in Firestore for a specific event.
- * @param {string} eventCode
- * @param {object} updates - Object containing state updates.
- */
 export async function updateScheduleData(eventCode, updates) {
   const docRef = doc(db, eventSchedulePath(eventCode));
   try {
