@@ -5260,9 +5260,9 @@ export default function App() {
       if (isReferee) return [
         { id: 'schedule', label: 'My Games', icon: BookOpen },
         { id: 'scoreboard', label: 'Scores', icon: Trophy },
-        { id: 'info', label: 'Map', icon: MapIcon },
         { id: 'walkie', label: 'Radio', icon: Radio },
         { id: 'timeline', label: 'Feed', icon: Bell, badge: unread },
+        { id: 'more', label: 'More', icon: MoreHorizontal },
       ];
       if (!isAdmin && !isLeader) return [
         { id: 'schedule', label: 'Schedule', icon: Calendar },
@@ -6864,8 +6864,38 @@ export default function App() {
                 </button>
               )}
 
+              {/* Service Info & Rules (for roles like referee who have My Games pointing to schedule instead of service info) */}
+              {!getActiveTabs().some(t => t.id === 'service') && eventConfig.eventType === 'service' && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setCurrentTab('service');
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <BookOpen size={18} color="var(--vbt-sky)" /> Service Info & Rules
+                </button>
+              )}
+
               {/* Service Mode specific: Camp Scoreboard (Only for admin, leader, referee, since other roles have it on the bottom tab bar) */}
-              {eventConfig.eventType === 'service' && ['admin', 'leader', 'referee'].includes(currentUser.role) && (
+              {eventConfig.eventType === 'service' && ['admin', 'leader', 'referee'].includes(currentUser.role) && !getActiveTabs().some(t => t.id === 'scoreboard') && (
                 <button
                   className="more-drawer-item"
                   onClick={() => {
