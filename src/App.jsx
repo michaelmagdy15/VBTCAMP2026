@@ -814,6 +814,32 @@ export default function App() {
   const [editEventConfig, setEditEventConfig] = useState(null);
   const [savingEventConfig, setSavingEventConfig] = useState(false);
 
+  // Servants Library (Directory) Additional States
+  const [showDirAddForm, setShowDirAddForm] = useState(false);
+  const [dirAddName, setDirAddName] = useState('');
+  const [dirAddPhone, setDirAddPhone] = useState('');
+  const [dirAddPasscode, setDirAddPasscode] = useState('1234');
+  const [dirAddRole, setDirAddRole] = useState('volunteer');
+  const [editingServantId, setEditingServantId] = useState(null);
+  const [editingServantName, setEditingServantName] = useState('');
+  const [editingServantPhone, setEditingServantPhone] = useState('');
+  const [editingServantPasscode, setEditingServantPasscode] = useState('');
+  const [editingServantRole, setEditingServantRole] = useState('');
+
+  // Games Library Additional States
+  const [showGameAddForm, setShowGameAddForm] = useState(false);
+  const [gameAddName, setGameAddName] = useState('');
+  const [gameAddType, setGameAddType] = useState('station');
+  const [gameAddLocation, setGameAddLocation] = useState('');
+  const [gameAddHowToPlay, setGameAddHowToPlay] = useState('');
+  const [gameAddLesson, setGameAddLesson] = useState('');
+  const [editingGameId, setEditingGameId] = useState(null);
+  const [editingGameName, setEditingGameName] = useState('');
+  const [editingGameType, setEditingGameType] = useState('station');
+  const [editingGameLocation, setEditingGameLocation] = useState('');
+  const [editingGameHowToPlay, setEditingGameHowToPlay] = useState('');
+  const [editingGameLesson, setEditingGameLesson] = useState('');
+
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1117,7 +1143,7 @@ export default function App() {
       // Calculate smart auto-assignment!
       const currentAssignments = eventConfig?.servantAssignments || {};
       const autoAssign = determineAutoAssignment(currentAssignments);
-      
+      const nowStr = new Date().toISOString();
       await setDoc(doc(db, 'vbt_servants', id), {
         id,
         name,
@@ -1125,14 +1151,17 @@ export default function App() {
         role: autoAssign.role,
         preferredRole: newServantPreferredRole,
         passcode: '1234',
-        createdAt: new Date().toISOString()
+        createdAt: nowStr,
+        servicesAttended: currentEventCode ? [{ code: currentEventCode, date: nowStr }] : []
       });
       
-      // Update the event configuration in Firestore with this new assignment
+      // Update the event configuration in Firestore with this new assignment and check-in status
       const updatedAssignments = { ...currentAssignments, [id]: autoAssign.code };
+      const updatedActiveServants = [...(eventConfig?.activeServants || []), id];
       const configRef = doc(db, 'vbt_events', currentEventCode, 'config', 'main');
       await updateDoc(configRef, {
-        servantAssignments: updatedAssignments
+        servantAssignments: updatedAssignments,
+        activeServants: updatedActiveServants
       });
       
       // Update local state list so they show up in UI directories
@@ -1141,7 +1170,8 @@ export default function App() {
         name, 
         role: autoAssign.role, 
         roleCode: autoAssign.code,
-        preferredRole: newServantPreferredRole 
+        preferredRole: newServantPreferredRole,
+        servicesAttended: currentEventCode ? [{ code: currentEventCode, date: nowStr }] : []
       };
       setGlobalServants(prev => [...prev, newServ]);
       
@@ -2820,6 +2850,39 @@ export default function App() {
     return getTeamLeaders(oldRoles, oldAttending) !== getTeamLeaders(newRoles, newAttending);
   };
 
+  const syncServantsAttendanceField = async (newAttending, oldAttending, eventCode, eventDate) => {
+    try {
+      const { doc, getDoc, updateDoc } = await import('firebase/firestore');
+      const date = eventDate || new Date().toISOString();
+      const added = newAttending.filter(x => !oldAttending.includes(x));
+      const removed = oldAttending.filter(x => !newAttending.includes(x));
+      
+      for (const sId of added) {
+        const docRef = doc(db, 'vbt_servants', sId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const existing = snap.data();
+          const attended = existing.servicesAttended || [];
+          if (!attended.find(e => e.code === eventCode)) {
+            attended.push({ code: eventCode, date });
+            await updateDoc(docRef, { servicesAttended: attended });
+          }
+        }
+      }
+      for (const sId of removed) {
+        const docRef = doc(db, 'vbt_servants', sId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const existing = snap.data();
+          const attended = (existing.servicesAttended || []).filter(e => e.code !== eventCode);
+          await updateDoc(docRef, { servicesAttended: attended });
+        }
+      }
+    } catch (e) {
+      console.error("Error syncing servant attendance fields:", e);
+    }
+  };
+
   const handleAutoSaveRosterData = async (newAttending, newRoles) => {
     if (!currentEventCode || !eventConfig) return;
     try {
@@ -2847,8 +2910,131 @@ export default function App() {
       
       // Update local state config so it matches
       setEventConfig(updatedConfig);
+
+      // Sync individual servant document servicesAttended fields in the background
+      const oldAttending = eventConfig.activeServants || [];
+      syncServantsAttendanceField(newAttending, oldAttending, currentEventCode, eventConfig.eventDate);
     } catch (err) {
       console.error("Auto-save failed:", err);
+    }
+  };
+
+  const handleRecalculateAttendance = async () => {
+    try {
+      const { doc, getDoc, getDocs, collection, writeBatch } = await import('firebase/firestore');
+      const regSnap = await getDoc(doc(db, 'vbt_event_registry', 'events'));
+      if (!regSnap.exists()) {
+        alert('Event registry document not found.');
+        return;
+      }
+      const eventsList = regSnap.data().list || [];
+      const attendanceMap = {};
+      
+      for (const ev of eventsList) {
+        if (!ev.code) continue;
+        const configSnap = await getDoc(doc(db, 'vbt_events', ev.code, 'config', 'main'));
+        if (configSnap.exists()) {
+          const configData = configSnap.data();
+          const activeS = configData.activeServants || [];
+          const date = configData.eventDate || ev.date || new Date().toISOString();
+          
+          for (const sId of activeS) {
+            if (!sId) continue;
+            if (!attendanceMap[sId]) {
+              attendanceMap[sId] = [];
+            }
+            if (!attendanceMap[sId].find(x => x.code === ev.code)) {
+              attendanceMap[sId].push({ code: ev.code, date });
+            }
+          }
+        }
+      }
+      
+      const batch = writeBatch(db);
+      const servantsSnap = await getDocs(collection(db, 'vbt_servants'));
+      
+      servantsSnap.forEach((servSnap) => {
+        const sId = servSnap.id;
+        const attended = attendanceMap[sId] || [];
+        batch.update(doc(db, 'vbt_servants', sId), {
+          servicesAttended: attended
+        });
+      });
+      
+      await batch.commit();
+      alert(`✨ Recalculated attendance history: Updated ${servantsSnap.size} servants!`);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to recalculate attendance: ' + e.message);
+    }
+  };
+
+  const handleSeedDefaultGames = async () => {
+    try {
+      const defaultStations = [
+        {
+          name: 'Commitment',
+          type: 'station',
+          location: 'Football Field',
+          howToPlay: 'Objective: One team must move from Point A to Point B while staying connected by holding hands. The opposing team tries to break their bond using water balloons and obstacles. The first team to reach Point B without breaking wins!\n\nRules:\n1. The moving team must hold hands at all times.\n2. Opposing team can throw water balloons.\n3. Opposing team can stand or move to create obstacles.\n4. If the chain breaks, the team returns to Point A and starts over.\n5. First team to reach Point B with the bond intact wins!\n\nTips for Success:\n- Communicate and move together.\n- Stay strong and don\'t let anything break your bond.\n- Persevere – every try brings you closer to success!',
+          lesson: 'A game of bond, unity, and perseverance. Stay strong and don\'t let anything break your bond.',
+          timesUsed: 1,
+          lastUsedEvent: 'july6'
+        },
+        {
+          name: 'Knock & Unlock',
+          type: 'station',
+          location: 'Terrace',
+          howToPlay: 'Objective: To teach the importance of showing love, care, and kindness to others.\n\nSetup:\n- A large square is set up with a bucket at each corner.\n- Two teams stand on opposite corners.\n- Each team is assigned the bucket on the opposite corner.\n\nHow to Play:\n1. Teams use cups or sponges to carry water to the opposing team\'s bucket.\n2. The goal is NOT to fill your own bucket, but to fill the other team\'s bucket.\n3. The more water you pour into the opposing bucket, the more puzzle pieces you earn! (Full bucket = 5 pieces, Half = 3, Less = 1-2, Very little = 0).\n4. After collecting pieces, teams combine their puzzle pieces, work together to assemble the puzzle, and identify what the puzzle represents.\n5. The first team to correctly identify the key wins the game!',
+          lesson: 'Revelation 3:20 - Jesus stands at the door and knocks. A key is needed to open a door. In this game, the key symbolizes opening our hearts to Jesus. The lesson is that the more love, care, and kindness we show to others, the closer we grow to Christ. Just as teams receive more puzzle pieces when they help fill someone else\'s bucket, we receive more joy, purpose, and connection with Jesus when we serve and care for those around us.\n\nMain Message: THE MORE WE GIVE, THE MORE WE RECEIVE.',
+          timesUsed: 1,
+          lastUsedEvent: 'july6'
+        },
+        {
+          name: 'Trust',
+          type: 'station',
+          location: 'Court',
+          howToPlay: 'Objective: To teach trust and faith, even when we cannot see the full picture.\n\nHow the Game Works:\n1. One team member (the "Describer") gets a drawing. He can only see it.\n2. He describes the shape to his team using only geometric shapes (e.g., "Draw half a circle, then a small triangle beside it...").\n3. The rest of the team listens carefully and draws what they hear on a board/paper. They cannot ask questions.\n4. When they think they are done, they show their drawing! The goal is to match the original shape.\n\nGame Rules:\n- The describer may only use names of geometric shapes.\n- No telling or showing the answer.\n- No questions allowed from the team.\n- The team has one chance to draw the shape.\n- The closer the drawing matches the original, the more points earned!\n\nTips for Success:\n- Listen carefully.\n- Be clear and specific in describing.\n- Trust the describer.\n- Work together and encourage each other.',
+          lesson: 'Faith and trust. Many times, God asks us to trust Him even when we do not understand what He is doing or where He is leading us. Just like the teams could only see a small part of the logo, we often only see a small part of God\'s plan. However, God sees the complete picture.\n\nMain Message: TRUST GOD, EVEN WHEN YOU CANNOT SEE THE WHOLE PICTURE.',
+          timesUsed: 1,
+          lastUsedEvent: 'july6'
+        },
+        {
+          name: 'Communication',
+          type: 'station',
+          location: 'Pool',
+          howToPlay: 'Objective: To teach the importance of communication and listening to one another.\n\nSetup: Set up a course with several obstacles between Point A and Point B.\nGoal: Safely transfer the item (water) through the course and reach Point B as a team!\n\nHow it Works - Rounds:\n- Round 1: Hearing (Verbal) - Player is blindfolded. Can only follow verbal instructions from teammates. Focus: Listening and giving clear verbal directions.\n- Round 2: Touch (Non-verbal) - Player is blindfolded. Cannot hear. Can only be guided through touch by a teammate. Focus: Non-verbal communication and trusting touch.\n\nTips for Success:\n- Speak clearly and simply.\n- Listen carefully and patiently.\n- Encourage and support one another.\n- Trust your teammates and work together.',
+          lesson: 'Listening and understanding. Communication is essential in every relationship, especially in our friendship with God. Just as the players needed to listen carefully and trust the guidance they received, we need to take time to listen to God\'s voice and communicate with Him through prayer. Good communication helps us stay connected, understand one another, and move in the right direction.\n\nMain Message: A STRONG FRIENDSHIP REQUIRES CLEAR COMMUNICATION AND LISTENING.',
+          timesUsed: 1,
+          lastUsedEvent: 'july6'
+        },
+        {
+          name: 'Loyalty (Big Game)',
+          type: 'big_game',
+          location: 'Football Field',
+          howToPlay: 'Objective: Each team has a flag that represents their friendship with God. During a large water color battle, teams must protect their own flag while trying to mark the flags of other teams with their team color.\n\nHow to Play:\n1. Each team is given a flag and a team color (water color).\n2. Protect your own flag while trying to mark (splash) other teams\' flags with your color.\n3. Throughout the game, teams must choose to attack others or defend their own flag.\n4. The team whose flag remains the cleanest at the end wins!\n\nHow to Defend Your Flag - Options:\n- Option 1: Stay Loyal. Stay Close. Keep a loyal teammate with the flag and protect him at all costs! (Stick together, Protect your flag bearer, Don\'t let them get marked!)\n- Option 2: Secure the Zone. Place the flag inside the safe zone. Players can attack the flag only if they enter the zone! (Safe zone around the flag, Attack only if you enter the zone, Control the zone to your advantage)\n\nVictory Condition: The first team to successfully mark all other teams\' flags wins!\n\nTips for Success:\n- Communicate with your team.\n- Work together and trust one another.\n- Balance offense and defense.\n- Be willing to sacrifice for your team.',
+          lesson: 'Commitment and loyalty. In the game, protecting the flag required sacrifice, teamwork, and commitment. Some players had to give up the chance to attack in order to defend something important. Our relationship with God is the same. Loyalty means choosing to protect and strengthen our friendship with Him, even when it takes effort, time, and sacrifice.\n\nMain Message: WHAT IS VALUABLE IS WORTH PROTECTING. Loyalty means staying committed, even when it requires sacrifice.',
+          timesUsed: 1,
+          lastUsedEvent: 'july6'
+        },
+        {
+          name: 'Reflection',
+          type: 'reflection',
+          location: 'Main Hall',
+          howToPlay: 'Review Bible targets, discuss lessons from the games, and share reflection insights.',
+          lesson: 'Open your heart to Jesus and live in unity, love, and loyalty. Reflection leader: Daniel El Masry.',
+          timesUsed: 1,
+          lastUsedEvent: 'july6'
+        }
+      ];
+      for (const g of defaultStations) {
+        const slug = g.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        await upsertGame(slug, g);
+      }
+      alert('✨ Games library initialized with the standard camp games successfully!');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to seed default games: ' + e.message);
     }
   };
 
@@ -7613,21 +7799,81 @@ export default function App() {
       {/* ═══ SERVANTS DIRECTORY MODAL ════════════════════════ */}
       {showServantDirectoryModal && (
         <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',flexDirection:'column',background:'#080b18'}}>
-          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)'}}>
+          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)',flexWrap:'wrap'}}>
             <button onClick={()=>setShowServantDirectoryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
             <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>Servants Directory</h2>
-            <span style={{marginLeft:'auto',fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{globalServants.length}</span>
+            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{globalServants.length}</span>
+            <div style={{marginLeft:'auto',display:'flex',gap:'8px'}}>
+              <button onClick={handleRecalculateAttendance} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>🔄 Recalculate</button>
+              <button onClick={()=>setShowDirAddForm(!showDirAddForm)} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>{showDirAddForm?'Close Form':'+ Add Servant'}</button>
+            </div>
           </div>
           <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
             <input value={servantDirectorySearch} onChange={e=>setServantDirectorySearch(e.target.value)} placeholder='Search servants...' style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 14px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}} />
           </div>
+          
+          {showDirAddForm && (
+            <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',padding:'16px',margin:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+              <h3 style={{fontSize:'0.9rem',fontWeight:'800',color:'#fff',margin:0}}>Add New Servant</h3>
+              <div>
+                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Full Name</label>
+                <input value={dirAddName} onChange={e=>setDirAddName(e.target.value)} placeholder="Full Name" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
+              </div>
+              <div>
+                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Phone Number</label>
+                <input value={dirAddPhone} onChange={e=>setDirAddPhone(e.target.value)} placeholder="Phone Number" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
+              </div>
+              <div style={{display:'flex',gap:'10px'}}>
+                <div style={{flex:1}}>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Passcode</label>
+                  <input value={dirAddPasscode} onChange={e=>setDirAddPasscode(e.target.value)} placeholder="1234" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Default Role</label>
+                  <select value={dirAddRole} onChange={e=>setDirAddRole(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}}>
+                    <option value="volunteer" style={{background:'#0d1426'}}>General Helper</option>
+                    <option value="referee" style={{background:'#0d1426'}}>Game Referee</option>
+                    <option value="leader" style={{background:'#0d1426'}}>Team Leader</option>
+                    <option value="service_leader" style={{background:'#0d1426'}}>Service Leader</option>
+                    <option value="admin" style={{background:'#0d1426'}}>Coordinator / Admin</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:'10px',marginTop:'4px'}}>
+                <button onClick={()=>{setShowDirAddForm(false); setDirAddName(''); setDirAddPhone('');}} style={{background:'rgba(255,255,255,0.05)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'600',padding:'8px 16px',borderRadius:'10px',cursor:'pointer'}}>Cancel</button>
+                <button onClick={async ()=>{
+                  if (!dirAddName.trim()) { alert('Please enter a name.'); return; }
+                  const sId = dirAddName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+                  try {
+                    await addServant({
+                      id: sId,
+                      name: dirAddName.trim(),
+                      phone: dirAddPhone.trim(),
+                      passcode: dirAddPasscode.trim() || '1234',
+                      defaultRole: dirAddRole,
+                      role: dirAddRole,
+                      createdAt: new Date().toISOString(),
+                      servicesAttended: []
+                    });
+                    setShowDirAddForm(false);
+                    setDirAddName('');
+                    setDirAddPhone('');
+                    setDirAddPasscode('1234');
+                  } catch (e) {
+                    alert('Error adding servant: ' + e.message);
+                  }
+                }} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'8px 16px',borderRadius:'10px',cursor:'pointer'}}>Add Servant</button>
+              </div>
+            </div>
+          )}
+
           {globalServants.length > 0 && (
             <div style={{padding:'12px 16px 8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
               <p style={{fontSize:'0.7rem',color:'#f59e0b',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'10px'}}>Top Servants</p>
               <div style={{display: 'flex', alignItems: 'center',gap:'8px',overflowX:'auto',paddingBottom:'4px'}}>
                 {[...globalServants].sort((a,b)=>(b.servicesAttended?.length||0)-(a.servicesAttended?.length||0)).slice(0,5).map((s,i)=>(
                   <div key={s.id} style={{minWidth:'76px',textAlign:'center',background:'rgba(255,255,255,0.04)',borderRadius:'12px',padding:'10px 6px',flexShrink:0}}>
-                    <div style={{fontSize:'1.1rem',marginBottom:'4px'}}>{['&#127945;','&#129352;','&#129353;','&#127885;','&#127885;'][i]}</div>
+                    <div style={{fontSize:'1.1rem',marginBottom:'4px'}}>{['🏆', '🥈', '🥉', '🏅', '🎖️'][i]}</div>
                     <div style={{fontSize:'0.7rem',fontWeight:'700',color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'68px'}}>{s.name?.split(' ')[0]||'?'}</div>
                     <div style={{fontSize:'0.6rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0}x</div>
                   </div>
@@ -7636,29 +7882,109 @@ export default function App() {
             </div>
           )}
           <div style={{flex:1,overflowY:'auto',padding:'8px 16px',paddingBottom:`calc(16px + env(safe-area-inset-bottom))`}}>
-            {globalServants.filter(s=>!servantDirectorySearch||s.name?.toLowerCase().includes(servantDirectorySearch.toLowerCase())).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(s=>(
-              <div key={s.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}} onClick={()=>setExpandedServant(expandedServant===s.id?null:s.id)}>
-                  <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#1441a1,#60a5fa)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'800',color:'#fff',fontSize:'1rem',flexShrink:0}}>{s.name?.[0]?.toUpperCase()||'?'}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:'700',color:'#fff',fontSize:'0.9rem'}}>{s.name}</div>
-                    <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0} services &nbsp;&#183;&nbsp; {s.defaultRole||'volunteer'}</div>
+            {globalServants.filter(s=>!servantDirectorySearch||s.name?.toLowerCase().includes(servantDirectorySearch.toLowerCase())).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(s=>{
+              const isEditing = editingServantId === s.id;
+              if (isEditing) {
+                return (
+                  <div key={s.id} style={{background:'rgba(255,255,255,0.06)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.12)'}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                      <div>
+                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Name</label>
+                        <input value={editingServantName} onChange={e=>setEditingServantName(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
+                      </div>
+                      <div>
+                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Phone</label>
+                        <input value={editingServantPhone} onChange={e=>setEditingServantPhone(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
+                      </div>
+                      <div style={{display:'flex',gap:'10px'}}>
+                        <div style={{flex:1}}>
+                          <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Passcode</label>
+                          <input value={editingServantPasscode} onChange={e=>setEditingServantPasscode(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
+                        </div>
+                        <div style={{flex:1}}>
+                          <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Default Role</label>
+                          <select value={editingServantRole} onChange={e=>setEditingServantRole(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}}>
+                            <option value="volunteer">General Helper</option>
+                            <option value="referee">Game Referee</option>
+                            <option value="leader">Team Leader</option>
+                            <option value="service_leader">Service Leader</option>
+                            <option value="admin">Coordinator / Admin</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{display:'flex',justifyContent:'flex-end',gap:'8px',marginTop:'4px'}}>
+                        <button onClick={()=>setEditingServantId(null)} style={{background:'rgba(255,255,255,0.05)',border:'none',color:'#fff',fontSize:'0.75rem',fontWeight:'600',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>Cancel</button>
+                        <button onClick={async ()=>{
+                          if (!editingServantName.trim()) { alert('Name cannot be empty.'); return; }
+                          try {
+                            await updateServant(s.id, {
+                              name: editingServantName.trim(),
+                              phone: editingServantPhone.trim(),
+                              passcode: editingServantPasscode.trim(),
+                              defaultRole: editingServantRole,
+                              role: editingServantRole
+                            });
+                            setEditingServantId(null);
+                          } catch (e) {
+                            alert('Failed to save servant details: ' + e.message);
+                          }
+                        }} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.75rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>Save</button>
+                      </div>
+                    </div>
                   </div>
-                  <a href={getWhatsAppLink(s,'your assigned role')} target='_blank' rel='noopener noreferrer' onClick={e=>e.stopPropagation()} style={{fontSize:'1.4rem',textDecoration:'none',flexShrink:0}} title='Message on WhatsApp'>&#128172;</a>
+                );
+              }
+              
+              return (
+                <div key={s.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}} onClick={()=>setExpandedServant(expandedServant===s.id?null:s.id)}>
+                    <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#1441a1,#60a5fa)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'800',color:'#fff',fontSize:'1rem',flexShrink:0}}>{s.name?.[0]?.toUpperCase()||'?'}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:'700',color:'#fff',fontSize:'0.9rem'}}>{s.name}</div>
+                      <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0} services &nbsp;&#183;&nbsp; {s.defaultRole||'volunteer'}</div>
+                    </div>
+                    <a href={getWhatsAppLink(s,'your assigned role')} target='_blank' rel='noopener noreferrer' onClick={e=>e.stopPropagation()} style={{fontSize:'1.4rem',textDecoration:'none',flexShrink:0}} title='Message on WhatsApp'>&#128172;</a>
+                  </div>
+                  {expandedServant===s.id && (
+                    <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                      {s.phone && <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'4px'}}>Phone: <span style={{color:'#fff'}}>{s.phone}</span></div>}
+                      <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'4px'}}>Passcode: <span style={{color:'#fff',fontFamily:'monospace'}}>{s.passcode||'—'}</span></div>
+                      <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'12px'}}>Last seen: <span style={{color:'#fff'}}>{s.lastSeen?new Date(s.lastSeen).toLocaleDateString():'Never'}</span></div>
+                      
+                      <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
+                        <button onClick={(e)=>{
+                          e.stopPropagation();
+                          setEditingServantId(s.id);
+                          setEditingServantName(s.name || '');
+                          setEditingServantPhone(s.phone || '');
+                          setEditingServantPasscode(s.passcode || '1234');
+                          setEditingServantRole(s.defaultRole || s.role || 'volunteer');
+                        }} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'5px 10px',borderRadius:'6px',cursor:'pointer'}}>✏️ Edit</button>
+                        <button onClick={async (e)=>{
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to delete ${s.name} from the directory?`)) {
+                            try {
+                              await deleteServant(s.id);
+                            } catch (err) {
+                              alert('Failed to delete: ' + err.message);
+                            }
+                          }
+                        }} style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',fontSize:'0.7rem',fontWeight:'700',padding:'5px 10px',borderRadius:'6px',cursor:'pointer'}}>🗑️ Delete</button>
+                      </div>
+
+                      {(s.servicesAttended||[]).length > 0 && (
+                        <div>
+                          <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Attendance History ({s.servicesAttended.length})</div>
+                          {(s.servicesAttended||[]).slice(-5).reverse().map((e,i)=>(
+                            <div key={i} style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginBottom:'2px'}}>&#183; {e.code} &mdash; {new Date(e.date).toLocaleDateString()}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {expandedServant===s.id && (
-                  <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                    <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'4px'}}>Passcode: <span style={{color:'#fff',fontFamily:'monospace'}}>{s.passcode||'—'}</span></div>
-                    <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'10px'}}>Last seen: <span style={{color:'#fff'}}>{s.lastSeen?new Date(s.lastSeen).toLocaleDateString():'Never'}</span></div>
-                    {(s.servicesAttended||[]).length > 0 && (
-                      <div>{(s.servicesAttended||[]).slice(-5).reverse().map((e,i)=>(
-                        <div key={i} style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginBottom:'2px'}}>&#183; {e.code} &mdash; {new Date(e.date).toLocaleDateString()}</div>
-                      ))}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {globalServants.length===0 && <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>No servants yet. They appear here when they log in.</div>}
           </div>
         </div>
@@ -7667,11 +7993,16 @@ export default function App() {
       {/* ═══ GAMES LIBRARY MODAL ═══════════════════════════════ */}
       {showGamesLibraryModal && (
         <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',flexDirection:'column',background:'#080b18'}}>
-          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)'}}>
+          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)',flexWrap:'wrap'}}>
             <button onClick={()=>setShowGamesLibraryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
             <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>Games Library</h2>
-            <span style={{marginLeft:'auto',fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{gamesLibrary.length}</span>
+            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{gamesLibrary.length}</span>
+            <div style={{marginLeft:'auto',display:'flex',gap:'8px'}}>
+              <button onClick={handleSeedDefaultGames} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>✨ Seed Defaults</button>
+              <button onClick={()=>setShowGameAddForm(!showGameAddForm)} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>{showGameAddForm?'Close Form':'+ Add Game'}</button>
+            </div>
           </div>
+          
           <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',flexDirection:'column',gap:'10px'}}>
             <input value={gamesLibrarySearch} onChange={e=>setGamesLibrarySearch(e.target.value)} placeholder='Search games...' style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 14px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}} />
             <div style={{display: 'flex', alignItems: 'center',gap:'6px'}}>
@@ -7680,29 +8011,170 @@ export default function App() {
               ))}
             </div>
           </div>
-          <div style={{flex:1,overflowY:'auto',padding:'8px 16px',paddingBottom:`calc(16px + env(safe-area-inset-bottom))`}}>
-            {gamesLibrary.filter(g=>(gamesLibraryFilter==='all'||g.type===gamesLibraryFilter)&&(!gamesLibrarySearch||g.name?.toLowerCase().includes(gamesLibrarySearch.toLowerCase()))).map(g=>(
-              <div key={g.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{display:'flex',alignItems:'flex-start',gap:'10px',cursor:'pointer'}} onClick={()=>setExpandedGame(expandedGame===g.id?null:g.id)}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px',flexWrap:'wrap'}}>
-                      <span style={{fontWeight:'800',color:'#fff',fontSize:'0.95rem'}}>{g.name}</span>
-                      <span style={{fontSize:'0.65rem',padding:'2px 8px',borderRadius:'10px',background:g.type==='big_game'?'rgba(245,158,11,0.2)':g.type==='reflection'?'rgba(139,92,246,0.2)':'rgba(59,130,246,0.2)',color:g.type==='big_game'?'#f59e0b':g.type==='reflection'?'#a78bfa':'#60a5fa',fontWeight:'700'}}>{g.type==='big_game'?'Big Game':g.type?.charAt(0).toUpperCase()+(g.type?.slice(1)||'')}</span>
-                    </div>
-                    {g.location && <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.35)',marginBottom:'4px'}}>{g.location}</div>}
-                    <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.25)'}}>Used {g.timesUsed||1}x &nbsp;&#183;&nbsp; Last: {g.lastUsedEvent||'—'}</div>
-                  </div>
-                  <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.75rem',flexShrink:0,marginTop:'2px'}} onClick={()=>setExpandedGame(expandedGame===g.id?null:g.id)}>{expandedGame===g.id?'&#9650;':'&#9660;'}</span>
-                </div>
-                {expandedGame===g.id && (
-                  <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                    {g.howToPlay && <><p style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>How to Play</p><p style={{fontSize:'0.85rem',color:'#fff',lineHeight:1.65,marginBottom:'12px',whiteSpace:'pre-wrap'}}>{g.howToPlay}</p></>}
-                    {g.lesson && <><p style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Lesson</p><p style={{fontSize:'0.85rem',color:'#4ade80',lineHeight:1.65}}>{g.lesson}</p></>}
-                  </div>
-                )}
+
+          {showGameAddForm && (
+            <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',padding:'16px',margin:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+              <h3 style={{fontSize:'0.9rem',fontWeight:'800',color:'#fff',margin:0}}>Add New Game</h3>
+              <div>
+                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Game Name</label>
+                <input value={gameAddName} onChange={e=>setGameAddName(e.target.value)} placeholder="Game Name" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
               </div>
-            ))}
-            {gamesLibrary.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>No games saved yet. Create an event to start building the library.</div>}
+              <div style={{display:'flex',gap:'10px'}}>
+                <div style={{flex:1}}>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Type</label>
+                  <select value={gameAddType} onChange={e=>setGameAddType(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}}>
+                    <option value="station" style={{background:'#0d1426'}}>Station</option>
+                    <option value="big_game" style={{background:'#0d1426'}}>Big Game</option>
+                    <option value="reflection" style={{background:'#0d1426'}}>Reflection</option>
+                  </select>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Location</label>
+                  <input value={gameAddLocation} onChange={e=>setGameAddLocation(e.target.value)} placeholder="e.g. Football Field" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>How to Play</label>
+                <textarea value={gameAddHowToPlay} onChange={e=>setGameAddHowToPlay(e.target.value)} placeholder="Rules, setup, and instructions..." rows={3} style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none',resize:'none'}} />
+              </div>
+              <div>
+                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Spiritual Lesson</label>
+                <textarea value={gameAddLesson} onChange={e=>setGameAddLesson(e.target.value)} placeholder="Main message or biblical context..." rows={2} style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none',resize:'none'}} />
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:'10px',marginTop:'4px'}}>
+                <button onClick={()=>{setShowGameAddForm(false); setGameAddName(''); setGameAddLocation(''); setGameAddHowToPlay(''); setGameAddLesson('');}} style={{background:'rgba(255,255,255,0.05)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'600',padding:'8px 16px',borderRadius:'10px',cursor:'pointer'}}>Cancel</button>
+                <button onClick={async ()=>{
+                  if (!gameAddName.trim()) { alert('Please enter a game name.'); return; }
+                  const slug = gameAddName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                  try {
+                    await upsertGame(slug, {
+                      name: gameAddName.trim(),
+                      type: gameAddType,
+                      location: gameAddLocation.trim(),
+                      howToPlay: gameAddHowToPlay.trim(),
+                      lesson: gameAddLesson.trim(),
+                      timesUsed: 1,
+                      lastUsedEvent: currentEventCode || '—'
+                    });
+                    setShowGameAddForm(false);
+                    setGameAddName('');
+                    setGameAddLocation('');
+                    setGameAddHowToPlay('');
+                    setGameAddLesson('');
+                  } catch (e) {
+                    alert('Error adding game: ' + e.message);
+                  }
+                }} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'8px 16px',borderRadius:'10px',cursor:'pointer'}}>Add Game</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{flex:1,overflowY:'auto',padding:'8px 16px',paddingBottom:`calc(16px + env(safe-area-inset-bottom))`}}>
+            {gamesLibrary.filter(g=>(gamesLibraryFilter==='all'||g.type===gamesLibraryFilter)&&(!gamesLibrarySearch||g.name?.toLowerCase().includes(gamesLibrarySearch.toLowerCase()))).map(g=>{
+              const isEditing = editingGameId === g.id;
+              if (isEditing) {
+                return (
+                  <div key={g.id} style={{background:'rgba(255,255,255,0.06)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.12)'}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                      <div>
+                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Game Name</label>
+                        <input value={editingGameName} onChange={e=>setEditingGameName(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
+                      </div>
+                      <div style={{display:'flex',gap:'10px'}}>
+                        <div style={{flex:1}}>
+                          <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Type</label>
+                          <select value={editingGameType} onChange={e=>setEditingGameType(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}}>
+                            <option value="station">Station</option>
+                            <option value="big_game">Big Game</option>
+                            <option value="reflection">Reflection</option>
+                          </select>
+                        </div>
+                        <div style={{flex:1}}>
+                          <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Location</label>
+                          <input value={editingGameLocation} onChange={e=>setEditingGameLocation(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>How to Play</label>
+                        <textarea value={editingGameHowToPlay} onChange={e=>setEditingGameHowToPlay(e.target.value)} rows={3} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',resize:'none'}} />
+                      </div>
+                      <div>
+                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Lesson</label>
+                        <textarea value={editingGameLesson} onChange={e=>setEditingGameLesson(e.target.value)} rows={2} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',resize:'none'}} />
+                      </div>
+                      <div style={{display:'flex',justifyContent:'flex-end',gap:'8px',marginTop:'4px'}}>
+                        <button onClick={()=>setEditingGameId(null)} style={{background:'rgba(255,255,255,0.05)',border:'none',color:'#fff',fontSize:'0.75rem',fontWeight:'600',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>Cancel</button>
+                        <button onClick={async ()=>{
+                          if (!editingGameName.trim()) { alert('Game name cannot be empty.'); return; }
+                          try {
+                            await upsertGame(g.id, {
+                              name: editingGameName.trim(),
+                              type: editingGameType,
+                              location: editingGameLocation.trim(),
+                              howToPlay: editingGameHowToPlay.trim(),
+                              lesson: editingGameLesson.trim()
+                            });
+                            setEditingGameId(null);
+                          } catch (e) {
+                            alert('Failed to save game details: ' + e.message);
+                          }
+                        }} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.75rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>Save</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={g.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div style={{display:'flex',alignItems:'flex-start',gap:'10px',cursor:'pointer'}} onClick={()=>setExpandedGame(expandedGame===g.id?null:g.id)}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px',flexWrap:'wrap'}}>
+                        <span style={{fontWeight:'800',color:'#fff',fontSize:'0.95rem'}}>{g.name}</span>
+                        <span style={{fontSize:'0.65rem',padding:'2px 8px',borderRadius:'10px',background:g.type==='big_game'?'rgba(245,158,11,0.2)':g.type==='reflection'?'rgba(139,92,246,0.2)':'rgba(59,130,246,0.2)',color:g.type==='big_game'?'#f59e0b':g.type==='reflection'?'#a78bfa':'#60a5fa',fontWeight:'700'}}>{g.type==='big_game'?'Big Game':g.type?.charAt(0).toUpperCase()+(g.type?.slice(1)||'')}</span>
+                      </div>
+                      {g.location && <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.35)',marginBottom:'4px'}}>{g.location}</div>}
+                      <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.25)'}}>Used {g.timesUsed||1}x &nbsp;&#183;&nbsp; Last: {g.lastUsedEvent||'—'}</div>
+                    </div>
+                    <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.75rem',flexShrink:0,marginTop:'2px'}} onClick={()=>setExpandedGame(expandedGame===g.id?null:g.id)}>{expandedGame===g.id?'▲':'▼'}</span>
+                  </div>
+                  {expandedGame===g.id && (
+                    <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                      {g.howToPlay && <><p style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>How to Play</p><p style={{fontSize:'0.85rem',color:'#fff',lineHeight:1.65,marginBottom:'12px',whiteSpace:'pre-wrap'}}>{g.howToPlay}</p></>}
+                      {g.lesson && <><p style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Lesson</p><p style={{fontSize:'0.85rem',color:'#4ade80',lineHeight:1.65,marginBottom:'12px'}}>{g.lesson}</p></>}
+                      
+                      <div style={{display:'flex',gap:'8px'}}>
+                        <button onClick={(e)=>{
+                          e.stopPropagation();
+                          setEditingGameId(g.id);
+                          setEditingGameName(g.name || '');
+                          setEditingGameType(g.type || 'station');
+                          setEditingGameLocation(g.location || '');
+                          setEditingGameHowToPlay(g.howToPlay || '');
+                          setEditingGameLesson(g.lesson || '');
+                        }} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'5px 10px',borderRadius:'6px',cursor:'pointer'}}>✏️ Edit</button>
+                        <button onClick={async (e)=>{
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to delete ${g.name} from the library?`)) {
+                            try {
+                              await deleteGame(g.id);
+                            } catch (err) {
+                              alert('Failed to delete: ' + err.message);
+                            }
+                          }
+                        }} style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',fontSize:'0.7rem',fontWeight:'700',padding:'5px 10px',borderRadius:'6px',cursor:'pointer'}}>🗑️ Delete</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {gamesLibrary.length===0 && (
+              <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>
+                <p style={{marginBottom:'16px'}}>No games saved yet. Create an event to start building the library.</p>
+                <button onClick={handleSeedDefaultGames} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'10px 20px',borderRadius:'10px',cursor:'pointer'}}>🌱 Seed Default Games</button>
+              </div>
+            )}
           </div>
         </div>
       )}
