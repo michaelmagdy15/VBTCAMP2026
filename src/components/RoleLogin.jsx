@@ -312,11 +312,24 @@ function hexToRgb(hex) {
  * Extract servants that match a given prefix from globalServants array.
  * globalServants is expected to be an array of { name, role } objects.
  */
-function filterServants(globalServants, rolePrefixes) {
+function getEffectiveRole(servant, eventConfig) {
+  if (!servant) return '';
+  const sId = servant.id || servant.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const eventAssignedRole = eventConfig?.servantAssignments?.[sId];
+  if (eventAssignedRole) {
+    return eventAssignedRole;
+  }
+  return servant.role || '';
+}
+
+function filterServants(globalServants, rolePrefixes, eventConfig) {
   if (!Array.isArray(globalServants)) return [];
   const prefixes = Array.isArray(rolePrefixes) ? rolePrefixes : [rolePrefixes];
   return globalServants.filter(
-    (s) => s?.role && prefixes.some(prefix => s.role.toLowerCase().startsWith(prefix))
+    (s) => {
+      const role = getEffectiveRole(s, eventConfig);
+      return role && prefixes.some(prefix => role.toLowerCase().startsWith(prefix));
+    }
   );
 }
 
@@ -388,20 +401,20 @@ export default function RoleLogin({
 
   // Servants filtered by role prefix
   const refereeServants = useMemo(
-    () => filterServants(globalServants, ['referee', 'station_', 'big_game_', 'reflection', 'media']),
-    [globalServants],
+    () => filterServants(globalServants, ['referee', 'station_', 'big_game_', 'reflection', 'media'], eventConfig),
+    [globalServants, eventConfig],
   );
   const leaderServants = useMemo(
-    () => filterServants(globalServants, ['team_', 'leader']),
-    [globalServants],
+    () => filterServants(globalServants, ['team_', 'leader'], eventConfig),
+    [globalServants, eventConfig],
   );
   const serviceLeaderServants = useMemo(
-    () => filterServants(globalServants, ['service_leader', 'admin']),
-    [globalServants],
+    () => filterServants(globalServants, ['service_leader', 'admin'], eventConfig),
+    [globalServants, eventConfig],
   );
 
   const coordinatorServants = useMemo(() => {
-    const coords = filterServants(globalServants, ['coordinator']);
+    const coords = filterServants(globalServants, ['coordinator'], eventConfig);
     const defaults = ['Michael Mitry', 'Andrew Rafik', 'Michael Nakhla', 'Yohanna', 'Anthony', 'Rita Ghaly'];
     defaults.forEach(name => {
       if (!coords.find(c => c.name.toLowerCase() === name.toLowerCase())) {
@@ -409,7 +422,7 @@ export default function RoleLogin({
       }
     });
     return coords.sort((a,b) => a.name.localeCompare(b.name));
-  }, [globalServants]);
+  }, [globalServants, eventConfig]);
 
   // ── Logged-in view ─────────────────────────────────────────
   if (currentUser) {
