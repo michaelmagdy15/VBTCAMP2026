@@ -3038,6 +3038,70 @@ export default function App() {
     }
   };
 
+  const handleImportCurrentEventGames = async () => {
+    if (!eventConfig) {
+      alert('No active event config found to import games from.');
+      return;
+    }
+    try {
+      let count = 0;
+      
+      // 1. Import stations
+      if (eventConfig.stations) {
+        for (const [key, station] of Object.entries(eventConfig.stations)) {
+          if (station && station.name?.trim()) {
+            const slug = station.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            await upsertGame(slug, {
+              name: station.name.trim(),
+              type: 'station',
+              location: station.location || '',
+              howToPlay: station.howToPlay || '',
+              lesson: station.lesson || '',
+              timesUsed: 1,
+              lastUsedEvent: currentEventCode || '—'
+            });
+            count++;
+          }
+        }
+      }
+      
+      // 2. Import Big Game
+      if (eventConfig.bigGameName?.trim()) {
+        const slug = eventConfig.bigGameName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        await upsertGame(slug, {
+          name: eventConfig.bigGameName.trim(),
+          type: 'big_game',
+          location: eventConfig.bigGameLocation || '',
+          howToPlay: eventConfig.bigGameHowToPlay || '',
+          lesson: eventConfig.bigGameLesson || '',
+          timesUsed: 1,
+          lastUsedEvent: currentEventCode || '—'
+        });
+        count++;
+      }
+      
+      // 3. Import Reflection
+      if (eventConfig.reflectionName?.trim()) {
+        const slug = eventConfig.reflectionName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        await upsertGame(slug, {
+          name: eventConfig.reflectionName.trim(),
+          type: 'reflection',
+          location: eventConfig.reflectionLocation || '',
+          howToPlay: eventConfig.reflectionHowToPlay || '',
+          lesson: eventConfig.reflectionLesson || '',
+          timesUsed: 1,
+          lastUsedEvent: currentEventCode || '—'
+        });
+        count++;
+      }
+      
+      alert(`✨ Successfully imported ${count} games from the current service into the library!`);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to import current games: ' + e.message);
+    }
+  };
+
   const handleWizardAutoAssign = () => {
     const teamNamesObj = { red: newTeamRed, white: newTeamWhite, black: newTeamBlack, blue: newTeamBlue };
     const updated = performMagicAutoAssign(wizardAttending, wizardRoles, teamNamesObj);
@@ -7997,7 +8061,8 @@ export default function App() {
             <button onClick={()=>setShowGamesLibraryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
             <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>Games Library</h2>
             <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{gamesLibrary.length}</span>
-            <div style={{marginLeft:'auto',display:'flex',gap:'8px'}}>
+            <div style={{marginLeft:'auto',display:'flex',gap:'8px',flexWrap:'wrap'}}>
+              <button onClick={handleImportCurrentEventGames} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>📥 Import Current Service</button>
               <button onClick={handleSeedDefaultGames} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>✨ Seed Defaults</button>
               <button onClick={()=>setShowGameAddForm(!showGameAddForm)} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>{showGameAddForm?'Close Form':'+ Add Game'}</button>
             </div>
@@ -8171,8 +8236,11 @@ export default function App() {
             })}
             {gamesLibrary.length===0 && (
               <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>
-                <p style={{marginBottom:'16px'}}>No games saved yet. Create an event to start building the library.</p>
-                <button onClick={handleSeedDefaultGames} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'10px 20px',borderRadius:'10px',cursor:'pointer'}}>🌱 Seed Default Games</button>
+                <p style={{marginBottom:'16px'}}>No games saved yet. Start building your library by importing from the active service or seeding default games.</p>
+                <div style={{display:'flex',justifyContent:'center',gap:'10px',flexWrap:'wrap'}}>
+                  <button onClick={handleImportCurrentEventGames} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'10px 20px',borderRadius:'10px',cursor:'pointer'}}>📥 Import Current Service</button>
+                  <button onClick={handleSeedDefaultGames} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'10px 20px',borderRadius:'10px',cursor:'pointer'}}>🌱 Seed Default Games</button>
+                </div>
               </div>
             )}
           </div>
