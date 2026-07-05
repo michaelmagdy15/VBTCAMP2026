@@ -819,6 +819,15 @@ export default function App() {
         console.error("Anonymous authentication failed:", err);
       });
     }
+
+    // Auto-logout user if they are still on the old June 26th event
+    const savedEvent = localStorage.getItem('vbt_current_event');
+    if (savedEvent === 'june26') {
+      localStorage.removeItem('vbt_current_event');
+      localStorage.removeItem('vbt_user_june26');
+      setCurrentEventCode('');
+      setCurrentUser(null);
+    }
   }, []);
 
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────

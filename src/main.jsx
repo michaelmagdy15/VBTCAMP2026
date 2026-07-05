@@ -25,6 +25,8 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        // Force checking for updates immediately on launch
+        registration.update();
 
         // NOTE: We intentionally do NOT send SKIP_WAITING here.
         // Sending it mid-session causes a controllerchange event which triggers a page reload,
