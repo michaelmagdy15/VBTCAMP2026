@@ -30,7 +30,7 @@ export default function ScoreboardTab({
       
       {/* Standings section rendered inside Scores page only */}
       <div style={{ width: '100%', marginBottom: '8px' }}>
-        {eventConfig.eventType !== 'normal' ? (
+        {eventConfig.eventType !== 'normal' && eventConfig.gameEngineType !== 'Shuffle' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Trophy size={18} style={{ color: '#fbbf24' }} />
@@ -66,14 +66,14 @@ export default function ScoreboardTab({
                     }} />
                     
                     <h4 style={{ 
-                      fontSize: '0.85rem', 
-                      fontWeight: '800', 
-                      color: '#ffffff', 
-                      margin: '0 0 4px 0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
+                       fontSize: '0.85rem', 
+                       fontWeight: '800', 
+                       color: '#ffffff', 
+                       margin: '0 0 4px 0',
+                       display: 'flex',
+                       justifyContent: 'space-between',
+                       alignItems: 'center'
+                     }}>
                       <span>{customName}</span>
                       {scoreCalculations.leadColor === colorName && (
                         <span style={{ fontSize: '0.7rem', color: '#fbbf24', animation: 'pulse-glow 1.5s infinite' }}>👑 Lead</span>
@@ -92,11 +92,13 @@ export default function ScoreboardTab({
               })}
             </div>
           </div>
-        ) : eventConfig.eventType === 'normal' ? (
+        ) : (eventConfig.eventType === 'normal' || eventConfig.gameEngineType === 'Shuffle') ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Trophy size={18} style={{ color: '#fbbf24' }} />
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Leaderboard (Normal Mode)</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                Leaderboard ({eventConfig.gameEngineType === 'Shuffle' ? 'Shuffle Mode Rotations' : 'Normal Mode'})
+              </span>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -105,6 +107,7 @@ export default function ScoreboardTab({
                 const score = scoreCalculations.finalScores[teamCode] || 0;
                 const winsPts = scoreCalculations.wins[teamCode] || 0;
                 const ded = scoreCalculations.deductions[teamCode] || 0;
+                const tok = scoreCalculations.tokensCount[teamCode] || 0;
                 
                 return (
                   <div key={teamCode} className="glass-panel" style={{ 
@@ -121,10 +124,10 @@ export default function ScoreboardTab({
                       </span>
                       <div>
                         <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
-                          {teamCode} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>({team?.side})</span>
+                          {teamCode} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>({team?.side || 'Service'})</span>
                         </h4>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                          Wins: <strong>{winsPts}</strong> • Deductions: <strong style={{ color: ded > 0 ? '#ef4444' : 'var(--text-muted)' }}>-{ded}</strong>
+                          Games: <strong>{winsPts}</strong> • {eventConfig.gameEngineType === 'Shuffle' && <>Tokens: <strong>{tok}</strong> ({(tok * 2)} pts) • </>}Deductions: <strong style={{ color: ded > 0 ? '#ef4444' : 'var(--text-secondary)' }}>-{ded}</strong>
                         </div>
                       </div>
                     </div>
@@ -284,7 +287,7 @@ export default function ScoreboardTab({
               <div>
                 <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{blockTitle}</h3>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  {eventConfig.eventType !== 'normal' ? (
+                  {eventConfig.eventType !== 'normal' && eventConfig.gameEngineType !== 'Shuffle' ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {['Red', 'White', 'Black', 'Blue'].map((c, i) => {
                         const customColorName = eventConfig.teamNames?.[c.toLowerCase()] || c;
@@ -293,6 +296,17 @@ export default function ScoreboardTab({
                           <span key={c}>
                             {i > 0 && ' | '}
                             {customColorName}: <span style={{ color: colorHex, fontWeight: '700' }}>{bScores?.[c] || 0}</span>
+                          </span>
+                        );
+                      })}
+                    </span>
+                  ) : eventConfig.gameEngineType === 'Shuffle' ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {(scoreCalculations.sortedTeams || []).map((tCode, i) => {
+                        return (
+                          <span key={tCode}>
+                            {i > 0 && ' | '}
+                            {tCode}: <span style={{ color: '#ffffff', fontWeight: '700' }}>{bScores?.[tCode] || 0}</span>
                           </span>
                         );
                       })}

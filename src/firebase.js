@@ -163,7 +163,6 @@ export async function createEvent(eventCode, config) {
       timeShiftMinutes: 0,
       isTimerPaused: false,
       timerPausedAt: null,
-      appsScriptWebappUrl: '',
       createdAt: new Date().toISOString()
     });
 
@@ -420,7 +419,10 @@ export async function subscribeToWebPush(uid, name, role) {
     // Register subscription with our Cloud Run notification service
     const res = await fetch(`${NOTIFY_SERVICE_URL}/subscribe`, {
       method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': 'vbt_secret_camp_2026_key'
+      },
       body   : JSON.stringify({ uid, name, role, subscription }),
     });
 
@@ -441,7 +443,10 @@ export async function sendWebPushNotification(title, body, type = 'announcement'
   try {
     await fetch(`${NOTIFY_SERVICE_URL}/notify`, {
       method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': 'vbt_secret_camp_2026_key'
+      },
       body   : JSON.stringify({ title, body, type }),
     });
   } catch (err) {

@@ -10,6 +10,8 @@ export const DEFAULT_MAP_CONFIG = {
   zoom: 18,
   satelliteUrl:
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  streetUrl:
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png',
   waypoints: [],
 };
 

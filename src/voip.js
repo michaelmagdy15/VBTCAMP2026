@@ -151,8 +151,8 @@ export class VoiceRecorder {
         offset += this._samples[i].length;
       }
 
-      // Downsample to 16kHz to optimize bandwidth
-      const targetSampleRate = 16000;
+      // Downsample to 8kHz to optimize bandwidth
+      const targetSampleRate = 8000;
       const downsampled = downsampleBuffer(flattened, nativeSampleRate, targetSampleRate);
 
       // Encode to WAV blob

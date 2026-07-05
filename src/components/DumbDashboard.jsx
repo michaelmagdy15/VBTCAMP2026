@@ -939,6 +939,7 @@ export default function DumbDashboard({
       )}
 
       {/* ─── Tab Content Views ─────────────────────────────────── */}
+      <div key={activeTab} className="animate-fade-tab">
       
       {/* Tab: Actions */}
       {activeTab === 'actions' && (
@@ -1312,10 +1313,12 @@ export default function DumbDashboard({
           <EmergencySOS
             currentUser={currentUser}
             activeEventCode={activeEventCode}
+            eventConfig={eventConfig}
             triggerRemotePushNotification={triggerRemotePushNotification}
           />
         </div>
       )}
+      </div>
 
       {/* Bottom Navigation Bar */}
       <nav style={S.bottomNav}>

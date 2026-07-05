@@ -10,7 +10,8 @@ import {
   getChannelColor
 } from '../voip';
 import { playChime, unlockAudioContext, getSharedAudioContext } from '../chimes';
-import { agoraClient, AGORA_APP_ID, generateAgoraToken } from '../agoraConfig';
+import { agoraClient, AGORA_APP_ID } from '../agoraConfig';
+import { NOTIFY_SERVICE_URL } from '../firebase';
 import { acquireChannelLock, releaseChannelLock, subscribeToChannelLock } from '../liveAudio';
 import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks } from "agora-rtc-react";
 
@@ -340,14 +341,34 @@ function WalkieTalkieInner({ eventCode, currentUser, onSpeakingChange }) {
 
   // Generate Token when channel changes
   useEffect(() => {
+    let active = true;
     if (eventCode && activeChannel && connected) {
-      try {
-        const t = generateAgoraToken(`${eventCode}_${activeChannel}`);
-        setToken(t);
-      } catch (err) {
-        console.error("Token generation failed:", err);
-      }
+      const fetchToken = async () => {
+        try {
+          const response = await fetch(`${NOTIFY_SERVICE_URL}/agora-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': 'vbt_secret_camp_2026_key'
+            },
+            body: JSON.stringify({ channelName: `${eventCode}_${activeChannel}` })
+          });
+          if (!response.ok) {
+            throw new Error(`Token fetch responded with ${response.status}`);
+          }
+          const data = await response.json();
+          if (active) {
+            setToken(data.token);
+          }
+        } catch (err) {
+          console.error("Token generation failed:", err);
+        }
+      };
+      fetchToken();
     }
+    return () => {
+      active = false;
+    };
   }, [eventCode, activeChannel, connected]);
 
   // Agora Integration
@@ -683,6 +704,13 @@ function WalkieTalkieInner({ eventCode, currentUser, onSpeakingChange }) {
                 const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
                 silentAudio.play().catch(() => {});
               } catch(e) { /* ignore */ }
+              
+              // Configure the agoraClient with the Cloud Proxy setting for stability on Egyptian mobile networks
+              try {
+                agoraClient.startProxyServer(3);
+              } catch (e) {
+                console.error("Failed to start Agora proxy server:", e);
+              }
               
               setConnected(true);
               playChime('notification');

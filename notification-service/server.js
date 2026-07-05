@@ -13,6 +13,7 @@
 const express  = require('express');
 const webpush  = require('web-push');
 const admin    = require('firebase-admin');
+const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
 // ── Firebase Admin (uses Cloud Run service account automatically) ──────
 admin.initializeApp({
@@ -37,11 +38,24 @@ app.use(express.json());
 // CORS — allow the VBT web app to call this service from any origin
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
+
+const API_KEY = process.env.API_KEY || 'vbt_secret_camp_2026_key';
+
+function requireApiKey(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing API key' });
+  }
+  next();
+}
+
+const AGORA_APP_ID = process.env.AGORA_APP_ID || '64b2de4f075a47e080329c3166ba192c';
+const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || '9e2b092750db456ebb625b6dc56e88ec';
 
 // ── Health check ──────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
@@ -107,7 +121,7 @@ async function sendToAll(payload) {
 
 // ── /notify — send announcement push to everyone ──────────────────────
 // Body: { title, body, type?, url? }
-app.post('/notify', async (req, res) => {
+app.post('/notify', requireApiKey, async (req, res) => {
   const { title, body, type = 'announcement', url = '/' } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'title and body required' });
 
@@ -121,7 +135,7 @@ app.post('/notify', async (req, res) => {
 });
 
 // ── /test — sends a test push immediately, great for debugging ────────
-app.post('/test', async (req, res) => {
+app.post('/test', requireApiKey, async (req, res) => {
   try {
     const snap = await db.collection('vbt_web_push_subscriptions').get();
     if (snap.empty) {
@@ -144,7 +158,7 @@ app.post('/test', async (req, res) => {
 });
 
 // ── /subscribers — how many devices are registered (for debugging) ────
-app.get('/subscribers', async (_req, res) => {
+app.get('/subscribers', requireApiKey, async (_req, res) => {
   try {
     const snap = await db.collection('vbt_web_push_subscriptions').get();
     const list = snap.docs.map(d => ({
@@ -154,6 +168,33 @@ app.get('/subscribers', async (_req, res) => {
     }));
     res.json({ count: snap.size, subscribers: list });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── /agora-token — generate Agora RTC token ─────────────────────────
+app.post('/agora-token', requireApiKey, (req, res) => {
+  const { channelName } = req.body;
+  if (!channelName) {
+    return res.status(400).json({ error: 'channelName is required' });
+  }
+  try {
+    const role = RtcRole.PUBLISHER;
+    const expirationTimeInSeconds = 3600 * 24; // 24 hours
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      AGORA_APP_ID,
+      AGORA_APP_CERTIFICATE,
+      channelName,
+      0,
+      role,
+      privilegeExpiredTs
+    );
+    res.json({ token });
+  } catch (err) {
+    console.error('Error generating Agora token:', err);
     res.status(500).json({ error: err.message });
   }
 });

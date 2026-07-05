@@ -15,34 +15,34 @@ import { ROLES } from '../permissions';
 const ROLE_META = [
   {
     key: ROLES.VOLUNTEER,
-    label: 'Volunteer',
+    label: 'Volunteer / Viewer',
     icon: Eye,
-    desc: 'Watch scores live — no login required',
-    color: '#64748b',
+    desc: 'Watch scores & schedule live — no login required',
+    color: '#00b0ff', // Shakes Cyan
     needsPasscode: false,
   },
   {
     key: ROLES.GAME_LEADER,
-    label: 'Game Leader',
+    label: 'Game Leader / Referee',
     icon: Crosshair,
-    desc: 'Enter scores for your assigned games',
-    color: '#60a5fa',
+    desc: 'Enter scores & game results',
+    color: '#3b82f6', // VBT Blue
     needsPasscode: true,
   },
   {
     key: ROLES.TEAM_LEADER,
-    label: 'Team Leader',
+    label: 'Team Leader / Servant',
     icon: Users,
-    desc: 'Manage deductions & announcements for your team',
-    color: '#3b82f6',
+    desc: 'Submit deductions & view schedules',
+    color: '#ff9100', // Fries Orange
     needsPasscode: false,
   },
   {
     key: ROLES.SERVICE_LEADER,
     label: 'Service Leader',
     icon: Shield,
-    desc: 'Manage service timeline and pings',
-    color: '#2563eb',
+    desc: 'Manage service timeline & alerts',
+    color: '#a855f7', // Tie Purple
     needsPasscode: true,
   },
 ];
@@ -52,7 +52,7 @@ const COORDINATOR_META = {
   label: 'Coordinator',
   icon: Shield,
   desc: 'Full control over config, scores & alerts',
-  color: '#1441a1',
+  color: '#f97316', // VBT Warm Orange / CTA
   needsPasscode: true,
 };
 
@@ -132,30 +132,35 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
-    padding: '12px 8px',
-    borderRadius: 16,
+    justifyContent: 'center',
+    gap: 6,
+    padding: '20px 12px',
+    borderRadius: 20,
     cursor: 'pointer',
     textAlign: 'center',
     background: selected
-      ? `rgba(${hexToRgb(color)}, 0.15)`
-      : 'rgba(30, 41, 59, 0.5)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: `2px solid ${selected ? color : 'transparent'}`,
-    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-    transform: selected ? 'scale(1.02)' : 'scale(1)',
+      ? `linear-gradient(135deg, rgba(${hexToRgb(color)}, 0.15) 0%, rgba(${hexToRgb(color)}, 0.02) 100%)`
+      : 'rgba(28, 28, 30, 0.65)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: `2px solid ${selected ? color : 'rgba(255, 255, 255, 0.06)'}`,
+    boxShadow: selected
+      ? `0 12px 28px -4px rgba(${hexToRgb(color)}, 0.2), 0 0 15px rgba(${hexToRgb(color)}, 0.08)`
+      : '0 4px 16px rgba(0, 0, 0, 0.4)',
+    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    transform: selected ? 'scale(1.03)' : 'scale(1)',
     touchAction: 'manipulation',
   }),
   cardLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 700,
-    color: '#f8fafc',
+    color: '#ffffff',
     fontFamily: 'var(--font-title)',
+    marginTop: 4,
   },
   cardDesc: {
-    fontSize: 12,
-    color: '#94a3b8',
+    fontSize: 11,
+    color: 'var(--text-secondary)',
     lineHeight: 1.4,
   },
 
@@ -287,7 +292,7 @@ function extractAssignedTeams(servant) {
   if (!servant?.role) return [];
   const role = servant.role.toLowerCase();
   if (role.startsWith('team_')) {
-    return [role.replace('team_', '')];
+    return [role];
   }
   return [];
 }
@@ -363,7 +368,10 @@ export default function RoleLogin({
       : ROLE_META.find((r) => r.key === currentUser.role) || ROLE_META[0];
     const assignments = [];
     if (currentUser.assignedTeams?.length) {
-      assignments.push(`Teams: ${currentUser.assignedTeams.join(', ')}`);
+      const cleanTeams = currentUser.assignedTeams.map(t => 
+        t.replace(/^team_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      );
+      assignments.push(`Teams: ${cleanTeams.join(', ')}`);
     }
     if (currentUser.assignedGames?.length) {
       assignments.push(`Games: ${currentUser.assignedGames.join(', ')}`);
@@ -433,7 +441,9 @@ export default function RoleLogin({
     }
 
     // Build user object
+    const matchedServant = (globalServants || []).find(s => s.name && s.name.trim().toLowerCase() === name.trim().toLowerCase());
     const user = {
+      id: matchedServant ? matchedServant.id : name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
       name: name.trim(),
       role: selectedRole,
       passcode,
@@ -467,7 +477,7 @@ export default function RoleLogin({
   // ── Render ─────────────────────────────────────────────────
   return (
     <div style={S.wrapper}>
-      {/* Shake animation keyframe (injected once) */}
+      {/* Shake animation & hover/press micro-interactions (pure CSS) */}
       <style>{`
         @keyframes rl-shake {
           0%, 100% { transform: translateX(0); }
@@ -476,33 +486,67 @@ export default function RoleLogin({
           60% { transform: translateX(-4px); }
           80% { transform: translateX(4px); }
         }
+        .role-card-hover {
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease !important;
+        }
+        .role-card-hover:hover {
+          transform: translateY(-4px) scale(1.02) !important;
+          border-color: rgba(255, 255, 255, 0.15) !important;
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
+        }
+        .role-card-hover:active {
+          transform: scale(0.95) !important;
+        }
       `}</style>
 
-      {/* ── Coordinator Subtle Login Button ── */}
-      <div style={{ position: 'absolute', bottom: 12, right: 16 }}>
-        <button
-          type="button"
-          onClick={handleCoordinatorClick}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'rgba(148, 163, 184, 0.4)', // subtle
-            fontSize: '0.75rem',
-            cursor: 'pointer',
-            padding: 8
-          }}
-        >
-          Coordinator Access
-        </button>
-      </div>
-
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+      {/* Page Title & Title description */}
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <h2 style={{
+          fontSize: '2rem',
+          fontWeight: '900',
+          fontFamily: 'var(--font-title)',
+          color: '#ffffff',
+          marginBottom: '8px',
+          textShadow: '0 0 15px rgba(59, 130, 246, 0.3)',
+          letterSpacing: '-0.02em'
+        }}>
+          Access Portal
+        </h2>
+        <p style={{
+          fontSize: '0.9rem',
+          color: 'var(--text-secondary)',
+          maxWidth: '360px',
+          margin: '0 auto 16px auto',
+          lineHeight: '1.4'
+        }}>
+          Identify your role to view real-time scores, manage event schedules, or coordinate the camp.
+        </p>
         <button
           type="button"
           onClick={onLogout}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}
+          style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '9999px',
+            color: 'var(--text-secondary)',
+            fontSize: '0.8rem',
+            padding: '6px 16px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+            e.currentTarget.style.color = 'var(--text-secondary)';
+          }}
         >
-          ← Back to Homepage
+          ← Exit to Camp Page
         </button>
       </div>
 
@@ -514,18 +558,60 @@ export default function RoleLogin({
           return (
             <div
               key={rm.key}
+              className="role-card-hover"
               style={S.card(selected, rm.color)}
               onClick={() => handleSelectRole(rm.key)}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === 'Enter' && handleSelectRole(rm.key)}
             >
-              <Icon size={26} color={selected ? rm.color : '#64748b'} />
+              {/* Colored Circular Icon Container */}
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                background: selected ? `rgba(${hexToRgb(rm.color)}, 0.2)` : 'rgba(255, 255, 255, 0.03)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '10px',
+                transition: 'all 0.3s ease',
+                border: `1px solid ${selected ? `rgba(${hexToRgb(rm.color)}, 0.4)` : 'rgba(255, 255, 255, 0.05)'}`
+              }}>
+                <Icon size={22} color={selected ? rm.color : '#94a3b8'} />
+              </div>
               <span style={S.cardLabel}>{rm.label}</span>
               <span style={S.cardDesc}>{rm.desc}</span>
             </div>
           );
         })}
+      </div>
+
+      {/* ── Coordinator Access Button (Clean & Integrated) ── */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px', marginBottom: '24px' }}>
+        <button
+          type="button"
+          onClick={handleCoordinatorClick}
+          style={{
+            background: selectedRole === ROLES.COORDINATOR ? `linear-gradient(135deg, rgba(${hexToRgb(COORDINATOR_META.color)}, 0.15) 0%, rgba(${hexToRgb(COORDINATOR_META.color)}, 0.02) 100%)` : 'rgba(255, 255, 255, 0.03)',
+            border: `1px solid ${selectedRole === ROLES.COORDINATOR ? COORDINATOR_META.color : 'rgba(255, 255, 255, 0.06)'}`,
+            borderRadius: '16px',
+            color: selectedRole === ROLES.COORDINATOR ? '#ffffff' : 'rgba(148, 163, 184, 0.7)',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            padding: '12px 24px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            boxShadow: selectedRole === ROLES.COORDINATOR ? `0 8px 24px -4px rgba(${hexToRgb(COORDINATOR_META.color)}, 0.2)` : 'none'
+          }}
+          className="role-card-hover"
+        >
+          <Shield size={16} color={selectedRole === ROLES.COORDINATOR ? COORDINATOR_META.color : 'rgba(148, 163, 184, 0.7)'} />
+          <span>System Coordinator Login</span>
+        </button>
       </div>
 
 

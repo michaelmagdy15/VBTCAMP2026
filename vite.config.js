@@ -34,6 +34,34 @@ export default defineConfig({
             handler: 'NetworkFirst', // Walkie-talkie voice messages — always fresh
             options: { cacheName: 'vbt-voice-cache', networkTimeoutSeconds: 5 },
           },
+          {
+            urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/rastertiles\/.+/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'cartodb-tiles-cache',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/.+/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'arcgis-tiles-cache',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
         ],
       },
       manifest: false // Use existing public/manifest.json

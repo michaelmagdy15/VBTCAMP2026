@@ -133,8 +133,7 @@ const defaultCampState = {
   tokens: {},
   timeShiftMinutes: 0,
   isTimerPaused: false,
-  timerPausedAt: null,
-  appsScriptWebappUrl: ''
+  timerPausedAt: null
 };
 
 // Default event config (Service Mode first)
@@ -247,7 +246,10 @@ const triggerRemotePushNotification = async (title, body, targetUrl = '/') => {
   try {
     const res = await fetch(`${NOTIFY_SERVICE_URL}/notify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': 'vbt_secret_camp_2026_key'
+      },
       body: JSON.stringify({ title, body, url: targetUrl })
     });
     if (!res.ok) console.error('Failed to send remote push:', res.status);
@@ -725,6 +727,14 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch(err => {
+        console.error("Anonymous authentication failed:", err);
+      });
+    }
+  }, []);
+
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
   const side1Name = eventConfig.side1Name || 'Team A';
   const side2Name = eventConfig.side2Name || 'Team B';
@@ -768,11 +778,6 @@ export default function App() {
     )).sort();
   }, [campData]);
 
-  // Google Sheet manual sync states
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState('');
-  const [syncError, setSyncError] = useState(false);
-
   // Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
     const evCode = localStorage.getItem('vbt_current_event');
@@ -794,10 +799,6 @@ export default function App() {
   const [campState, setCampState] = useState(defaultCampState);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
-  const [appsScriptWebappUrl, setAppsScriptWebappUrl] = useState(() => {
-    const evCode = localStorage.getItem('vbt_current_event');
-    return evCode ? (localStorage.getItem(`vbt_apps_url_${evCode}`) || '') : '';
-  });
 
   // PWA & Onboarding UI State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -813,12 +814,6 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
-
-  useEffect(() => {
-    if (currentEventCode) {
-      localStorage.setItem(`vbt_apps_url_${currentEventCode}`, appsScriptWebappUrl);
-    }
-  }, [appsScriptWebappUrl, currentEventCode]);
 
   // URL check for QR Check-in logic
   useEffect(() => {
@@ -1050,49 +1045,7 @@ export default function App() {
   // -----------------------------------------
 
 
-  // Sync live updates (scores, tokens, deductions) back to the Google Sheet
-  const syncToGoogleSheet = async (updateData) => {
-    // Writeback to sheet disabled temporarily to prevent accidental sheet modifications
-    const ENABLE_SHEET_WRITEBACK = false;
-    if (!ENABLE_SHEET_WRITEBACK) {
-      console.log("[Sheet Sync] Writeback is disabled. Skipping spreadsheet update:", updateData);
-      return;
-    }
 
-    const targetUrl = appsScriptWebappUrl || campState.appsScriptWebappUrl;
-    if (!targetUrl) return;
-
-    // Capitalize score values to satisfy Google Sheets strict data validation
-    const normalizedData = { ...updateData };
-    if (normalizedData.blockScores) {
-      const normalizedBlockScores = {};
-      for (const key in normalizedData.blockScores) {
-        const val = normalizedData.blockScores[key];
-        if (val === 'teamA' || val === 'shakes') normalizedBlockScores[key] = side1Name;
-        else if (val === 'teamB' || val === 'fries') normalizedBlockScores[key] = side2Name;
-        else if (val === 'tie' || val === 'TIE') normalizedBlockScores[key] = 'Tie';
-        else normalizedBlockScores[key] = 'NA';
-      }
-      normalizedData.blockScores = normalizedBlockScores;
-    }
-
-    try {
-      await fetch(targetUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'update_scores',
-          ...normalizedData
-        })
-      });
-      console.log("[Sheet Sync] Sent update to Google Sheets Web App:", normalizedData);
-    } catch (err) {
-      console.error("[Sheet Sync] Error syncing to Google Sheets:", err);
-    }
-  };
   const [activePingAlert, setActivePingAlert] = useState({ show: false, text: '' });
   const [urgentAlert, setUrgentAlert] = useState({ show: false, text: '', type: 'urgent', timestamp: '' });
   const [statsSubTab, setStatsSubTab] = useState('charts');
@@ -1904,8 +1857,7 @@ export default function App() {
           timeShiftMinutes: data.timeShiftMinutes || 0,
           isTimerPaused: !!data.isTimerPaused,
           timerPausedAt: data.timerPausedAt || null,
-          lastUpdatedAt: data.lastUpdatedAt || null,
-          appsScriptWebappUrl: data.appsScriptWebappUrl || ''
+          lastUpdatedAt: data.lastUpdatedAt || null
         };
 
         // Chimes for live score/deduction/token updates
@@ -1923,7 +1875,6 @@ export default function App() {
 
         setCampState(normalized);
         localStorage.setItem(`vbt_state_${currentEventCode}`, JSON.stringify(normalized));
-        if (data.appsScriptWebappUrl) setAppsScriptWebappUrl(data.appsScriptWebappUrl);
       } else {
         setCampState(defaultCampState);
       }
@@ -1977,38 +1928,7 @@ export default function App() {
     }
   };
 
-  // Google Sheets Synchronizer trigger
-  const handleSyncGoogleSheet = async () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    setSyncStatus('Connecting to Google Sheet parser...');
-    setSyncError(false);
-    
-    try {
-      const res = await fetch('https://sync-vbt-sheet-75ez7bhuzq-ew.a.run.app', {
-        method: 'POST'
-      });
-      
-      if (!res.ok) {
-        throw new Error(`Sync function returned HTTP status ${res.status}`);
-      }
-      
-      const result = await res.json();
-      if (result.status === 'success') {
-        setSyncStatus(`Successfully imported ${result.matchups} matchups!`);
-        playBellChime();
-        setTimeout(() => setSyncStatus(''), 4000);
-      } else {
-        throw new Error(result.message || 'Unknown sync error');
-      }
-    } catch (err) {
-      console.error("Manual sync failed:", err);
-      setSyncError(true);
-      setSyncStatus(`Sync failed: ${err.message}`);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+
 
   // Login Handler — uses dynamic per-event passcodes from eventConfig
   const handleLogin = (userAttempt) => {
@@ -2813,7 +2733,6 @@ export default function App() {
     
     if (newShift !== currentShift) {
       await handleUpdateCampState({ timeShiftMinutes: newShift });
-      await syncToGoogleSheet({ timeShiftMinutes: newShift });
     }
     
     // Post delay notification/announcement
@@ -2850,7 +2769,6 @@ export default function App() {
     const newShift = Math.max(0, currentShift - prevAdded);
     if (newShift !== currentShift) {
       await handleUpdateCampState({ timeShiftMinutes: newShift });
-      await syncToGoogleSheet({ timeShiftMinutes: newShift });
       
       const resetMsg = `🔄 Match timer for ${m.game} was reset. Overall schedule delay adjusted back by -${prevAdded}m.`;
       await addAnnouncement(currentEventCode, resetMsg, currentUser?.name || 'System', 'system');
@@ -2896,7 +2814,6 @@ export default function App() {
     if (prevWinner !== computedWinner) {
       const newBlockScores = { ...(campState.blockScores || {}), [key]: computedWinner };
       await handleUpdateCampState({ blockScores: newBlockScores });
-      await syncToGoogleSheet({ blockScores: newBlockScores });
       
       if (currentUser) {
         const teamNameA = m.teamA || m.shakes || 'Team A';
@@ -3301,9 +3218,6 @@ export default function App() {
     const newBlockScores = { ...(campState.blockScores || {}), [key]: newWinner };
     await handleUpdateCampState({ blockScores: newBlockScores });
 
-    // Write back to Google Sheets Web App
-    await syncToGoogleSheet({ blockScores: newBlockScores });
-
     if (currentUser) {
       const msg = `updated ${game} (Block ${block}, Rd ${round}) winner to ${newWinner.toUpperCase()}`;
       await addAnnouncement(currentEventCode, msg, currentUser.name, 'score');
@@ -3327,9 +3241,6 @@ export default function App() {
 
     const newDeductions = { ...(campState.teamDeductions || {}), [teamCode]: newVal };
     await handleUpdateCampState({ teamDeductions: newDeductions });
-
-    // Write back to Google Sheets Web App
-    await syncToGoogleSheet({ teamDeductions: newDeductions });
 
     if (currentUser) {
       const action = amount > 0 ? 'added' : 'removed';
@@ -3356,7 +3267,6 @@ export default function App() {
 
     const newDeductions = { ...(campState.teamDeductions || {}), [teamCode]: newVal };
     await handleUpdateCampState({ teamDeductions: newDeductions });
-    await syncToGoogleSheet({ teamDeductions: newDeductions });
 
     if (currentUser) {
       const msg = `deducted ${ptsNum} points from ${teamCode} for ${reason} (Total: ${newVal})`;
@@ -3389,9 +3299,6 @@ export default function App() {
 
     const newTokensState = { ...(campState.tokens || {}), [side]: newTokens };
     await handleUpdateCampState({ tokens: newTokensState });
-
-    // Write back to Google Sheets Web App
-    await syncToGoogleSheet({ tokens: newTokensState });
 
     if (currentUser) {
       let sideText = side;
@@ -5360,7 +5267,7 @@ export default function App() {
       </header>
 
       {/* Content tabs */}
-      <main className="content-area animate-fade">
+      <main key={currentTab} className="content-area animate-fade-tab">
         <React.Suspense fallback={<div className="skeleton" style={{ height: '80vh', margin: '16px', borderRadius: '12px' }}></div>}>
         {currentUser?.role === 'leader' && (
           <div className="glass-panel animate-fade" style={{
@@ -5427,7 +5334,7 @@ export default function App() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
               }}>
-                {(currentUser.teamCode || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                {(currentUser.teamCode || '').replace(/^team_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </span>
             </div>
           </div>
@@ -6201,10 +6108,7 @@ export default function App() {
             quickServantName={quickServantName}
             quickServantPasscode={quickServantPasscode}
             quickServantLoading={quickServantLoading}
-            isSyncing={isSyncing}
-            syncStatus={syncStatus}
-            syncError={syncError}
-            appsScriptWebappUrl={appsScriptWebappUrl}
+
             isOfflineMode={isOfflineMode}
             side1Name={side1Name}
             side2Name={side2Name}
@@ -6240,8 +6144,7 @@ export default function App() {
             setQuickServantName={setQuickServantName}
             setQuickServantPasscode={setQuickServantPasscode}
             handleQuickAddServant={handleQuickAddServant}
-            handleSyncGoogleSheet={handleSyncGoogleSheet}
-            setAppsScriptWebappUrl={setAppsScriptWebappUrl}
+
             setIsOfflineMode={setIsOfflineMode}
             handleAdjustTokens={handleAdjustTokens}
             handleOpenRosterEdit={handleOpenRosterEdit}

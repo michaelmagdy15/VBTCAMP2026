@@ -21,7 +21,12 @@ export const ROLES = {
  * Defaults to 'viewer' when no role is present.
  */
 export function getPermissionLevel(user) {
-  return user?.role || ROLES.VOLUNTEER;
+  const role = user?.role || ROLES.VOLUNTEER;
+  if (role === 'admin') return ROLES.COORDINATOR;
+  if (role === 'leader') return ROLES.TEAM_LEADER;
+  if (role === 'referee') return ROLES.GAME_LEADER;
+  if (role === 'service_leader') return ROLES.SERVICE_DAY_LEADER;
+  return role;
 }
 
 // ─── Scoreboard ──────────────────────────────────────────────

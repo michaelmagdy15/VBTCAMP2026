@@ -392,8 +392,10 @@ export default function ScheduleTab({
           const teams = currentUser.assignedTeams || [];
           if (teams.length > 0) {
             assignmentTitle = teams.map(t => {
-              const name = eventConfig.teamNames?.[t.toLowerCase()] || t;
-              return name.charAt(0).toUpperCase() + name.slice(1);
+              const teamInfo = campData?.teams?.[t];
+              const name = teamInfo?.name || eventConfig.teamNames?.[t.toLowerCase()] || t;
+              const cleanName = name.replace(/^team_/i, '').replace(/_/g, ' ');
+              return cleanName.replace(/\b\w/g, c => c.toUpperCase());
             }).join(' & ');
             assignmentDetail = 'Your team(s) to lead today';
             assignmentIcon = '👥';
@@ -480,7 +482,7 @@ export default function ScheduleTab({
                         const updatedUser = { ...currentUser };
                         if (isLeaderRole) {
                           updatedUser.teamCode = newCode;
-                          updatedUser.assignedTeams = [newCode.replace('team_', '')];
+                          updatedUser.assignedTeams = [newCode];
                           setScheduleTeamFilter(newCode);
                         } else if (isRefRole) {
                           updatedUser.roleCode = newCode;

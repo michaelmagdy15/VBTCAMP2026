@@ -32,10 +32,7 @@ export default function SettingsTab({
   quickServantName,
   quickServantPasscode,
   quickServantLoading,
-  isSyncing,
-  syncStatus,
-  syncError,
-  appsScriptWebappUrl,
+
   isOfflineMode,
   side1Name,
   side2Name,
@@ -71,8 +68,7 @@ export default function SettingsTab({
   setQuickServantName,
   setQuickServantPasscode,
   handleQuickAddServant,
-  handleSyncGoogleSheet,
-  setAppsScriptWebappUrl,
+
   setIsOfflineMode,
   handleAdjustTokens,
   handleOpenRosterEdit,
@@ -276,6 +272,81 @@ export default function SettingsTab({
               </div>
             </div>
 
+            {eventConfig.eventType === 'service' && (
+              <div className="glass-panel" style={{ padding: '16px', marginTop: '12px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.03)' }}>
+                <div>
+                  <h3 style={{ fontSize: '0.9rem', color: '#a78bfa', fontWeight: '800', marginBottom: '8px' }}>🔄 Game Engine Type</h3>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    Current engine: <strong>{eventConfig.gameEngineType || 'Team vs Team'}</strong>
+                  </p>
+                  
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (eventConfig.gameEngineType === 'Team vs Team' || !eventConfig.gameEngineType) return;
+                        if (window.confirm("Switch to Team vs Team engine?")) {
+                          await updateEventConfig(currentEventCode, { gameEngineType: 'Team vs Team' });
+                          setEventConfig(prev => ({ ...prev, gameEngineType: 'Team vs Team' }));
+                          setEditEventConfig(prev => ({ ...prev, gameEngineType: 'Team vs Team' }));
+                          alert("Switched to Team vs Team engine!");
+                        }
+                      }}
+                      disabled={savingEventConfig}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: (eventConfig.gameEngineType === 'Team vs Team' || !eventConfig.gameEngineType) ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
+                        border: '1px solid var(--border-light)',
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🤜🤛 Team vs Team
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (eventConfig.gameEngineType === 'Shuffle') return;
+                        if (window.confirm("Switch to Shuffle engine (Solo Rotations)?")) {
+                          const updates = { 
+                            gameEngineType: 'Shuffle',
+                            stations: {
+                              ...eventConfig.stations,
+                              station_5: eventConfig.stations?.station_5 || { name: 'Whiffle Ball', location: 'Station 5', howToPlay: '', lesson: '' },
+                              station_6: eventConfig.stations?.station_6 || { name: 'Blind Shape', location: 'Station 6', howToPlay: '', lesson: '' }
+                            }
+                          };
+                          await updateEventConfig(currentEventCode, updates);
+                          setEventConfig(prev => ({ ...prev, ...updates }));
+                          setEditEventConfig(prev => ({ ...prev, ...updates }));
+                          alert("Switched to Shuffle engine!");
+                        }
+                      }}
+                      disabled={savingEventConfig}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: eventConfig.gameEngineType === 'Shuffle' ? 'var(--gradient-vbt)' : 'rgba(255,255,255,0.05)',
+                        border: '1px solid var(--border-light)',
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔄 Shuffle Mode
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <DynamicConfigurator
               eventConfig={eventConfig}
               campState={campState}
@@ -423,8 +494,12 @@ export default function SettingsTab({
                       <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏁 Rename Games & Locations</h4>
                       <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Change station names, locations, Big Game, and Reflection details.</p>
                       
-                      {['station_1', 'station_2', 'station_3', 'station_4'].map((stKey, idx) => {
-                        const st = editStations[stKey] || { name: '', location: '' };
+                      {(() => {
+                        const stationKeys = eventConfig.gameEngineType === 'Shuffle'
+                          ? ['station_1', 'station_2', 'station_3', 'station_4', 'station_5', 'station_6']
+                          : ['station_1', 'station_2', 'station_3', 'station_4'];
+                        return stationKeys.map((stKey, idx) => {
+                          const st = editStations[stKey] || { name: '', location: '' };
                         return (
                           <div key={stKey} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
                             <div>
@@ -459,7 +534,8 @@ export default function SettingsTab({
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                      })()}
 
                       {/* Big Game Renaming */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -608,6 +684,12 @@ export default function SettingsTab({
                                     <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
                                     <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
                                     <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
+                                    {eventConfig.gameEngineType === 'Shuffle' && (
+                                      <>
+                                        <option value="station_5">{(editStations.station_5?.name || 'Station 5') + ' Lead'}</option>
+                                        <option value="station_6">{(editStations.station_6?.name || 'Station 6') + ' Lead'}</option>
+                                      </>
+                                    )}
                                     <option value="big_game_1">Big Game Lead 1</option>
                                     <option value="big_game_2">Big Game Lead 2</option>
                                     <option value="reflection">Reflection Lead</option>
@@ -687,261 +769,7 @@ export default function SettingsTab({
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="glass-panel" style={{ padding: '16px' }}>
-                {/* Google Sheets Live Sync panel */}
-                <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Google Sheets Live Sync</h3>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Manage schedule synchronization from your camp spreadsheet. The app polls in the background, or you can force an instant sync below.
-                </p>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {/* Direct Google Sheet link button */}
-                  <a 
-                    href="https://docs.google.com/spreadsheets/d/106n37V38hEdy9Mto0kXS4aipAQDNi5uNh7kR9IWrbME/edit?gid=32520354#gid=32520354"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-light)',
-                      color: '#ffffff',
-                      fontFamily: 'var(--font-title)',
-                      fontWeight: '600',
-                      fontSize: '0.85rem',
-                      textDecoration: 'none',
-                      textAlign: 'center',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-                  >
-                    <Calendar size={16} />
-                    Open Google Sheet
-                  </a>
-
-                  {/* Sync Trigger button */}
-                  <button 
-                    onClick={handleSyncGoogleSheet}
-                    disabled={isSyncing}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      background: 'var(--gradient-vbt)',
-                      border: 'none',
-                      color: '#ffffff',
-                      fontFamily: 'var(--font-title)',
-                      fontWeight: '700',
-                      fontSize: '0.85rem',
-                      cursor: isSyncing ? 'not-allowed' : 'pointer',
-                      opacity: isSyncing ? 0.7 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 12px rgba(41, 182, 246, 0.2)'
-                    }}
-                  >
-                    {isSyncing ? (
-                      <>
-                        <div className="spinner" style={{
-                          width: '14px',
-                          height: '14px',
-                          border: '2px solid rgba(255,255,255,0.3)',
-                          borderTop: '2px solid #ffffff',
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite'
-                        }} />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <Clock3 size={16} />
-                        Sync Google Sheet Now
-                      </>
-                    )}
-                  </button>
-
-                  {/* Sync status messages */}
-                  {syncStatus && (
-                    <div style={{
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: syncError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                      border: syncError ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(34, 197, 94, 0.2)',
-                      color: syncError ? '#f87171' : '#4ade80',
-                      fontSize: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      <AlertCircle size={14} />
-                      <span>{syncStatus}</span>
-                    </div>
-                  )}
-
-                  {/* Step-by-step Apps Script guide */}
-                  <div style={{
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light)',
-                    padding: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    <div>
-                      <h4 style={{ fontSize: '0.78rem', color: '#ffffff', marginBottom: '6px', fontWeight: '700' }}>⚡ Setup Two-Way Auto-Sync</h4>
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
-                        To make updates sync bidirectionally (Spreadsheet ➔ App and App ➔ Spreadsheet), copy this unified code and paste it inside the sheet's <strong>Extensions → Apps Script</strong> editor:
-                      </p>
-                      <pre style={{
-                        background: 'rgba(0,0,0,0.4)',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        fontSize: '0.65rem',
-                        color: 'var(--vbt-sky)',
-                        overflowX: 'auto',
-                        maxHeight: '180px',
-                        fontFamily: 'monospace',
-                        border: '1px solid rgba(255,255,255,0.03)'
-                      }}>
-                        {`function onEdit(e) {
-  UrlFetchApp.fetch('https://sync-vbt-sheet-75ez7bhuzq-ew.a.run.app', {
-    method: 'post'
-  });
-}
-
-function doPost(e) {
-  try {
-    var postData = JSON.parse(e.postData.contents);
-    var action = postData.action;
-    
-    if (action === "update_scores") {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var calcSheet = ss.getSheetByName("Score Calculator");
-      
-      // Update Block Scores
-      if (postData.blockScores) {
-        for (var key in postData.blockScores) {
-          var parts = key.split("_");
-          if (parts.length >= 3) {
-            var block = parts[0];
-            var round = parts[1];
-            var gameName = parts.slice(2).join("_");
-            var winner = postData.blockScores[key];
-            if (winner) {
-              var wLower = winner.toLowerCase();
-              if (wLower === "shakes") winner = "Shakes";
-              else if (wLower === "fries") winner = "Fries";
-              else if (wLower === "tie") winner = "Tie";
-              else winner = "NA";
-            }
-            
-            var cell = getScoreCell(block, round, gameName);
-            if (cell) {
-              calcSheet.getRange(cell.row, cell.col).setValue(winner);
-            }
-          }
-        }
-      }
-      
-      // Update Tokens
-      if (postData.tokens) {
-        calcSheet.getRange(48, 8).setValue(postData.tokens.shakes || 0);
-        calcSheet.getRange(48, 9).setValue(postData.tokens.fries || 0);
-      }
-      
-      // Update Point Deductions
-      if (postData.teamDeductions) {
-        var clearCells = ["F4", "F5", "F6", "F7", "F8", "F12", "F13", "F14", "F15", "F16", "F20", "F21", "F25", "F26", "F27", "F28"];
-        for (var team in postData.teamDeductions) {
-          var tSheet = ss.getSheetByName(team);
-          if (tSheet) {
-            for (var i = 0; i < clearCells.length; i++) {
-              tSheet.getRange(clearCells[i]).setValue(0);
-            }
-            tSheet.getRange("F4").setValue(postData.teamDeductions[team] || 0);
-          }
-        }
-      }
-      
-      SpreadsheetApp.flush();
-      return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function getScoreCell(block, round, gameName) {
-  var b = parseInt(block);
-  var r = parseInt(round);
-  
-  if (b === 1) {
-    var row = 4 + r;
-    var colMap = { "Big Mac": 3, "Cone Memory": 4, "Scale": 5, "Chubby Bunny": 6 };
-    return { row: row, col: colMap[gameName] };
-  } else if (b === 2) {
-    var row = 15 + r;
-    var colMap = { "Cheesy Strings": 3, "Lift": 4, "Bible Whispers": 5, "Puzzle": 6 };
-    return { row: row, col: colMap[gameName] };
-  } else if (b === 3) {
-    var row = 26 + r;
-    var colMap = { "Big Bucket 1": 4, "Big Bucket 2": 5 };
-    return { row: row, col: colMap[gameName] };
-  } else if (b === 4) {
-    var row = 33 + r;
-    var colMap = { 
-      "Nadala+ 1": 2, "Balloon Darts 1": 3, "Golden Snitch 1": 4,
-      "Nadala+ 2": 5, "Balloon Darts 2": 6, "Golden Snitch 2": 7 
-    };
-    return { row: row, col: colMap[gameName] };
-  }
-  return null;
-}`}
-                      </pre>
-                    </div>
-
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                      <label style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
-                        🔗 Apps Script Web App URL
-                      </label>
-                      <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
-                        Deploy the Apps Script project as a **Web App** (Execute as: "Me", Who has access: "Anyone"), then paste the generated URL here to enable app-to-sheets write-back:
-                      </p>
-                      <input 
-                        type="text"
-                        value={appsScriptWebappUrl}
-                        onChange={(e) => setAppsScriptWebappUrl(e.target.value)}
-                        onBlur={(e) => handleUpdateCampState({ appsScriptWebappUrl: e.target.value })}
-                        placeholder="https://script.google.com/macros/s/.../exec"
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          background: 'rgba(0, 0, 0, 0.3)',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: '6px',
-                          color: '#ffffff',
-                          fontSize: '0.75rem',
-                          outline: 'none',
-                          fontFamily: 'monospace'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             <div className="glass-panel" style={{ padding: '16px' }}>
               <h3 style={{ fontSize: '0.9rem', color: '#ffffff', marginBottom: '6px' }}>Database Synchronization</h3>

@@ -6,13 +6,13 @@ service cloud.firestore {
     // VBT Sports Camp Web App Rules
     // ===============================================================
     match /vbt_camp/live_scores {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_camp/schedule_data {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_camp_announcements/{announcementId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /vbt_environments/{docId} {
@@ -39,35 +39,34 @@ service cloud.firestore {
     // VBT Sports Platform — Multi-Event Rules (v2.0)
     // ===============================================================
     match /vbt_event_registry/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_events/{eventCode}/{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /vbt_feedback/{eventCode}/responses/{responseId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /vbt_debriefs/{eventCode} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /vbt_push_tokens/{tokenId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_servants/{servantId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_service_templates/{templateId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_timer/{eventCode} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
     match /vbt_games/{gameId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     // ===============================================================

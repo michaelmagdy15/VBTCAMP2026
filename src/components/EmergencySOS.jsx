@@ -3,21 +3,63 @@ import { AlertTriangle, MapPin, ShieldAlert, CheckCircle } from 'lucide-react';
 import { addAnnouncement } from '../firebase';
 import { triggerHaptic } from '../utils/haptics';
 
-const STATIONS = [
-  'Soccer Field',
-  'Basketball Court',
-  'Volleyball Court',
-  'Tug of War Area',
-  'Obstacle Course',
-  'Main Hall / Cafeteria',
-  'First Aid Tent',
-  'Restrooms Area',
-  'Camp Entrance'
-];
+export default function EmergencySOS({ currentUser, activeEventCode, eventConfig, triggerRemotePushNotification }) {
+  const getDynamicStations = () => {
+    const list = [];
+    
+    // Add configured stations from eventConfig
+    if (eventConfig?.stations) {
+      Object.keys(eventConfig.stations).forEach(key => {
+        const st = eventConfig.stations[key];
+        if (st?.location && !list.includes(st.location)) {
+          list.push(st.location);
+        } else if (st?.name && !list.includes(st.name)) {
+          list.push(st.name);
+        }
+      });
+    }
+    
+    // Add Big Game and Reflection Locations
+    if (eventConfig?.bigGameLocation && !list.includes(eventConfig.bigGameLocation)) {
+      list.push(eventConfig.bigGameLocation);
+    }
+    if (eventConfig?.reflectionLocation && !list.includes(eventConfig.reflectionLocation)) {
+      list.push(eventConfig.reflectionLocation);
+    }
+    
+    // If we have some dynamic locations, add standard defaults like First Aid, Restrooms, Camp Entrance
+    if (list.length > 0) {
+      const extraDefaults = ['First Aid Tent', 'Restrooms Area', 'Camp Entrance'];
+      extraDefaults.forEach(def => {
+        if (!list.includes(def)) list.push(def);
+      });
+      return list;
+    }
+    
+    // Default fallback list
+    return [
+      'Soccer Field',
+      'Basketball Court',
+      'Volleyball Court',
+      'Tug of War Area',
+      'Obstacle Course',
+      'Main Hall / Cafeteria',
+      'First Aid Tent',
+      'Restrooms Area',
+      'Camp Entrance'
+    ];
+  };
 
-export default function EmergencySOS({ currentUser, activeEventCode, triggerRemotePushNotification }) {
-  const [selectedStation, setSelectedStation] = useState(STATIONS[0]);
+  const stations = getDynamicStations();
+  const [selectedStation, setSelectedStation] = useState(stations[0] || 'First Aid Tent');
   const [customLocation, setCustomLocation] = useState('');
+
+  useEffect(() => {
+    const list = getDynamicStations();
+    if (list.length > 0 && !list.includes(selectedStation)) {
+      setSelectedStation(list[0]);
+    }
+  }, [eventConfig]);
   const [useCustomLoc, setUseCustomLoc] = useState(false);
   const [issueType, setIssueType] = useState('Medical'); // 'Medical' | 'Physical Altercation' | 'Missing Camper' | 'General SOS'
   const [holdProgress, setHoldProgress] = useState(0);
@@ -169,7 +211,7 @@ export default function EmergencySOS({ currentUser, activeEventCode, triggerRemo
                 onChange={(e) => setSelectedStation(e.target.value)}
                 style={S.select}
               >
-                {STATIONS.map(st => (
+                {stations.map(st => (
                   <option key={st} value={st}>{st}</option>
                 ))}
               </select>

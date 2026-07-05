@@ -350,6 +350,7 @@ export default function GPSMap({
   const [userPos, setUserPos] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [useSatellite, setUseSatellite] = useState(false);
 
   // ── Route & Team Guidance State ──
   // Extract list of all subteams
@@ -472,6 +473,17 @@ export default function GPSMap({
     return () => unsub();
   }, [eventCode]);
 
+  // ── Toggle Map Layer dynamically based on useSatellite state ──
+  useEffect(() => {
+    if (tileRef.current) {
+      tileRef.current.setUrl(
+        useSatellite
+          ? (mapConfig?.satelliteUrl || DEFAULT_MAP_CONFIG.satelliteUrl)
+          : (mapConfig?.streetUrl || DEFAULT_MAP_CONFIG.streetUrl)
+      );
+    }
+  }, [useSatellite, mapConfig]);
+
   // ── Initialise Leaflet map ──
   useEffect(() => {
     if (!mapElRef.current || mapRef.current) return;
@@ -487,8 +499,12 @@ export default function GPSMap({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+    const initialUrl = useSatellite
+      ? (cfg.satelliteUrl || DEFAULT_MAP_CONFIG.satelliteUrl)
+      : (cfg.streetUrl || DEFAULT_MAP_CONFIG.streetUrl);
+
     tileRef.current = L.tileLayer(
-      cfg.satelliteUrl || DEFAULT_MAP_CONFIG.satelliteUrl,
+      initialUrl,
       { attribution: 'Tiles &copy; Esri', maxZoom: 22, crossOrigin: 'anonymous' }
     ).addTo(map);
 
@@ -1062,7 +1078,34 @@ export default function GPSMap({
       )}
 
       {/* ── Map ── */}
-      <div ref={mapElRef} style={{ ...S.mapContainer, height: isMobile ? 350 : 500 }} />
+      <div style={{ position: 'relative', width: '100%' }}>
+        <div ref={mapElRef} style={{ ...S.mapContainer, height: isMobile ? 350 : 500 }} />
+        <button
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            zIndex: 1000,
+            background: 'rgba(13, 20, 38, 0.9)',
+            border: '1px solid rgba(41, 182, 246, 0.3)',
+            color: '#ffffff',
+            padding: '8px 14px',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'all 0.2s',
+          }}
+          onClick={() => setUseSatellite(prev => !prev)}
+        >
+          {useSatellite ? '🌐 Street Map' : '🌐 Satellite Map'}
+        </button>
+      </div>
 
       {/* ── Add Waypoint Modal ── */}
       {isAdmin && pendingLatLng && (
