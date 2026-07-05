@@ -718,6 +718,7 @@ export default function App() {
   const [newServantName, setNewServantName] = useState('');
   const [newServantPreferredRole, setNewServantPreferredRole] = useState('volunteer');
   const [newServantPhone, setNewServantPhone] = useState('');
+  const [autoAssignedInfo, setAutoAssignedInfo] = useState(null);
   const [newEventSide1, setNewEventSide1] = useState('Team A');
   const [newEventSide2, setNewEventSide2] = useState('Team B');
   const [newEventDate, setNewEventDate] = useState('');
@@ -936,24 +937,23 @@ export default function App() {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
-      if ((isAndroid || isIOS) && !isStandalone) {
-        setShowInstallPrompt(true);
-      } else {
-        setShowOnboarding(true);
-      }
-      
       const savedUserStr = localStorage.getItem(`vbt_user_${code}`);
       if (savedUserStr) {
         try {
           const userObj = JSON.parse(savedUserStr);
           setCurrentUser(userObj);
+          setShowOnboarding(false);
           if (!isOfflineMode) {
             addAnnouncement(code, `${userObj.name} checked in via QR`, 'System', 'system').catch(() => {});
           }
+          alert(`Welcome back, ${userObj.name}! Checked in successfully.`);
         } catch (e) {
           console.error("Error parsing saved user:", e);
         }
       } else {
+        if ((isAndroid || isIOS) && !isStandalone) {
+          setShowInstallPrompt(true);
+        }
         // Show quick join form to collect name/phone
         setQuickJoinData(prev => ({ ...prev, code }));
         setCheckInStep('search');
@@ -1033,6 +1033,75 @@ export default function App() {
     }
   };
 
+  const determineAutoAssignment = (currentAssignments) => {
+    // 12 sub-teams
+    const teams = [
+      'team_red_1', 'team_blue_1',
+      'team_red_2', 'team_blue_2',
+      'team_red_3', 'team_blue_3',
+      'team_red_4', 'team_blue_4',
+      'team_red_5', 'team_blue_5',
+      'team_red_6', 'team_blue_6'
+    ];
+    // 6 game stations
+    const stations = [
+      'station_1', 'station_2', 'station_3', 'station_4', 'station_5', 'station_6'
+    ];
+
+    // Compute counts of servants currently assigned to each team/station
+    const teamCounts = {};
+    const stationCounts = {};
+
+    teams.forEach(t => teamCounts[t] = 0);
+    stations.forEach(s => stationCounts[s] = 0);
+
+    // Sum up assignments from the event config
+    if (currentAssignments) {
+      Object.entries(currentAssignments).forEach(([servantId, code]) => {
+        if (teamCounts[code] !== undefined) {
+          teamCounts[code]++;
+        } else if (stationCounts[code] !== undefined) {
+          stationCounts[code]++;
+        }
+      });
+    }
+
+    // PRIORITY 1: Any unstaffed Team (0 leaders)
+    for (let t of teams) {
+      if (teamCounts[t] === 0) {
+        return { role: 'leader', code: t, reason: `Staffing empty team ${t.replace('team_', '').replace('_', ' ').toUpperCase()}` };
+      }
+    }
+
+    // PRIORITY 2: Any understaffed Game Station (< 2 referees)
+    let minRefStation = null;
+    let minRefCount = Infinity;
+    stations.forEach(s => {
+      if (stationCounts[s] < minRefCount) {
+        minRefCount = stationCounts[s];
+        minRefStation = s;
+      }
+    });
+
+    if (minRefCount < 2 && minRefStation) {
+      return { role: 'referee', code: minRefStation, reason: `Supporting station ${minRefStation.replace('station_', '')} (currently has ${minRefCount} refs)` };
+    }
+
+    // PRIORITY 3: Staffing teams to 2 leaders
+    for (let t of teams) {
+      if (teamCounts[t] < 2) {
+        return { role: 'leader', code: t, reason: `Assisting team ${t.replace('team_', '').replace('_', ' ').toUpperCase()} (currently has 1 leader)` };
+      }
+    }
+
+    // PRIORITY 4: Fallback to the station with the least referees
+    if (minRefStation) {
+      return { role: 'referee', code: minRefStation, reason: `General reinforcement at station ${minRefStation.replace('station_', '')}` };
+    }
+
+    return { role: 'volunteer', code: '', reason: 'General Support' };
+  };
+
   const handleCheckInRegisterSubmit = async () => {
     if (!newServantName.trim()) {
       setCheckInError('Please enter your full name.');
@@ -1043,29 +1112,111 @@ export default function App() {
     const name = newServantName.trim();
     
     try {
-      const { doc, setDoc } = await import('firebase/firestore');
+      const { doc, setDoc, updateDoc } = await import('firebase/firestore');
+      
+      // Calculate smart auto-assignment!
+      const currentAssignments = eventConfig?.servantAssignments || {};
+      const autoAssign = determineAutoAssignment(currentAssignments);
+      
       await setDoc(doc(db, 'vbt_servants', id), {
         id,
         name,
         phone: newServantPhone.trim(),
-        role: 'pending',
+        role: autoAssign.role,
         preferredRole: newServantPreferredRole,
         passcode: '1234',
         createdAt: new Date().toISOString()
       });
       
-      // Update local state list so they show up for the coordinator
-      const newServ = { id, name, role: 'pending', preferredRole: newServantPreferredRole };
+      // Update the event configuration in Firestore with this new assignment
+      const updatedAssignments = { ...currentAssignments, [id]: autoAssign.code };
+      const configRef = doc(db, 'vbt_events', currentEventCode, 'config', 'main');
+      await updateDoc(configRef, {
+        servantAssignments: updatedAssignments
+      });
+      
+      // Update local state list so they show up in UI directories
+      const newServ = { 
+        id, 
+        name, 
+        role: autoAssign.role, 
+        roleCode: autoAssign.code,
+        preferredRole: newServantPreferredRole 
+      };
       setGlobalServants(prev => [...prev, newServ]);
       
-      if (!isOfflineMode) {
-        addAnnouncement(currentEventCode, `📢 Check-in Request: ${name} registered as pending ${newServantPreferredRole} (Phone: ${newServantPhone})`, 'System', 'system').catch(() => {});
+      // Prepare localized strings for the success display
+      let roleLabel = 'General Support';
+      let assignLabel = 'General Support';
+      if (autoAssign.role === 'leader') {
+        roleLabel = 'Team Leader';
+        assignLabel = autoAssign.code.replace('team_', '').replace('_', ' ').toUpperCase();
+      } else if (autoAssign.role === 'referee') {
+        roleLabel = 'Game Referee';
+        assignLabel = eventConfig?.stations?.[autoAssign.code]?.name || autoAssign.code.replace('station_', 'Station ');
       }
       
-      setCheckInStep('waiting');
+      setAutoAssignedInfo({
+        id,
+        name,
+        role: autoAssign.role,
+        roleLabel,
+        code: autoAssign.code,
+        assignLabel,
+        reason: autoAssign.reason
+      });
+      
+      if (!isOfflineMode) {
+        addAnnouncement(
+          currentEventCode, 
+          `📢 Smart Auto-Assign: ${name} checked in via QR and was auto-allocated as ${roleLabel} for "${assignLabel}" (${autoAssign.reason})`, 
+          'System', 
+          'system'
+        ).catch(() => {});
+      }
+      
+      setCheckInStep('assigned');
     } catch (err) {
-      console.error("Failed to register servant:", err);
+      console.error("Failed to register and auto-assign servant:", err);
       setCheckInError('Registration failed. Please try again.');
+    }
+  };
+
+  const handleCheckInEnterAsAssigned = async () => {
+    if (!autoAssignedInfo) return;
+    try {
+      await signInAnonymously(auth);
+      
+      let dbSide = '';
+      let dbAssignedGames = [];
+      let dbAssignedTeams = [];
+      
+      if (autoAssignedInfo.role === 'referee') {
+        dbAssignedGames = [autoAssignedInfo.code];
+      } else if (autoAssignedInfo.role === 'leader') {
+        dbAssignedTeams = [autoAssignedInfo.code];
+        const team = campData?.teams?.[autoAssignedInfo.code];
+        if (team) dbSide = team.side;
+      }
+      
+      const user = {
+        id: autoAssignedInfo.id,
+        name: autoAssignedInfo.name,
+        role: autoAssignedInfo.role,
+        roleCode: autoAssignedInfo.code,
+        teamCode: autoAssignedInfo.role === 'leader' ? autoAssignedInfo.code : '',
+        side: dbSide,
+        assignedGames: dbAssignedGames,
+        assignedTeams: dbAssignedTeams,
+        uiMode: 'detailed'
+      };
+      
+      setCurrentUser(user);
+      localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
+      setShowQuickJoinForm(false);
+    } catch (err) {
+      console.error("Auto-assigned login failed:", err);
+      alert("Failed to enter. Please try again.");
     }
   };
 
@@ -7388,6 +7539,33 @@ export default function App() {
                   </button>
                 </div>
               </>
+            )}
+
+            {checkInStep === 'assigned' && autoAssignedInfo && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:'2.8rem',marginBottom:'12px'}}>🎉</div>
+                <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Check-in Successful!</h2>
+                <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'16px'}}>
+                  Welcome, <strong style={{color:'#60a5fa'}}>{autoAssignedInfo.name}</strong>! You have been auto-allocated:
+                </p>
+                
+                <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',padding:'14px',marginBottom:'20px',textAlign:'left'}}>
+                  <div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Role</div>
+                  <div style={{fontSize:'0.9rem',fontWeight:'800',color:'#fff',marginBottom:'10px'}}>{autoAssignedInfo.roleLabel}</div>
+                  
+                  <div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Assigned Station / Team</div>
+                  <div style={{fontSize:'0.9rem',fontWeight:'800',color:'#38bdf8',marginBottom:'10px'}}>{autoAssignedInfo.assignLabel}</div>
+
+                  <div style={{fontSize:'0.65rem',color:'#f59e0b',fontStyle:'italic'}}>{autoAssignedInfo.reason}</div>
+                </div>
+
+                <button 
+                  onClick={handleCheckInEnterAsAssigned}
+                  style={{width:'100%',padding: '12px 14px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',fontWeight:'700',fontSize:'0.9rem',cursor:'pointer'}}
+                >
+                  Enter App & Start
+                </button>
+              </div>
             )}
 
             {checkInStep === 'waiting' && (
