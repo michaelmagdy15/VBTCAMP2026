@@ -1946,6 +1946,18 @@ export default function App() {
       if (role === ROLES.TEAM_LEADER) {
         resolvedRole = 'leader';
         teamCode = assignedTeams?.[0] || 'Unknown';
+        
+        // Find team inside campData.teams
+        const normUser = (teamCode || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+        const matchedTeamKey = Object.keys(campData?.teams || {}).find(k => {
+          const normK = k.toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+          return normK === normUser;
+        });
+        const dbTeam = matchedTeamKey ? campData.teams[matchedTeamKey] : null;
+        if (dbTeam) {
+          side = dbTeam.side || 'System';
+          grade = dbTeam.grade || 'All';
+        }
       } else if (role === ROLES.GAME_LEADER) {
         const gamePass = (eventConfig.passcodeGameLeader || 'VBT2026').toUpperCase();
         if (normalizedPasscode !== gamePass && normalizedPasscode !== 'VBT2026') {
@@ -3441,7 +3453,10 @@ export default function App() {
       if (scheduleTeamFilter) {
         const teamA = m.teamA || m.shakes;
         const teamB = m.teamB || m.fries;
-        if (teamA !== scheduleTeamFilter && teamB !== scheduleTeamFilter) {
+        const normA = (teamA || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+        const normB = (teamB || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+        const normFilter = (scheduleTeamFilter || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+        if (normA !== normFilter && normB !== normFilter) {
           return false;
         }
       }
@@ -3485,15 +3500,25 @@ export default function App() {
   }, [scheduleTeamFilter, scheduleBlockFilter, scheduleDayFilter, campData.matchups, eventConfig.eventType, daysCount, scheduleSortMode]);
 
   const myTeamInfo = useMemo(() => {
-    if (!currentUser) return null;
+    if (!currentUser || currentUser.role !== 'leader') return null;
     const isService = eventConfig.eventType === 'service';
+    const normUser = (currentUser.teamCode || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+    
     let rawSchedule = [];
     if (isService) {
       rawSchedule = (campData.matchups || [])
-        .filter(m => (m.teamA || m.shakes) === currentUser.teamCode || (m.teamB || m.fries) === currentUser.teamCode)
+        .filter(m => {
+          const teamA = m.teamA || m.shakes;
+          const teamB = m.teamB || m.fries;
+          const normA = (teamA || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+          const normB = (teamB || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+          return normA === normUser || normB === normUser;
+        })
         .map(m => {
           const teamA = m.teamA || m.shakes;
           const teamB = m.teamB || m.fries;
+          const normA = (teamA || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+          const isTeamA = normA === normUser;
           return {
             day: m.day || 1,
             block: `Block ${m.block}`,
@@ -3501,21 +3526,37 @@ export default function App() {
             game: m.game,
             time: m.time,
             location: m.location,
-            opponent: teamA === currentUser.teamCode ? teamB : teamA,
+            opponent: isTeamA ? teamB : teamA,
             shakes: teamA,
             fries: teamB
           };
         });
     } else {
-      rawSchedule = campData.teamSchedules?.[currentUser.teamCode] || [];
+      const matchedKey = Object.keys(campData.teamSchedules || {}).find(k => {
+        const normK = k.toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+        return normK === normUser;
+      });
+      rawSchedule = matchedKey ? campData.teamSchedules[matchedKey] : [];
     }
-    const teamDetails = campData.teams?.[currentUser.teamCode] || {};
+
+    const matchedTeamKey = Object.keys(campData.teams || {}).find(k => {
+      const normK = k.toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+      return normK === normUser;
+    });
+    const teamDetails = matchedTeamKey ? campData.teams[matchedTeamKey] : {};
+
+    const matchedDeductionKey = Object.keys(campState.teamDeductions || {}).find(k => {
+      const normK = k.toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+      return normK === normUser;
+    });
+    const deductionsVal = matchedDeductionKey ? (campState.teamDeductions || {})[matchedDeductionKey] : 0;
+
     return {
       ...teamDetails,
       schedule: rawSchedule,
       day1Schedule: isService ? rawSchedule.filter(s => (s.day || 1) === 1) : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 1')),
       day2Schedule: isService ? rawSchedule.filter(s => (s.day || 1) === 2) : rawSchedule.filter(s => s.block && s.block.toLowerCase().includes('day 2')),
-      deductions: (campState.teamDeductions || {})[currentUser.teamCode] || 0
+      deductions: deductionsVal
     };
   }, [currentUser, campState, campData, eventConfig]);
 
