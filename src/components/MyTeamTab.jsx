@@ -26,17 +26,17 @@ export default function MyTeamTab({
               borderRadius: '9999px',
               fontSize: '0.75rem',
               fontWeight: '700',
-              background: `${getTeamColorHex(currentUser.side)}22`,
-              border: `1px solid ${getTeamColorHex(currentUser.side)}55`,
+              background: `${getTeamColorHex(currentUser?.side)}22`,
+              border: `1px solid ${getTeamColorHex(currentUser?.side)}55`,
               color: '#ffffff',
               textTransform: 'uppercase',
               letterSpacing: '0.05em'
             }}>
-              {(eventConfig.teamNames?.[currentUser.side.toLowerCase()] || currentUser.side).toUpperCase()}
+              {(eventConfig?.teamNames?.[currentUser?.side?.toLowerCase()] || currentUser?.side || '').toUpperCase()}
             </span>
-            <h2 style={{ fontSize: '1.75rem', color: '#ffffff', marginTop: '6px' }}>Team {currentUser.teamCode}</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Leaders: {myTeamInfo.leaders}</p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Grade: {myTeamInfo.grade}</p>
+            <h2 style={{ fontSize: '1.75rem', color: '#ffffff', marginTop: '6px' }}>Team {currentUser?.teamCode}</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Leaders: {myTeamInfo?.leaders}</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Grade: {myTeamInfo?.grade}</p>
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700' }}>My Deductions</p>
@@ -49,19 +49,19 @@ export default function MyTeamTab({
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
           <button 
-            onClick={() => handleAdjustDeduction(currentUser.teamCode, 1)}
-            disabled={myTeamInfo.deductions >= 10}
+            onClick={() => handleAdjustDeduction && handleAdjustDeduction(currentUser?.teamCode, 1)}
+            disabled={myTeamInfo?.deductions >= 10}
             style={{
               flex: 1,
               padding: '10px',
               borderRadius: '8px',
-              border: myTeamInfo.deductions >= 10 ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(239, 68, 68, 0.3)',
-              background: myTeamInfo.deductions >= 10 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(239, 68, 68, 0.08)',
-              color: myTeamInfo.deductions >= 10 ? 'rgba(255, 255, 255, 0.25)' : '#ef4444',
+              border: myTeamInfo?.deductions >= 10 ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(239, 68, 68, 0.3)',
+              background: myTeamInfo?.deductions >= 10 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(239, 68, 68, 0.08)',
+              color: myTeamInfo?.deductions >= 10 ? 'rgba(255, 255, 255, 0.25)' : '#ef4444',
               fontFamily: 'var(--font-title)',
               fontWeight: '600',
               fontSize: '0.85rem',
-              cursor: myTeamInfo.deductions >= 10 ? 'not-allowed' : 'pointer',
+              cursor: myTeamInfo?.deductions >= 10 ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -71,23 +71,23 @@ export default function MyTeamTab({
             <Plus size={14} /> Add Deduction
           </button>
           <button 
-            onClick={() => handleAdjustDeduction(currentUser.teamCode, -1)}
-            disabled={myTeamInfo.deductions <= 0}
+            onClick={() => handleAdjustDeduction && handleAdjustDeduction(currentUser?.teamCode, -1)}
+            disabled={myTeamInfo?.deductions <= 0}
             style={{
               padding: '10px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border-light)',
               background: 'rgba(255,255,255,0.05)',
-              color: myTeamInfo.deductions <= 0 ? 'rgba(255, 255, 255, 0.25)' : '#ffffff',
+              color: myTeamInfo?.deductions <= 0 ? 'rgba(255, 255, 255, 0.25)' : '#ffffff',
               fontFamily: 'var(--font-title)',
               fontWeight: '600',
               fontSize: '0.85rem',
-              cursor: myTeamInfo.deductions <= 0 ? 'not-allowed' : 'pointer',
+              cursor: myTeamInfo?.deductions <= 0 ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              opacity: myTeamInfo.deductions <= 0 ? 0.5 : 1
+              opacity: myTeamInfo?.deductions <= 0 ? 0.5 : 1
             }}
           >
             <Minus size={14} />
@@ -259,9 +259,9 @@ export default function MyTeamTab({
         <div style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', display: 'grid', gap: '12px' }}>
           {['Red', 'White', 'Black', 'Blue'].map(colorName => {
             const colorHex = getTeamColorHex(colorName);
-            const customName = eventConfig.teamNames?.[colorName.toLowerCase()] || colorName;
-            const colorTeams = Object.entries(campData.teams || {})
-              .filter(([_, t]) => t.side === colorName);
+            const customName = eventConfig?.teamNames?.[colorName.toLowerCase()] || colorName;
+            const colorTeams = Object.entries(campData?.teams || {})
+              .filter(([_, t]) => t?.side === colorName);
 
             return (
               <div key={colorName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -273,8 +273,8 @@ export default function MyTeamTab({
                 ) : (
                   colorTeams.map(([code, t]) => (
                     <div key={code} style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', fontSize: '0.75rem', borderLeft: `3px solid ${colorHex}` }}>
-                      <p style={{ fontWeight: '700', color: '#ffffff', margin: 0 }}>{code} (Grade {t.grade})</p>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', margin: '4px 0 0 0' }}>{t.leaders}</p>
+                      <p style={{ fontWeight: '700', color: '#ffffff', margin: 0 }}>{code} (Grade {t?.grade})</p>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', margin: '4px 0 0 0' }}>{t?.leaders}</p>
                     </div>
                   ))
                 )}

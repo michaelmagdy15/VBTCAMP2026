@@ -5375,6 +5375,13 @@ export default function App() {
             getTeamColorHex={getTeamColorHex}
             eventConfig={eventConfig}
             isMobile={isMobile}
+            campData={campData}
+            daysCount={daysCount}
+            currentActiveSlot={currentActiveSlot}
+            handleAdjustDeduction={handleAdjustDeduction}
+            getEffectiveTimeShift={getEffectiveTimeShift}
+            getShiftedTimeStr={getShiftedTimeStr}
+            isTimeSlotActive={isTimeSlotActive}
           />
         )}
         {/* Tab 3: Full Schedule filterable */}
