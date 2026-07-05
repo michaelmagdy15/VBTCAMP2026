@@ -30,7 +30,7 @@ export default function ScoreboardTab({
       
       {/* Standings section rendered inside Scores page only */}
       <div style={{ width: '100%', marginBottom: '8px' }}>
-        {eventConfig.eventType !== 'normal' && eventConfig.gameEngineType !== 'Shuffle' ? (
+        {(eventConfig.eventType === 'service' || (eventConfig.eventType === 'camp' && eventConfig.gameEngineType !== 'Shuffle')) ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Trophy size={18} style={{ color: '#fbbf24' }} />
@@ -38,7 +38,7 @@ export default function ScoreboardTab({
             </div>
             
             <div className="standings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-              {scoreCalculations.colors.map(colorName => {
+              {scoreCalculations.colors.filter(c => (eventConfig.teamNames?.[c.toLowerCase()] || c) !== 'Unused').map(colorName => {
                 const colorHex = getTeamColorHex(colorName);
                 const score = scoreCalculations.finalScores[colorName] || 0;
                 const winsPts = scoreCalculations.wins[colorName] || 0;
@@ -287,9 +287,9 @@ export default function ScoreboardTab({
               <div>
                 <h3 style={{ fontSize: '0.95rem', color: '#ffffff' }}>{blockTitle}</h3>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  {eventConfig.eventType !== 'normal' && eventConfig.gameEngineType !== 'Shuffle' ? (
+                  {(eventConfig.eventType === 'service' || (eventConfig.eventType === 'camp' && eventConfig.gameEngineType !== 'Shuffle')) ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      {['Red', 'White', 'Black', 'Blue'].map((c, i) => {
+                      {['Red', 'White', 'Black', 'Blue'].filter(c => (eventConfig.teamNames?.[c.toLowerCase()] || c) !== 'Unused').map((c, i) => {
                         const customColorName = eventConfig.teamNames?.[c.toLowerCase()] || c;
                         const colorHex = getTeamColorHex(c);
                         return (
