@@ -392,7 +392,7 @@ export default function RoleLogin({
     [globalServants],
   );
   const leaderServants = useMemo(
-    () => filterServants(globalServants, 'team_'),
+    () => filterServants(globalServants, ['team_', 'leader']),
     [globalServants],
   );
   const serviceLeaderServants = useMemo(
