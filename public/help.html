@@ -299,10 +299,11 @@
         <li><a href="#pwa-install">2. iOS PWA Installation Guide</a></li>
         <li><a href="#roles">3. Role-by-Role Operations Guide</a></li>
         <li><a href="#features">4. Comprehensive Feature Breakdown</a></li>
-        <li><a href="#connectivity">5. Localized Connectivity & Optimization</a></li>
-        <li><a href="#offline">6. Offline Architecture & Caching</a></li>
-        <li><a href="#trouble">7. Troubleshooting & FAQs</a></li>
-        <li><a href="#appstore">8. App Store Reviewer Information</a></li>
+        <li><a href="#games">5. Event Games & Station Details</a></li>
+        <li><a href="#connectivity">6. Localized Connectivity & Optimization</a></li>
+        <li><a href="#offline">7. Offline Architecture & Caching</a></li>
+        <li><a href="#trouble">8. Troubleshooting & FAQs</a></li>
+        <li><a href="#appstore">9. App Store Reviewer Information</a></li>
       </ul>
     </div>
 
@@ -362,6 +363,7 @@
           <li><strong>Score Adjustment:</strong> Increase or decrease game scoring points directly on the court.</li>
           <li><strong>Match Completion:</strong> Tap the completion toggle to submit final match results to the server, instantly recalculating scoreboard aggregates.</li>
           <li><strong>Assigned Matches View:</strong> Filter scoreboard timelines to show only the court matches assigned to your referee account.</li>
+          <li><strong>Stopwatch and Timer:</strong> Referees have a dedicated stopwatch for each slot to track timing accurately.</li>
         </ul>
       </div>
 
@@ -387,6 +389,7 @@
           <li><strong>Timeline Shift:</strong> Advance or delay the event timeline blocks dynamically, shifting schedule times across the entire camp instantly.</li>
           <li><strong>Emergency Pings:</strong> Send system-wide, high-priority notification broadcasts and audio-visual alert triggers to all active screens.</li>
           <li><strong>Event Setup:</strong> Customize camp configurations, games, teams, and preset emergency stations.</li>
+          <li><strong>Section-by-Section Saving:</strong> Coordinators can update configurations page-by-page. To prevent accidental data overrides, each section has a dedicated save button with a toast notification to confirm updates.</li>
         </ul>
       </div>
     </div>
@@ -413,6 +416,7 @@
       <ul>
         <li><strong>Filters:</strong> Users can filter schedule entries by Day, Time Block, or specific Teams.</li>
         <li><strong>Active Highlights:</strong> Current active schedule slots are highlighted in bright borders to keep servants synchronized with the timeline.</li>
+        <li><strong>Time Shift Controls:</strong> Shifting the entire schedule is done globally from the Coordinator panel, keeping all screens synchronized.</li>
       </ul>
 
       <h3>🎧 3. Walkie-Talkie Radio Channels</h3>
@@ -430,6 +434,7 @@
       </p>
       <ul>
         <li><strong>GPS Tracking:</strong> Captures and uploads device locations (when permitted) so camp coordinators can locate lost participants.</li>
+        <li><strong>Layer Toggles:</strong> Switch dynamically between low-data Street view and high-definition Satellite view to balance image detail and network usage.</li>
         <li><strong>Offline Pre-caching:</strong> Service workers automatically cache map regions so tiles load even in internet dead-zones.</li>
       </ul>
 
@@ -451,7 +456,15 @@
         <li><strong>Broadcasting:</strong> Broadcasts an SOS event containing GPS coordinates and timestamps to the coordinator's dashboard and alerts the device with vibration haptics.</li>
       </ul>
 
-      <h3>⚙️ 7. Terminology Shifts (Camp vs. Service Mode)</h3>
+      <h3>🖥️ 7. Desktop Split Grid</h3>
+      <p>
+        When launching the portal on large screens (desktops or laptops), the app automatically unlocks a split screen layout.
+      </p>
+      <ul>
+        <li><strong>Two-Column Layout:</strong> Displays the Schedule timeline on the left and the Scoreboard/Tug-of-War on the right simultaneously, maximizing efficiency for coordinators.</li>
+      </ul>
+
+      <h3>⚙️ 8. Terminology Shifts (Camp vs. Service Mode)</h3>
       <p>
         Allows churches to reuse the app for spiritual services rather than sports camps. If the active event type is shifted to "Service Mode" in Firestore:
       </p>
@@ -460,9 +473,54 @@
       </ul>
     </div>
 
-    <!-- 5. Localized Connectivity & Optimization -->
+    <!-- 5. Event Games & Station Details -->
+    <div id="games" class="card">
+      <h2>5. Event Games & Station Details</h2>
+      <p>Here is the official reference manual for all 6 games played at VBT Sports Camp, including rules, equipment needed, and assigned leaders:</p>
+
+      <h3>Game 1: Blind Builder</h3>
+      <p><strong>Leaders:</strong> Micho, Emily</p>
+      <p><strong>Rules:</strong> One player is blindfolded and is given plastic cups. They must build a pyramid through verbal instructions from his/her teammates. Each teammate stays stacking until he/she stacks a full pyramid, then the next team member takes his/her turn.</p>
+      <p><strong>Scoring:</strong> The team with the highest number of stacks completed wins.</p>
+      <p><strong>Equipment Needed:</strong> 2 Blindfolds, 20 Plastic Cups, 2 Tables, 10 Tokens</p>
+
+      <h3>Game 2: Skee Ball</h3>
+      <p><strong>Leaders:</strong> Macarious, Dani</p>
+      <p><strong>Rules:</strong> Each team member gets a try at throwing the ball and dropping it in the holes. Referees record accumulated scores.</p>
+      <p><strong>Scoring:</strong> Team with the highest accumulated score wins.</p>
+      <p><strong>Equipment Needed:</strong> Skee ball, Tokens, Table</p>
+
+      <h3>Game 3: Minefield</h3>
+      <p><strong>Leaders:</strong> Nathalie, Kiro</p>
+      <p><strong>Rules:</strong> One player from each team is blindfolded and must cross from one point to the other with obstacles placed throughout. One team member is chosen to guide him or the whole team does. At the end of the obstacle course, the blindfolded team member places a cone with his team's color in an XO (Tic-Tac-Toe) game.</p>
+      <p><strong>Scoring:</strong> The team with the most XO wins receives one token each.</p>
+      <p><strong>Equipment Needed:</strong> 2 Blindfolds, Cones (at least 3 of each color), Obstacles, Tokens, 4 pieces of rope</p>
+
+      <h3>Game 4: Helium Stick & Human Chairs</h3>
+      <p><strong>Leaders:</strong> Karim, John, Cinderella, Patrick</p>
+      <p><strong>Rules:</strong> Each team is split into two halves: one team of four (boys only or girls only) for the Human Chair game, and two teams of three for the Helium Stick game.</p>
+      <ul>
+        <li><strong>Helium Stick:</strong> Each team member must put two fingers under the broomstick and they must lower it to the ground together without losing contact.</li>
+        <li><strong>Human Chairs Circle:</strong> Team members build a circle by lying on each other's laps. Chairs are placed under them initially, then removed one by one until they support themselves.</li>
+      </ul>
+      <p><strong>Equipment Needed:</strong> 4 Broom sticks, 8 Chairs</p>
+
+      <h3>Game 5: Whiffle Ball</h3>
+      <p><strong>Leaders:</strong> Joice, Jessica</p>
+      <p><strong>Rules:</strong> Each team member is given a colored ball and must throw it in its corresponding colored hole. Each team member gets one try.</p>
+      <p><strong>Scoring:</strong> Team with the most goals wins.</p>
+      <p><strong>Equipment Needed:</strong> Whiffle Ball, Table, Tokens</p>
+
+      <h3>Game 6: Blind Shape</h3>
+      <p><strong>Leaders:</strong> Bassem, Sara</p>
+      <p><strong>Rules:</strong> Each team is given a rope and are blindfolded. They are told to create a specific shape (square, triangle, etc.) with the rope. The referee reviews correctness.</p>
+      <p><strong>Scoring:</strong> Team with the highest amount of correct shapes wins.</p>
+      <p><strong>Equipment Needed:</strong> 2 Long ropes, 20 Blindfolds</p>
+    </div>
+
+    <!-- 6. Localized Connectivity & Optimization -->
     <div id="connectivity" class="card">
-      <h2>5. Localized Connectivity & Optimization</h2>
+      <h2>6. Localized Connectivity & Optimization</h2>
       <p>
         To ensure stable operation on carrier networks in Egypt (Vodafone, Orange, WE, Etisalat), the platform implements specific network optimizations:
       </p>
@@ -473,22 +531,22 @@
       </ul>
     </div>
 
-    <!-- 6. Offline Architecture & Caching -->
+    <!-- 7. Offline Architecture & Caching -->
     <div id="offline" class="card">
-      <h2>6. Offline Architecture & Caching</h2>
+      <h2>7. Offline Architecture & Caching</h2>
       <p>
         The portal is designed as an offline-first system:
       </p>
       <ul>
-        <li><strong>Workbox Caching:</strong> Pre-caches the React HTML shell, Outift/Inter local fonts, icons, and stylesheets.</li>
+        <li><strong>Workbox Caching:</strong> Pre-caches the React HTML shell, Outfit/Inter local fonts, icons, and stylesheets.</li>
         <li><strong>Tile Caching:</strong> Stores up to 500 Leaflet map tiles. Coordinates scrolled through while connected remain fully functional when offline.</li>
         <li><strong>IndexedDB Queue:</strong> Uses Firestore local cache databases. Data writes are saved locally and synced automatically once internet connectivity is restored.</li>
       </ul>
     </div>
 
-    <!-- 7. Troubleshooting & FAQs -->
+    <!-- 8. Troubleshooting & FAQs -->
     <div id="trouble" class="card">
-      <h2>7. Troubleshooting & FAQs</h2>
+      <h2>8. Troubleshooting & FAQs</h2>
       <h3>Q: Walkie-Talkie microphone fails to connect?</h3>
       <p>
         Go to your browser or device app settings and allow microphone permissions for <code>https://vbt.mitrixo.com</code>.
@@ -503,9 +561,9 @@
       </p>
     </div>
 
-    <!-- 8. App Store Reviewer Information -->
+    <!-- 9. App Store Reviewer Information -->
     <div id="appstore" class="card">
-      <h2>8. App Store Reviewer Information</h2>
+      <h2>9. App Store Reviewer Information</h2>
       <p>
         This section contains required metadata compliance policies for Apple App Store reviewers:
       </p>

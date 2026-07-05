@@ -106,7 +106,27 @@ import LogisticsPanel from './components/LogisticsPanel';
 import LogisticsTab from './components/LogisticsTab';
 import FeedMessage from './components/FeedMessage';
 import ScheduleExporter from './components/ScheduleExporter';
-const WalkieTalkie = React.lazy(() => import('./components/WalkieTalkie'));
+const lazyWithRetry = (componentImport) => {
+  return React.lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error("Error loading chunk:", error);
+      if (
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('dynamically imported module') ||
+        error.message?.includes('Loading chunk') ||
+        error.name === 'TypeError'
+      ) {
+        console.warn("Chunk load error detected, forcing reload...");
+        window.location.reload();
+      }
+      throw error;
+    }
+  });
+};
+
+const WalkieTalkie = lazyWithRetry(() => import('./components/WalkieTalkie'));
 import GPSMap from './components/GPSMap';
 import ScheduleBuilder from './components/ScheduleBuilder';
 import OfflineBackupModal from './components/OfflineBackupModal';
@@ -116,8 +136,8 @@ import { subscribeToMapConfig, updateMapConfig } from './mapEngine';
 
 // Extracted Tab Components
 import MyTeamTab from './components/MyTeamTab';
-const TimelineFeedTab = React.lazy(() => import('./components/TimelineFeedTab'));
-const ScoreboardTab = React.lazy(() => import('./components/ScoreboardTab'));
+const TimelineFeedTab = lazyWithRetry(() => import('./components/TimelineFeedTab'));
+const ScoreboardTab = lazyWithRetry(() => import('./components/ScoreboardTab'));
 import ScheduleTab from './components/ScheduleTab';
 import SettingsTab from './components/SettingsTab';
 import ServiceTab from './components/ServiceTab';
@@ -125,6 +145,42 @@ import ServiceTab from './components/ServiceTab';
 // Firebase Web Push VAPID key (Generate in Firebase Console -> Project Settings -> Cloud Messaging -> Web Push Certificates)
 // Replace this placeholder with your actual key to connect browser push notifications.
 const WEBPUSH_VAPID_KEY = "BBWNlIKCRTY40ybSED7bBc5AUlRT7IHvZ0EajhdPVnxDcuSnZ7_3I50nXF79S6QG8cRcqr3UCIVBcC-v4Yvc3RU"; 
+
+const FALLBACK_SERVANT_ASSIGNMENTS = {
+  // Team Leaders
+  'andrew': 'team_red_1',
+  'sherry': 'team_red_1',
+  'amberto': 'team_red_2',
+  'youstina': 'team_red_2',
+  'youssef': 'team_white_1',
+  'tony': 'team_white_1',
+  'seif': 'team_white_2',
+  'rougy': 'team_white_2',
+  'tony tafaya': 'team_black_1',
+  'sandra': 'team_black_1',
+  'kirollos': 'team_black_2',
+  'martina': 'team_black_2',
+  
+  // Game Leaders / Referees
+  'micho': 'station_1',
+  'emily': 'station_1',
+  'macarious': 'station_2',
+  'dani': 'station_2',
+  'nathalie': 'station_3',
+  'kiro': 'station_3',
+  'karim': 'station_4',
+  'john': 'station_4',
+  'cinderella': 'station_4',
+  'patrick': 'station_4',
+  'joice': 'station_5',
+  'jessica': 'station_5',
+  'bassem': 'station_6',
+  'sara': 'station_6',
+  
+  // Other roles
+  'michael mitry': 'media',
+  'amy': 'equipment'
+};
 
 // Default state when Firestore is empty
 const defaultCampState = {
@@ -1429,21 +1485,29 @@ export default function App() {
 
   // Auto-populate refereeSelectedGame for Service Mode referees based on their roleCode
   useEffect(() => {
-    if (currentUser && currentUser.role === 'referee' && eventConfig.eventType === 'service' && currentUser.roleCode) {
-      let autoGame = '';
-      if (currentUser.roleCode.startsWith('station_')) {
-        const key = currentUser.roleCode;
-        if (eventConfig.stations?.[key]?.name) {
-          autoGame = eventConfig.stations[key].name;
-        }
-      } else if (currentUser.roleCode.startsWith('big_game_')) {
-        autoGame = eventConfig.bigGameName || 'Loyalty (Big Game)';
-      } else if (currentUser.roleCode === 'reflection') {
-        autoGame = eventConfig.reflectionName || 'Reflection';
+    if (currentUser && currentUser.role === 'referee' && eventConfig.eventType === 'service') {
+      const sId = currentUser.id || currentUser.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      let roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[sId];
+      if (!roleCode && currentUser.name) {
+        const normName = currentUser.name.toLowerCase().trim();
+        roleCode = FALLBACK_SERVANT_ASSIGNMENTS[normName];
       }
-      if (autoGame && autoGame !== refereeSelectedGame) {
-        setRefereeSelectedGame(autoGame);
-        localStorage.setItem('vbt_ref_selected_game', autoGame);
+      if (roleCode) {
+        let autoGame = '';
+        if (roleCode.startsWith('station_')) {
+          const key = roleCode;
+          if (eventConfig.stations?.[key]?.name) {
+            autoGame = eventConfig.stations[key].name;
+          }
+        } else if (roleCode.startsWith('big_game_')) {
+          autoGame = eventConfig.bigGameName || 'Loyalty (Big Game)';
+        } else if (roleCode === 'reflection') {
+          autoGame = eventConfig.reflectionName || 'Reflection';
+        }
+        if (autoGame && autoGame !== refereeSelectedGame) {
+          setRefereeSelectedGame(autoGame);
+          localStorage.setItem('vbt_ref_selected_game', autoGame);
+        }
       }
     }
   }, [currentUser, eventConfig, refereeSelectedGame]);
@@ -1680,11 +1744,46 @@ export default function App() {
   useEffect(() => {
     if (!currentEventCode) return;
     const unsub = subscribeToServiceData(currentEventCode, (data) => {
-      if (data) {
+      if (data && (data.serviceBrief || (data.groups && data.groups.length > 0) || (data.games && data.games.length > 0))) {
         setServiceData({ serviceBrief: data.serviceBrief || '', groups: data.groups || [], games: data.games || [] });
         setEditServiceBrief(data.serviceBrief || '');
         setEditGroups(data.groups || []);
         setEditGames(data.games || []);
+      } else {
+        // Populate beautiful default details for outreach service events
+        const defaultData = {
+          serviceBrief: "Welcome to today's VBT Sports Outreach Service! Today we are visiting Ard el Golf to share the joy of sports, run active game stations, and share a Bible lesson on Faith and Teamwork. Let's make sure every child has a wonderful, safe, and inspiring experience!",
+          groups: [
+            { leaderName: "Mina Magdy", kidCount: 15 },
+            { leaderName: "Fady Shenouda", kidCount: 12 },
+            { leaderName: "Joy Michael", kidCount: 18 },
+            { leaderName: "Sarah Gamil", kidCount: 14 }
+          ],
+          games: [
+            { 
+              name: "Relay Race", 
+              location: "Main Field", 
+              howToPlay: "Divide kids into equal lines. First player runs to the cone, grabs a tennis ball, runs back, and tags the next player. The fastest team to complete wins!", 
+              lesson: "Faithfulness & Perseverance (Hebrews 12:1-2) — Just like a relay race, we run our race of faith with patience, looking unto Jesus." 
+            },
+            { 
+              name: "Target Throw", 
+              location: "Court Yard", 
+              howToPlay: "Each child gets 3 attempts to throw beanbags into the colored hula hoops placed at different distances. Hoops have different point values (10, 20, 30).", 
+              lesson: "Aiming High & Focus (Philippians 3:14) — We press toward the mark for the prize of the high calling of God in Christ Jesus." 
+            },
+            { 
+              name: "Bible Trivia Battle", 
+              location: "Shaded Tree Area", 
+              howToPlay: "Ask questions from today's lesson. First child/group to raise their hand gets to answer. Each correct answer wins a point.", 
+              lesson: "Treasuring God's Word (Psalm 119:11) — Thy word have I hid in mine heart, that I might not sin against thee." 
+            }
+          ]
+        };
+        setServiceData(defaultData);
+        setEditServiceBrief(defaultData.serviceBrief);
+        setEditGroups(defaultData.groups);
+        setEditGames(defaultData.games);
       }
     });
     return () => unsub();
@@ -1932,7 +2031,7 @@ export default function App() {
 
   // Login Handler — uses dynamic per-event passcodes from eventConfig
   const handleLogin = (userAttempt) => {
-    const { role, name, passcode, assignedTeams, assignedGames } = userAttempt;
+    const { id, role, name, passcode, assignedTeams, assignedGames } = userAttempt;
     const normalizedPasscode = (passcode || '').trim().toUpperCase();
 
     let resolvedRole = 'viewer';
@@ -1986,6 +2085,7 @@ export default function App() {
     }
 
     const user = {
+      id: id || name?.toLowerCase().replace(/[^a-z0-9]/g, '_'),
       role: resolvedRole,
       name: name || (resolvedRole === 'admin' ? 'Coordinator' : 'Guest'),
       teamCode,
@@ -5133,7 +5233,12 @@ export default function App() {
   const isReferee = currentUser && currentUser.role === 'referee';
   const getRefereeAssignedGame = () => {
     if (!currentUser || currentUser.role !== 'referee') return null;
-    const roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[currentUser.id];
+    const sId = currentUser.id || currentUser.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    let roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[sId];
+    if (!roleCode && currentUser.name) {
+      const normName = currentUser.name.toLowerCase().trim();
+      roleCode = FALLBACK_SERVANT_ASSIGNMENTS[normName];
+    }
     if (roleCode) {
       if (roleCode.startsWith('station_')) {
         return eventConfig.stations?.[roleCode]?.name || null;
@@ -5205,7 +5310,7 @@ export default function App() {
         boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
       }}>
         <div className="header-container" style={{
-          maxWidth: '600px',
+          maxWidth: '1200px',
           margin: '0 auto',
           padding: '12px 16px',
           display: 'flex',

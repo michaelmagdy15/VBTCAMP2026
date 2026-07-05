@@ -106,12 +106,25 @@
       margin-top: 24px;
       margin-bottom: 10px;
       color: #ffffff;
+      border-left: 3px solid var(--vbt-blue);
+      padding-left: 10px;
     }
 
     p {
       color: var(--text-secondary);
       margin-bottom: 16px;
       font-size: 0.98rem;
+    }
+
+    ul, ol {
+      margin-left: 24px;
+      margin-bottom: 20px;
+      color: var(--text-secondary);
+      font-size: 0.98rem;
+    }
+
+    li {
+      margin-bottom: 10px;
     }
 
     .card {
@@ -244,6 +257,36 @@
     .badge-referee { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.3); }
     .badge-servant { background: rgba(255, 145, 0, 0.15); color: #ff9100; border-color: rgba(255, 145, 0, 0.3); }
     .badge-sos { background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+    .badge-info { background: rgba(168, 85, 247, 0.15); color: #c084fc; border-color: rgba(168, 85, 247, 0.3); }
+
+    .game-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .game-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .game-leader {
+      font-size: 0.82rem;
+      color: var(--vbt-sky);
+      font-weight: 600;
+      background: rgba(96, 165, 250, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(96, 165, 250, 0.2);
+    }
 
     .footer {
       text-align: center;
@@ -285,7 +328,7 @@
         <div class="flow-node">
           <span class="step-tag">Step 1</span>
           <div class="flow-node-title">Boot App</div>
-          <div class="flow-node-desc">Legitimate sessions sign in anonymously automatically.</div>
+          <div class="flow-node-desc">Legitimate sessions sign in anonymously automatically on boot.</div>
         </div>
         
         <div class="flow-arrow"></div>
@@ -306,7 +349,7 @@
       </div>
       
       <p style="margin-top: 16px;">
-        Once complete, the client unlocks matching tabs and settings. Voluteers get instantly redirected to the dashboard without entering passcodes.
+        Once complete, the client unlocks matching tabs and settings. Volunteers get instantly redirected to the dashboard without entering passcodes. Referees/Game Leaders will automatically have their assigned station selected.
       </p>
     </div>
 
@@ -321,7 +364,7 @@
         <div class="flow-node">
           <span class="step-tag">Step 1</span>
           <div class="flow-node-title">Find Assigned Game</div>
-          <div class="flow-node-desc">Select your court or game under the Scoreboard tab.</div>
+          <div class="flow-node-desc">Your assigned game is auto-selected. You can manage matchups under the Schedule tab.</div>
         </div>
         
         <div class="flow-arrow"></div>
@@ -382,44 +425,209 @@
       </div>
     </div>
 
-    <!-- 4. Emergency SOS Flow -->
+    <!-- 4. Desktop Split Grid -->
     <div class="card">
-      <h2><span class="role-badge badge-sos">Emergency SOS</span> Flow 4: Triggering Assistance Pings</h2>
+      <h2>🖥️ Flow 4: Desktop Split-Grid Workspace</h2>
       <p>
-        If a safety issue occurs during camp, anyone in distress can dispatch coordinates immediately:
+        When launching the portal on large screens (desktops or laptops), the app automatically unlocks a split screen:
       </p>
       
-      <div class="flowchart">
+      <div class="flowchart flowchart-horizontal">
         <div class="flow-node">
           <span class="step-tag">Step 1</span>
-          <div class="flow-node-title">Trigger SOS</div>
-          <div class="flow-node-desc">Tap the red SOS button or banner inside the Dashboard.</div>
+          <div class="flow-node-title">Access Schedule / Scores</div>
+          <div class="flow-node-desc">Open either Schedule or Scoreboard tab on a desktop screen.</div>
         </div>
         
         <div class="flow-arrow"></div>
         
         <div class="flow-node">
           <span class="step-tag">Step 2</span>
-          <div class="flow-node-title">Select Preset Location</div>
-          <div class="flow-node-desc">Select nearest station (Soccer Court, Dining Hall, etc.).</div>
+          <div class="flow-node-title">Split-Grid Activation</div>
+          <div class="flow-node-desc">The app displays the Timeline on the left and the Scoreboard/Tug-of-War on the right.</div>
         </div>
         
         <div class="flow-arrow"></div>
         
         <div class="flow-node">
           <span class="step-tag">Step 3</span>
-          <div class="flow-node-title">Capture & Broadcast</div>
-          <div class="flow-node-desc">App retrieves GPS coordinates, triggers device haptics, and broadcasts alerts.</div>
+          <div class="flow-node-title">Simultaneous Control</div>
+          <div class="flow-node-desc">Coordinators can manage schedule pings while watching scores live on the same screen!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Coordinator Save Controls -->
+    <div class="card">
+      <h2>💾 Flow 5: Coordinator Settings & Individual Section Saving</h2>
+      <p>
+        Coordinators can update configurations page-by-page. To prevent accidental data overrides, each section has a dedicated save button:
+      </p>
+      
+      <div class="flowchart">
+        <div class="flow-node">
+          <span class="step-tag">Step 1</span>
+          <div class="flow-node-title">Modify Data Section</div>
+          <div class="flow-node-desc">Edit Team Names, Station/Game Names, or Servant Assignments in their inputs.</div>
         </div>
         
         <div class="flow-arrow"></div>
         
         <div class="flow-node">
-          <span class="step-tag">Step 4</span>
-          <div class="flow-node-title">Coordinator Responds</div>
-          <div class="flow-node-desc">Alert flashes red on all leader screens, showing the map location marker.</div>
+          <span class="step-tag">Step 2</span>
+          <div class="flow-node-title">Click "Save Section"</div>
+          <div class="flow-node-desc">Tap the individual save button located inside the edited section container.</div>
+        </div>
+        
+        <div class="flow-arrow"></div>
+        
+        <div class="flow-node">
+          <span class="step-tag">Step 3</span>
+          <div class="flow-node-title">Success Toast</div>
+          <div class="flow-node-desc">A green success notification slides in, confirming updates have been committed to the database.</div>
         </div>
       </div>
+    </div>
+
+    <!-- 6. Active Event Games & Stations -->
+    <div class="card">
+      <h2>🎮 Complete Station & Game Rules Manual</h2>
+      <p>
+        Below is the official reference manual for all 6 games played at VBT Sports Camp, including rules, equipment needed, and assigned leaders:
+      </p>
+
+      <!-- Game 1 -->
+      <div class="game-card">
+        <div class="game-title">
+          <span>Game 1: Blind Builder</span>
+          <span class="game-leader">Leaders: Micho, Emily</span>
+        </div>
+        <p><strong>Rules:</strong> One player is blindfolded and is given plastic cups. They must build a pyramid through verbal instructions from his/her teammates or a single teammate. Each teammate stays stacking until he/she stacks a full pyramid, then the next team member takes his/her turn.</p>
+        <p><strong>Scoring:</strong> The team with the highest number of stacks completed wins.</p>
+        <p><strong>Equipment Needed:</strong></p>
+        <ul>
+          <li>2 Blindfolds</li>
+          <li>20 Plastic Cups</li>
+          <li>2 Tables</li>
+          <li>10 Tokens</li>
+        </ul>
+      </div>
+
+      <!-- Game 2 -->
+      <div class="game-card">
+        <div class="game-title">
+          <span>Game 2: Skee Ball</span>
+          <span class="game-leader">Leaders: Macarious, Dani</span>
+        </div>
+        <p><strong>Rules:</strong> Each team member gets a try at throwing the ball and dropping it in the holes. Referees record accumulated scores.</p>
+        <p><strong>Scoring:</strong> Team with the highest accumulated score wins.</p>
+        <p><strong>Reference:</strong> Classic Skee-Ball - Fodor Billiards</p>
+        <p><strong>Equipment Needed:</strong></p>
+        <ul>
+          <li>Skee ball</li>
+          <li>Tokens</li>
+          <li>Table</li>
+        </ul>
+      </div>
+
+      <!-- Game 3 -->
+      <div class="game-card">
+        <div class="game-title">
+          <span>Game 3: Minefield</span>
+          <span class="game-leader">Leaders: Nathalie, Kiro</span>
+        </div>
+        <p><strong>Rules:</strong> One player from each team is blindfolded and must cross from one point to the other with obstacles placed throughout. One team member is chosen to guide him or the whole team does. At the end of the obstacle course, the blindfolded team member places a cone with his team's color in an XO (Tic-Tac-Toe) game.</p>
+        <p><strong>Scoring:</strong> The team with the most XO wins receives one token each.</p>
+        <p><strong>Equipment Needed:</strong></p>
+        <ul>
+          <li>2 Blindfolds</li>
+          <li>Cones (at least 3 of each color)</li>
+          <li>Obstacles</li>
+          <li>Tokens</li>
+          <li>4 pieces of rope</li>
+        </ul>
+      </div>
+
+      <!-- Game 4 -->
+      <div class="game-card">
+        <div class="game-title">
+          <span>Game 4: Helium Stick & Human Chairs</span>
+          <span class="game-leader">Leaders: Karim, John, Cinderella, Patrick</span>
+        </div>
+        <p><strong>Rules:</strong> Each team is split into two halves: one team of four (boys only or girls only) for the Human Chair game, and two teams of three for the Helium Stick game.</p>
+        <ul>
+          <li><strong>Helium Stick:</strong> Each team member must put two fingers under the broomstick and they must lower it to the ground together without losing contact.</li>
+          <li><strong>Human Chairs Circle:</strong> Team members build a circle by lying on each other's laps. Chairs are placed under them initially, then removed one by one until they support themselves.</li>
+        </ul>
+        <p><strong>Equipment Needed:</strong></p>
+        <ul>
+          <li>4 Broom sticks</li>
+          <li>8 Chairs</li>
+        </ul>
+      </div>
+
+      <!-- Game 5 -->
+      <div class="game-card">
+        <div class="game-title">
+          <span>Game 5: Whiffle Ball</span>
+          <span class="game-leader">Leaders: Joice, Jessica</span>
+        </div>
+        <p><strong>Rules:</strong> Each team member is given a colored ball and must throw it in its corresponding colored hole. Each team member gets one try.</p>
+        <p><strong>Scoring:</strong> Team with the most goals wins.</p>
+        <p><strong>Equipment Needed:</strong></p>
+        <ul>
+          <li>Whiffle Ball</li>
+          <li>Table</li>
+          <li>Tokens</li>
+        </ul>
+      </div>
+
+      <!-- Game 6 -->
+      <div class="game-card">
+        <div class="game-title">
+          <span>Game 6: Blind Shape</span>
+          <span class="game-leader">Leaders: Bassem, Sara</span>
+        </div>
+        <p><strong>Rules:</strong> Each team is given a rope and are blindfolded. They are told to create a specific shape (square, triangle, etc.) with the rope. The referee reviews correctness.</p>
+        <p><strong>Scoring:</strong> Team with the highest amount of correct shapes wins.</p>
+        <p><strong>Equipment Needed:</strong></p>
+        <ul>
+          <li>2 Long ropes</li>
+          <li>20 Blindfolds</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 7. Servant Roster Roster roles -->
+    <div class="card">
+      <h2>👥 Official Servant Roster & Assignments</h2>
+      <p>
+        The platform maps logged-in servants to their specific team schedules or game control channels. Below is the active roster structure:
+      </p>
+      
+      <h3>❤️ Team 1 & 2 Leaders (Red Team)</h3>
+      <ul>
+        <li><strong>Team 1 Leaders:</strong> Andrew, Sherry</li>
+        <li><strong>Team 2 Leaders:</strong> Amberto, Youstina</li>
+      </ul>
+
+      <h3>🤍 Team 3 & 4 Leaders (White Team)</h3>
+      <ul>
+        <li><strong>Team 3 Leaders:</strong> Youssef, Tony</li>
+        <li><strong>Team 4 Leaders:</strong> Seif, Rougy</li>
+      </ul>
+
+      <h3>🖤 Team 5 & 6 Leaders (Black Team)</h3>
+      <ul>
+        <li><strong>Team 5 Leaders:</strong> Tony Tafaya, Sandra</li>
+        <li><strong>Team 6 Leaders:</strong> Kirollos, Martina</li>
+      </ul>
+
+      <h3>📸 Specialized Roles</h3>
+      <ul>
+        <li><strong>Multimedia Coordinator:</strong> Michael Mitry</li>
+        <li><strong>Equipment Manager:</strong> Amy</li>
+      </ul>
     </div>
 
     <div class="footer">

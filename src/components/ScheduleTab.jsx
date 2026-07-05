@@ -2,6 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, Users, Calendar, MapPin, Clock, Clock3 } from 'lucide-react';
 import ScheduleExporter from './ScheduleExporter';
 
+const FALLBACK_SERVANT_ASSIGNMENTS = {
+  // Team Leaders
+  'andrew': 'team_red_1',
+  'sherry': 'team_red_1',
+  'amberto': 'team_red_2',
+  'youstina': 'team_red_2',
+  'youssef': 'team_white_1',
+  'tony': 'team_white_1',
+  'seif': 'team_white_2',
+  'rougy': 'team_white_2',
+  'tony tafaya': 'team_black_1',
+  'sandra': 'team_black_1',
+  'kirollos': 'team_black_2',
+  'martina': 'team_black_2',
+  
+  // Game Leaders / Referees
+  'micho': 'station_1',
+  'emily': 'station_1',
+  'macarious': 'station_2',
+  'dani': 'station_2',
+  'nathalie': 'station_3',
+  'kiro': 'station_3',
+  'karim': 'station_4',
+  'john': 'station_4',
+  'cinderella': 'station_4',
+  'patrick': 'station_4',
+  'joice': 'station_5',
+  'jessica': 'station_5',
+  'bassem': 'station_6',
+  'sara': 'station_6',
+  
+  // Other roles
+  'michael mitry': 'media',
+  'amy': 'equipment'
+};
+
 // Localized Stopwatch & Timer Components to Optimize Render Performance
 function MatchupStopwatch({ actualStart, actualEnd, scheduledMinutes }) {
   const [now, setNow] = useState(Date.now());
@@ -353,7 +389,12 @@ export default function ScheduleTab({
 
       {/* ── MY ASSIGNMENT HERO CARD (referee / leader roles) ── */}
       {currentUser && (currentUser.role === 'referee' || currentUser.role === 'leader') && (() => {
-        const roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[currentUser.id];
+        const sId = currentUser.id || currentUser.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        let roleCode = currentUser.roleCode || eventConfig.servantAssignments?.[sId];
+        if (!roleCode && currentUser.name) {
+          const normName = currentUser.name.toLowerCase().trim();
+          roleCode = FALLBACK_SERVANT_ASSIGNMENTS[normName];
+        }
         let assignmentTitle = '';
         let assignmentDetail = '';
         let assignmentIcon = '📍';
@@ -556,7 +597,7 @@ export default function ScheduleTab({
         </div>
       )}
 
-      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode)) || showFullSchedule) && (
+      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode && eventConfig?.eventType !== 'service')) || showFullSchedule) && (
         <>
           <ScheduleExporter
             scheduleData={campData}
@@ -1357,7 +1398,7 @@ export default function ScheduleTab({
         </div>
       )}
 
-      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode)) || showFullSchedule) && (
+      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode && eventConfig?.eventType !== 'service')) || showFullSchedule) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredMatchups.length === 0 ? (
             <div className="empty-state">
@@ -1573,7 +1614,13 @@ export default function ScheduleTab({
                 const rosterList = globalServants
                   .filter(s => activeServants.includes(s.id))
                   .map(s => {
-                    const roleCode = eventConfig.servantAssignments?.[s.id] || 'volunteer';
+                    let roleCode = eventConfig.servantAssignments?.[s.id] || 'volunteer';
+                    if (roleCode === 'volunteer' && s.name) {
+                      const normName = s.name.toLowerCase().trim();
+                      if (FALLBACK_SERVANT_ASSIGNMENTS[normName]) {
+                        roleCode = FALLBACK_SERVANT_ASSIGNMENTS[normName];
+                      }
+                    }
                     let roleName = 'Volunteer / Ref';
                     let locationName = 'General';
                     let teamName = 'None';

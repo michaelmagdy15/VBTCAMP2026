@@ -10,6 +10,42 @@ import {
 } from 'lucide-react';
 import { ROLES } from '../permissions';
 
+const FALLBACK_SERVANT_ASSIGNMENTS = {
+  // Team Leaders
+  'andrew': 'team_red_1',
+  'sherry': 'team_red_1',
+  'amberto': 'team_red_2',
+  'youstina': 'team_red_2',
+  'youssef': 'team_white_1',
+  'tony': 'team_white_1',
+  'seif': 'team_white_2',
+  'rougy': 'team_white_2',
+  'tony tafaya': 'team_black_1',
+  'sandra': 'team_black_1',
+  'kirollos': 'team_black_2',
+  'martina': 'team_black_2',
+  
+  // Game Leaders / Referees
+  'micho': 'station_1',
+  'emily': 'station_1',
+  'macarious': 'station_2',
+  'dani': 'station_2',
+  'nathalie': 'station_3',
+  'kiro': 'station_3',
+  'karim': 'station_4',
+  'john': 'station_4',
+  'cinderella': 'station_4',
+  'patrick': 'station_4',
+  'joice': 'station_5',
+  'jessica': 'station_5',
+  'bassem': 'station_6',
+  'sara': 'station_6',
+  
+  // Other roles
+  'michael mitry': 'media',
+  'amy': 'equipment'
+};
+
 // ─── Constants ───────────────────────────────────────────────
 
 const ROLE_META = [
@@ -288,10 +324,19 @@ function filterServants(globalServants, rolePrefixes) {
  * Given a servant object, extract assigned team codes from their role
  * (e.g. role "team_red" → ["red"]).
  */
-function extractAssignedTeams(servant) {
-  if (!servant?.role) return [];
-  const role = servant.role.toLowerCase();
-  if (role.startsWith('team_')) {
+function extractAssignedTeams(servant, eventConfig) {
+  const sId = servant?.id || servant?.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  let role = servant?.role || '';
+  if (eventConfig?.servantAssignments?.[sId]) {
+    role = eventConfig.servantAssignments[sId];
+  }
+  if ((!role || role === 'volunteer') && servant?.name) {
+    const normName = servant.name.toLowerCase().trim();
+    if (FALLBACK_SERVANT_ASSIGNMENTS[normName]) {
+      role = FALLBACK_SERVANT_ASSIGNMENTS[normName];
+    }
+  }
+  if (role && role.toLowerCase().startsWith('team_')) {
     return [role];
   }
   return [];
@@ -302,10 +347,15 @@ function extractAssignedTeams(servant) {
  * Looks at eventConfig.servantAssignments or the servant's own metadata.
  */
 function extractAssignedGames(servant, eventConfig) {
-  // If eventConfig has explicit servant → game assignments
-  if (eventConfig?.servantAssignments) {
-    const entry = eventConfig.servantAssignments[servant?.name];
-    if (Array.isArray(entry?.games)) return entry.games;
+  const sId = servant?.id || servant?.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  let roleCode = eventConfig?.servantAssignments?.[sId];
+  if (!roleCode && servant?.name) {
+    const normName = servant.name.toLowerCase().trim();
+    roleCode = FALLBACK_SERVANT_ASSIGNMENTS[normName];
+  }
+  if (roleCode && roleCode.startsWith('station_')) {
+    const station = eventConfig?.stations?.[roleCode];
+    if (station?.name) return [station.name];
   }
   // Fallback: if the servant object itself carries games
   if (Array.isArray(servant?.assignedGames)) return servant.assignedGames;
@@ -459,7 +509,7 @@ export default function RoleLogin({
     // 3. Team Leader Login
     if (selectedRole === ROLES.TEAM_LEADER) {
       const servant = leaderServants.find((s) => s.name === name.trim());
-      user.assignedTeams = extractAssignedTeams(servant);
+      user.assignedTeams = extractAssignedTeams(servant, eventConfig);
     }
     // 4. Service Leader Login
     if (selectedRole === ROLES.SERVICE_LEADER) {

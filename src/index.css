@@ -516,7 +516,7 @@ body {
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   padding-left:  max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  max-width: 600px;
+  max-width: 1200px;
   margin: 0 auto;
   width: 100%;
   min-width: 0;
@@ -1382,3 +1382,13 @@ button, a, [role="button"] {
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* Desktop adaptation grid layout */
+@media (min-width: 768px) {
+  .service-tab-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px !important;
+    align-items: start;
+  }
+}
