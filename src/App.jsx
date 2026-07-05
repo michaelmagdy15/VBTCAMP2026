@@ -2646,8 +2646,8 @@ export default function App() {
       }
       const newNames = [
         "Andrew", "Sherry", "Amberto", "Youstina", "Youssef", "Tony", "Seif", "Rougy", "Tony tafaya", "Sandra", "Kirollos", "Martina",
-        "Dani", "Emily", "Maria", "Micho", "Nathalie", "Kiro", "Jessica", "John", "Cinderella", "Patrick", "Joice", "Karim", "Bassem", "Sara",
-        "Michael Mitry", "System Admin", "Amy", "Michel Ghobrial"
+        "Dani", "Emily", "Micho", "Nathalie", "Kiro", "Jessica", "John", "Cinderella", "Patrick", "Joice", "Karim", "Bassem", "Sara",
+        "Macarious", "Michael Mitry", "System Admin", "Amy", "Michel Ghobrial"
       ];
       
       const servantAssignments = {};
@@ -2667,8 +2667,8 @@ export default function App() {
       servantAssignments['kirollos'] = 'team_red_6';
       servantAssignments['martina'] = 'team_blue_6';
 
-      ['dani', 'emily'].forEach(id => servantAssignments[id] = 'station_1');
-      ['maria', 'micho'].forEach(id => servantAssignments[id] = 'station_2');
+      ['micho', 'emily'].forEach(id => servantAssignments[id] = 'station_1');
+      ['macarious', 'dani'].forEach(id => servantAssignments[id] = 'station_2');
       ['nathalie', 'kiro'].forEach(id => servantAssignments[id] = 'station_3');
       ['karim', 'john', 'cinderella', 'patrick'].forEach(id => servantAssignments[id] = 'station_4');
       ['joice', 'jessica'].forEach(id => servantAssignments[id] = 'station_5');
