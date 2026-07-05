@@ -5258,7 +5258,7 @@ export default function App() {
 
     if (eventConfig?.eventType === 'service') {
       if (isReferee) return [
-        { id: 'service', label: 'My Games', icon: BookOpen },
+        { id: 'schedule', label: 'My Games', icon: BookOpen },
         { id: 'scoreboard', label: 'Scores', icon: Trophy },
         { id: 'info', label: 'Map', icon: MapIcon },
         { id: 'walkie', label: 'Radio', icon: Radio },
