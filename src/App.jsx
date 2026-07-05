@@ -1240,6 +1240,229 @@ export default function App() {
     }
   };
 
+  const renderQuickJoinFormModal = () => {
+    if (!showQuickJoinForm) return null;
+    return (
+      <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(5,7,20,0.95)',backdropFilter:'blur(14px)',padding:'24px'}}>
+        <div style={{background:'#0d1426',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'24px',padding:'24px',width:'100%',maxWidth:'400px',boxSizing:'border-box'}}>
+          {checkInStep === 'search' && (
+            <>
+              <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Self Check-in</h2>
+              <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'20px'}}>Find your name in the roster to check in for {quickJoinData.code}.</p>
+              
+              <div style={{position:'relative', marginBottom:'20px'}}>
+                <input 
+                  type="text" 
+                  placeholder="🔍 Type your name..." 
+                  value={checkInSearchQuery}
+                  onChange={(e) => setCheckInSearchQuery(e.target.value)}
+                  style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
+                />
+                {checkInSearchQuery.trim().length >= 1 && (
+                  <div style={{maxHeight:'160px',overflowY:'auto',background:'#080d1a',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',marginTop:'6px'}}>
+                    {globalServants
+                      .filter(s => s.name?.toLowerCase().includes(checkInSearchQuery.toLowerCase()))
+                      .map(s => (
+                        <div 
+                          key={s.id} 
+                          onClick={() => {
+                            setSelectedCheckInServant(s);
+                            setCheckInPasscode('');
+                            setCheckInStep('passcode');
+                            setCheckInError('');
+                          }}
+                          style={{padding:'10px 14px',color:'#fff',fontSize:'0.85rem',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.05)',textAlign:'left'}}
+                        >
+                          {s.name} <span style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginLeft:'6px'}}>({s.role})</span>
+                        </div>
+                      ))
+                    }
+                    {globalServants.filter(s => s.name?.toLowerCase().includes(checkInSearchQuery.toLowerCase())).length === 0 && (
+                      <div style={{padding:'12px 14px',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',textAlign:'center'}}>
+                        No matches found.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:'20px',textAlign:'center'}}>
+                <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.4)',marginBottom:'12px'}}>Can't find your name?</p>
+                <button 
+                  onClick={() => {
+                    setNewServantName(checkInSearchQuery);
+                    setCheckInStep('register');
+                    setCheckInError('');
+                  }}
+                  style={{width:'100%',padding:'12px',borderRadius:'12px',border:'1px solid rgba(41, 182, 246, 0.4)',background:'rgba(41, 182, 246, 0.08)',color:'#29b6f6',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer',transition:'all 0.2s',marginBottom:'8px'}}
+                >
+                  📝 Register as New Servant
+                </button>
+                <button 
+                  onClick={() => setShowQuickJoinForm(false)}
+                  style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.85rem',cursor:'pointer',marginTop:'8px'}}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {checkInStep === 'passcode' && selectedCheckInServant && (
+            <>
+              <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'6px'}}>Passcode Required</h2>
+              <p style={{fontSize:'0.9rem',color:'#60a5fa',fontWeight:'600',marginBottom:'4px'}}>{selectedCheckInServant.name}</p>
+              <p style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'20px'}}>Please enter your passcode to log in (default is 1234).</p>
+
+              {checkInError && (
+                <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',padding:'10px',borderRadius:'10px',marginBottom:'16px',fontSize:'0.8rem',textAlign:'center'}}>
+                  {checkInError}
+                </div>
+              )}
+
+              <input 
+                type="password" 
+                placeholder="Enter passcode (e.g. 1234)" 
+                value={checkInPasscode}
+                onChange={(e) => setCheckInPasscode(e.target.value)}
+                style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'1.1rem',textAlign:'center',boxSizing:'border-box',outline:'none',letterSpacing:'0.1em',marginBottom:'20px'}}
+              />
+
+              <div style={{display:'flex',gap:'10px'}}>
+                <button 
+                  onClick={() => setCheckInStep('search')}
+                  style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.6)',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
+                >
+                  Back
+                </button>
+                <button 
+                  onClick={handleCheckInPasscodeSubmit}
+                  style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#1441a1,#60a5fa)',color:'#fff',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
+                >
+                  Check In
+                </button>
+              </div>
+            </>
+          )}
+
+          {checkInStep === 'register' && (
+            <>
+              <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Register Servant</h2>
+              <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'20px'}}>Join the service day. The coordinator will assign you a station.</p>
+
+              {checkInError && (
+                <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',padding:'10px',borderRadius:'10px',marginBottom:'16px',fontSize:'0.8rem',textAlign:'center'}}>
+                  {checkInError}
+                </div>
+              )}
+
+              <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'20px'}}>
+                <div>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',fontWeight:'600'}}>FULL NAME</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Fady Michel" 
+                    value={newServantName}
+                    onChange={(e) => setNewServantName(e.target.value)}
+                    style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
+                  />
+                </div>
+                <div>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',fontWeight:'600'}}>PHONE NUMBER</label>
+                  <input 
+                    type="tel" 
+                    placeholder="e.g. 01234567890" 
+                    value={newServantPhone}
+                    onChange={(e) => setNewServantPhone(e.target.value)}
+                    style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
+                  />
+                </div>
+                <div>
+                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',fontWeight:'600'}}>DESIRED ROLE</label>
+                  <select
+                    value={newServantPreferredRole}
+                    onChange={(e) => setNewServantPreferredRole(e.target.value)}
+                    style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
+                  >
+                    <option value="volunteer" style={{background:'#0d1426'}}>General Helper</option>
+                    <option value="referee" style={{background:'#0d1426'}}>Game Referee</option>
+                    <option value="leader" style={{background:'#0d1426'}}>Team Leader (Red/Blue)</option>
+                    <option value="equipment" style={{background:'#0d1426'}}>Equipment / Logistics</option>
+                    <option value="multimedia" style={{background:'#0d1426'}}>Multimedia / Camera</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:'10px'}}>
+                <button 
+                  onClick={() => setCheckInStep('search')}
+                  style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.6)',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
+                >
+                  Back
+                </button>
+                <button 
+                  onClick={handleCheckInRegisterSubmit}
+                  style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#1441a1,#60a5fa)',color:'#fff',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
+                >
+                  Submit Request
+                </button>
+              </div>
+            </>
+          )}
+
+          {checkInStep === 'assigned' && autoAssignedInfo && (
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:'2.8rem',marginBottom:'12px'}}>🎉</div>
+              <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Check-in Successful!</h2>
+              <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'16px'}}>
+                Welcome, <strong style={{color:'#60a5fa'}}>{autoAssignedInfo.name}</strong>! You have been auto-allocated:
+              </p>
+              
+              <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',padding:'14px',marginBottom:'20px',textAlign:'left'}}>
+                <div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Role</div>
+                <div style={{fontSize:'0.9rem',fontWeight:'800',color:'#fff',marginBottom:'10px'}}>{autoAssignedInfo.roleLabel}</div>
+                
+                <div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Assigned Station / Team</div>
+                <div style={{fontSize:'0.9rem',fontWeight:'800',color:'#38bdf8',marginBottom:'10px'}}>{autoAssignedInfo.assignLabel}</div>
+
+                <div style={{fontSize:'0.65rem',color:'#f59e0b',fontStyle:'italic'}}>{autoAssignedInfo.reason}</div>
+              </div>
+
+              <button 
+                onClick={handleCheckInEnterAsAssigned}
+                style={{width:'100%',padding: '12px 14px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',fontWeight:'700',fontSize:'0.9rem',cursor:'pointer'}}
+              >
+                Enter App & Start
+              </button>
+            </div>
+          )}
+
+          {checkInStep === 'waiting' && (
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:'2.5rem',marginBottom:'12px'}}>⏳</div>
+              <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Request Submitted!</h2>
+              <p style={{fontSize:'0.85rem',color:'rgba(255,255,255,0.6)',lineHeight:'1.5',marginBottom:'20px'}}>
+                Your check-in request has been sent. Please ask Michael Mitry or Amy to approve and assign your station/role.
+              </p>
+              <button 
+                onClick={handleCheckInEnterAsGuest}
+                style={{width:'100%',padding:'12px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#10b981,#059669)',color:'#fff',fontWeight:'700',fontSize:'0.9rem',cursor:'pointer',marginBottom:'12px'}}
+              >
+                Enter App as Guest
+              </button>
+              <button 
+                onClick={() => setShowQuickJoinForm(false)}
+                style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',cursor:'pointer'}}
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // UI state
   const [currentTab, setCurrentTab] = useState('scoreboard');
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
@@ -5400,15 +5623,18 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <RoleLogin 
-        eventConfig={eventConfig} 
-        globalServants={globalServants} 
-        onLogin={handleLogin}
-        onLogout={handleLeaveEvent}
-        currentUser={currentUser}
-        loginError={loginError}
-        setLoginError={setLoginError}
-      />
+      <>
+        <RoleLogin 
+          eventConfig={eventConfig} 
+          globalServants={globalServants} 
+          onLogin={handleLogin}
+          onLogout={handleLeaveEvent}
+          currentUser={currentUser}
+          loginError={loginError}
+          setLoginError={setLoginError}
+        />
+        {renderQuickJoinFormModal()}
+      </>
     );
   }
 
@@ -7373,225 +7599,7 @@ export default function App() {
       )}
 
       {/* ═══ QUICK JOIN FORM MODAL (SELF CHECK-IN WIZARD) ════════════════════════════ */}
-      {showQuickJoinForm && (
-        <div style={{position:'fixed',inset:0,zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(5,7,20,0.95)',backdropFilter:'blur(14px)',padding:'24px'}}>
-          <div style={{background:'#0d1426',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'24px',padding:'24px',width:'100%',maxWidth:'400px',boxSizing:'border-box'}}>
-            {checkInStep === 'search' && (
-              <>
-                <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Self Check-in</h2>
-                <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'20px'}}>Find your name in the roster to check in for {quickJoinData.code}.</p>
-                
-                <div style={{position:'relative', marginBottom:'20px'}}>
-                  <input 
-                    type="text" 
-                    placeholder="🔍 Type your name..." 
-                    value={checkInSearchQuery}
-                    onChange={(e) => setCheckInSearchQuery(e.target.value)}
-                    style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
-                  />
-                  {checkInSearchQuery.trim().length >= 1 && (
-                    <div style={{maxHeight:'160px',overflowY:'auto',background:'#080d1a',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',marginTop:'6px'}}>
-                      {globalServants
-                        .filter(s => s.name?.toLowerCase().includes(checkInSearchQuery.toLowerCase()))
-                        .map(s => (
-                          <div 
-                            key={s.id} 
-                            onClick={() => {
-                              setSelectedCheckInServant(s);
-                              setCheckInPasscode('');
-                              setCheckInStep('passcode');
-                              setCheckInError('');
-                            }}
-                            style={{padding:'10px 14px',color:'#fff',fontSize:'0.85rem',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.05)',textAlign:'left'}}
-                          >
-                            {s.name} <span style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginLeft:'6px'}}>({s.role})</span>
-                          </div>
-                        ))
-                      }
-                      {globalServants.filter(s => s.name?.toLowerCase().includes(checkInSearchQuery.toLowerCase())).length === 0 && (
-                        <div style={{padding:'12px 14px',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',textAlign:'center'}}>
-                          No matches found.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:'20px',textAlign:'center'}}>
-                  <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.4)',marginBottom:'12px'}}>Can't find your name?</p>
-                  <button 
-                    onClick={() => {
-                      setNewServantName(checkInSearchQuery);
-                      setCheckInStep('register');
-                      setCheckInError('');
-                    }}
-                    style={{width:'100%',padding:'12px',borderRadius:'12px',border:'1px solid rgba(41, 182, 246, 0.4)',background:'rgba(41, 182, 246, 0.08)',color:'#29b6f6',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer',transition:'all 0.2s',marginBottom:'8px'}}
-                  >
-                    📝 Register as New Servant
-                  </button>
-                  <button 
-                    onClick={() => setShowQuickJoinForm(false)}
-                    style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.85rem',cursor:'pointer',marginTop:'8px'}}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-
-            {checkInStep === 'passcode' && selectedCheckInServant && (
-              <>
-                <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'6px'}}>Passcode Required</h2>
-                <p style={{fontSize:'0.9rem',color:'#60a5fa',fontWeight:'600',marginBottom:'4px'}}>{selectedCheckInServant.name}</p>
-                <p style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'20px'}}>Please enter your passcode to log in (default is 1234).</p>
-
-                {checkInError && (
-                  <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',padding:'10px',borderRadius:'10px',marginBottom:'16px',fontSize:'0.8rem',textAlign:'center'}}>
-                    {checkInError}
-                  </div>
-                )}
-
-                <input 
-                  type="password" 
-                  placeholder="Enter passcode (e.g. 1234)" 
-                  value={checkInPasscode}
-                  onChange={(e) => setCheckInPasscode(e.target.value)}
-                  style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'12px',color:'#fff',fontSize:'1.1rem',textAlign:'center',boxSizing:'border-box',outline:'none',letterSpacing:'0.1em',marginBottom:'20px'}}
-                />
-
-                <div style={{display:'flex',gap:'10px'}}>
-                  <button 
-                    onClick={() => setCheckInStep('search')}
-                    style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.6)',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
-                  >
-                    Back
-                  </button>
-                  <button 
-                    onClick={handleCheckInPasscodeSubmit}
-                    style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#1441a1,#60a5fa)',color:'#fff',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
-                  >
-                    Check In
-                  </button>
-                </div>
-              </>
-            )}
-
-            {checkInStep === 'register' && (
-              <>
-                <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Register Servant</h2>
-                <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'20px'}}>Join the service day. The coordinator will assign you a station.</p>
-
-                {checkInError && (
-                  <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',padding:'10px',borderRadius:'10px',marginBottom:'16px',fontSize:'0.8rem',textAlign:'center'}}>
-                    {checkInError}
-                  </div>
-                )}
-
-                <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'20px'}}>
-                  <div>
-                    <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',fontWeight:'600'}}>FULL NAME</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Fady Michel" 
-                      value={newServantName}
-                      onChange={(e) => setNewServantName(e.target.value)}
-                      style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
-                    />
-                  </div>
-                  <div>
-                    <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',fontWeight:'600'}}>PHONE NUMBER</label>
-                    <input 
-                      type="tel" 
-                      placeholder="e.g. 01234567890" 
-                      value={newServantPhone}
-                      onChange={(e) => setNewServantPhone(e.target.value)}
-                      style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
-                    />
-                  </div>
-                  <div>
-                    <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'6px',fontWeight:'600'}}>DESIRED ROLE</label>
-                    <select
-                      value={newServantPreferredRole}
-                      onChange={(e) => setNewServantPreferredRole(e.target.value)}
-                      style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'10px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}}
-                    >
-                      <option value="volunteer" style={{background:'#0d1426'}}>General Helper</option>
-                      <option value="referee" style={{background:'#0d1426'}}>Game Referee</option>
-                      <option value="leader" style={{background:'#0d1426'}}>Team Leader (Red/Blue)</option>
-                      <option value="equipment" style={{background:'#0d1426'}}>Equipment / Logistics</option>
-                      <option value="multimedia" style={{background:'#0d1426'}}>Multimedia / Camera</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{display:'flex',gap:'10px'}}>
-                  <button 
-                    onClick={() => setCheckInStep('search')}
-                    style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'rgba(255,255,255,0.6)',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
-                  >
-                    Back
-                  </button>
-                  <button 
-                    onClick={handleCheckInRegisterSubmit}
-                    style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#1441a1,#60a5fa)',color:'#fff',fontWeight:'700',fontSize:'0.85rem',cursor:'pointer'}}
-                  >
-                    Submit Request
-                  </button>
-                </div>
-              </>
-            )}
-
-            {checkInStep === 'assigned' && autoAssignedInfo && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:'2.8rem',marginBottom:'12px'}}>🎉</div>
-                <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Check-in Successful!</h2>
-                <p style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.5)',marginBottom:'16px'}}>
-                  Welcome, <strong style={{color:'#60a5fa'}}>{autoAssignedInfo.name}</strong>! You have been auto-allocated:
-                </p>
-                
-                <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',padding:'14px',marginBottom:'20px',textAlign:'left'}}>
-                  <div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Role</div>
-                  <div style={{fontSize:'0.9rem',fontWeight:'800',color:'#fff',marginBottom:'10px'}}>{autoAssignedInfo.roleLabel}</div>
-                  
-                  <div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Assigned Station / Team</div>
-                  <div style={{fontSize:'0.9rem',fontWeight:'800',color:'#38bdf8',marginBottom:'10px'}}>{autoAssignedInfo.assignLabel}</div>
-
-                  <div style={{fontSize:'0.65rem',color:'#f59e0b',fontStyle:'italic'}}>{autoAssignedInfo.reason}</div>
-                </div>
-
-                <button 
-                  onClick={handleCheckInEnterAsAssigned}
-                  style={{width:'100%',padding: '12px 14px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',fontWeight:'700',fontSize:'0.9rem',cursor:'pointer'}}
-                >
-                  Enter App & Start
-                </button>
-              </div>
-            )}
-
-            {checkInStep === 'waiting' && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:'2.5rem',marginBottom:'12px'}}>⏳</div>
-                <h2 style={{fontSize:'1.3rem',fontWeight:'800',color:'#fff',marginBottom:'8px'}}>Request Submitted!</h2>
-                <p style={{fontSize:'0.85rem',color:'rgba(255,255,255,0.6)',lineHeight:'1.5',marginBottom:'20px'}}>
-                  Your check-in request has been sent. Please ask Michael Mitry or Amy to approve and assign your station/role.
-                </p>
-                <button 
-                  onClick={handleCheckInEnterAsGuest}
-                  style={{width:'100%',padding:'12px',borderRadius:'12px',border:'none',background:'linear-gradient(135deg,#10b981,#059669)',color:'#fff',fontWeight:'700',fontSize:'0.9rem',cursor:'pointer',marginBottom:'12px'}}
-                >
-                  Enter App as Guest
-                </button>
-                <button 
-                  onClick={() => setShowQuickJoinForm(false)}
-                  style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.8rem',cursor:'pointer'}}
-                >
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {renderQuickJoinFormModal()}
 
 
       {/* ═══ SERVANTS DIRECTORY MODAL ════════════════════════ */}
