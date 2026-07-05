@@ -398,10 +398,40 @@ function RotationTimerDisplay({ rotationTimer, setShowRotateNow, handleTimerPaus
 
   if (!rotationTimer?.startedAt) return null;
 
+  const durationMin = rotationTimer.durationMin || 15;
+  const totalSeconds = durationMin * 60;
+  const isExplainingRules = rotationSecondsLeft > (totalSeconds - 120); // first 2 minutes
+
   return (
     <div style={{
-      display:'flex',alignItems:'center',gap:'8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      position: 'fixed',
+      top: 'calc(12px + env(safe-area-inset-top, 0px))',
+      right: '60px',
+      zIndex: 1100,
+      background: 'rgba(13, 20, 38, 0.95)',
+      border: '1px solid rgba(255, 255, 255, 0.08)',
+      padding: '6px 12px',
+      borderRadius: '20px',
+      backdropFilter: 'blur(8px)',
+      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
     }}>
+      {rotationSecondsLeft != null && (
+        <span style={{ 
+          fontSize: '0.65rem', 
+          fontWeight: '700', 
+          textTransform: 'uppercase', 
+          color: isExplainingRules ? '#fbbf24' : '#4ade80',
+          background: isExplainingRules ? 'rgba(251,191,36,0.1)' : 'rgba(74,222,128,0.1)',
+          padding: '2px 6px',
+          borderRadius: '6px',
+          marginRight: '2px'
+        }}>
+          {isExplainingRules ? '📢 Explain Rules' : '🎮 Game Time'}
+        </span>
+      )}
       <span style={{fontSize:'0.7rem',color:rotationSecondsLeft<=60?'#f87171':'#4ade80',fontFamily:'monospace',fontWeight:'800'}}>
         {rotationSecondsLeft!=null ? (Math.floor(rotationSecondsLeft/60)+':'+(rotationSecondsLeft%60<10?'0':'')+(rotationSecondsLeft%60)) : '--:--'}
       </span>
@@ -2414,7 +2444,8 @@ export default function App() {
 
   // Rotation timer controls
   const handleTimerStart = async () => {
-    await setTimerState(currentEventCode, { durationMin: timerDurationMin, startedAt: new Date().toISOString(), isPaused: false, pausedAt: null, totalPausedMs: 0 });
+    const duration = eventConfig.roundDurationMinutes || timerDurationMin || 10;
+    await setTimerState(currentEventCode, { durationMin: duration, startedAt: new Date().toISOString(), isPaused: false, pausedAt: null, totalPausedMs: 0 });
     setShowRotateNow(false);
   };
   const handleTimerPause = async () => {
@@ -2613,15 +2644,19 @@ export default function App() {
       const servantAssignments = {};
       const activeServants = [];
 
-      // Team 1 & 2 -> Red
-      ['andrew', 'sherry'].forEach(id => servantAssignments[id] = 'team_red_1');
-      ['amberto', 'youstina'].forEach(id => servantAssignments[id] = 'team_red_2');
-      // Team 3 & 4 -> White
-      ['youssef', 'tony'].forEach(id => servantAssignments[id] = 'team_white_1');
-      ['seif', 'rougy'].forEach(id => servantAssignments[id] = 'team_white_2');
-      // Team 5 & 6 -> Black
-      ['tony_tafaya', 'sandra'].forEach(id => servantAssignments[id] = 'team_black_1');
-      ['kirollos', 'martina'].forEach(id => servantAssignments[id] = 'team_black_2');
+      // Group leaders mapped to Red and Blue sub-teams (Group X -> Red X and Blue X)
+      servantAssignments['andrew'] = 'team_red_1';
+      servantAssignments['sherry'] = 'team_blue_1';
+      servantAssignments['amberto'] = 'team_red_2';
+      servantAssignments['youstina'] = 'team_blue_2';
+      servantAssignments['youssef'] = 'team_red_3';
+      servantAssignments['tony'] = 'team_blue_3';
+      servantAssignments['seif'] = 'team_red_4';
+      servantAssignments['rougy'] = 'team_blue_4';
+      servantAssignments['tony_tafaya'] = 'team_red_5';
+      servantAssignments['sandra'] = 'team_blue_5';
+      servantAssignments['kirollos'] = 'team_red_6';
+      servantAssignments['martina'] = 'team_blue_6';
 
       ['dani', 'emily'].forEach(id => servantAssignments[id] = 'station_1');
       ['maria', 'micho'].forEach(id => servantAssignments[id] = 'station_2');
@@ -2658,11 +2693,13 @@ export default function App() {
           kidCount: 120,
           activeServants,
           servantAssignments,
+          side1Name: 'Red',
+          side2Name: 'Blue',
           teamNames: {
-              red: 'Teams 1 & 2',
-              white: 'Teams 3 & 4',
-              black: 'Teams 5 & 6',
-              blue: 'Unused'
+              red: 'Red Teams (1-6)',
+              blue: 'Blue Teams (1-6)',
+              white: 'Unused',
+              black: 'Unused'
           },
           stations: {
               station_1: { name: 'Blind Builder', location: '', howToPlay: 'One player is blindfolded and given cups to build a pyramid by verbal instructions from teammates. Team with highest number of stacks wins.', lesson: '' },
@@ -2676,9 +2713,8 @@ export default function App() {
 
       await setDoc(doc(db, 'vbt_events', targetEventCode, 'config', 'main'), evConfigUpdates, { merge: true });
       
-      // Generate 6x6 Schedule Matchups
+      // Generate 6x6 Schedule Matchups (Red vs Blue for each group rotating together)
       const generatedMatchups = [];
-      const teams = ['team_red_1', 'team_red_2', 'team_white_1', 'team_white_2', 'team_black_1', 'team_black_2'];
       const games = [
         'Blind Builder', 'Skee Ball', 'Minefield', 'Helium Stick & Human Chairs', 'Whiffle Ball', 'Blind Shape'
       ];
@@ -2686,8 +2722,10 @@ export default function App() {
 
       for (let block = 1; block <= 6; block++) {
         for (let station = 1; station <= 6; station++) {
-          let teamIdx = (station - 1 - (block - 1)) % 6;
-          if (teamIdx < 0) teamIdx += 6;
+          let pairIdx = (station - 1 - (block - 1)) % 6;
+          if (pairIdx < 0) pairIdx += 6;
+          
+          const teamNum = pairIdx + 1; // 1 to 6
           
           generatedMatchups.push({
             id: `b${block}_s${station}_${Date.now()}`,
@@ -2697,20 +2735,26 @@ export default function App() {
             time: times[block - 1],
             location: `Station ${station}`,
             game: games[station - 1],
-            teamA: teams[teamIdx],
-            teamB: ''
+            teamA: `team_red_${teamNum}`,
+            teamB: `team_blue_${teamNum}`
           });
         }
       }
       
       // Build teams map so scoring can aggregate by color side
       const teamsMap = {
-        'team_red_1':   { code: 'team_red_1',   name: 'Red 1',   leaders: 'Andrew, Sherry',    side: 'Red',   kidCount: 20 },
-        'team_red_2':   { code: 'team_red_2',   name: 'Red 2',   leaders: 'Amberto, Youstina', side: 'Red',   kidCount: 20 },
-        'team_white_1': { code: 'team_white_1', name: 'White 1', leaders: 'Youssef, Tony',     side: 'White', kidCount: 20 },
-        'team_white_2': { code: 'team_white_2', name: 'White 2', leaders: 'Seif, Rougy',       side: 'White', kidCount: 20 },
-        'team_black_1': { code: 'team_black_1', name: 'Black 1', leaders: 'Tony Tafaya, Sandra',side: 'Black', kidCount: 20 },
-        'team_black_2': { code: 'team_black_2', name: 'Black 2', leaders: 'Kirollos, Martina', side: 'Black', kidCount: 20 }
+        'team_red_1':   { code: 'team_red_1',   name: 'Red 1',   leaders: 'Andrew',         side: 'Red',   kidCount: 10 },
+        'team_blue_1':  { code: 'team_blue_1',  name: 'Blue 1',  leaders: 'Sherry',         side: 'Blue',  kidCount: 10 },
+        'team_red_2':   { code: 'team_red_2',   name: 'Red 2',   leaders: 'Amberto',        side: 'Red',   kidCount: 10 },
+        'team_blue_2':  { code: 'team_blue_2',  name: 'Blue 2',  leaders: 'Youstina',       side: 'Blue',  kidCount: 10 },
+        'team_red_3':   { code: 'team_red_3',   name: 'Red 3',   leaders: 'Youssef',        side: 'Red',   kidCount: 10 },
+        'team_blue_3':  { code: 'team_blue_3',  name: 'Blue 3',  leaders: 'Tony',           side: 'Blue',  kidCount: 10 },
+        'team_red_4':   { code: 'team_red_4',   name: 'Red 4',   leaders: 'Seif',           side: 'Red',   kidCount: 10 },
+        'team_blue_4':  { code: 'team_blue_4',  name: 'Blue 4',  leaders: 'Rougy',          side: 'Blue',  kidCount: 10 },
+        'team_red_5':   { code: 'team_red_5',   name: 'Red 5',   leaders: 'Tony Tafaya',    side: 'Red',   kidCount: 10 },
+        'team_blue_5':  { code: 'team_blue_5',  name: 'Blue 5',  leaders: 'Sandra',         side: 'Blue',  kidCount: 10 },
+        'team_red_6':   { code: 'team_red_6',   name: 'Red 6',   leaders: 'Kirollos',       side: 'Red',   kidCount: 10 },
+        'team_blue_6':  { code: 'team_blue_6',  name: 'Blue 6',  leaders: 'Martina',        side: 'Blue',  kidCount: 10 }
       };
 
       // Points per game station
@@ -3178,14 +3222,14 @@ export default function App() {
         leadColor,
         b1, b2, b3, b4, b5, b6,
         // Legacy fallbacks to avoid crashes
-        shakesFinal: finalScores['Red'] || 0,
-        friesFinal: finalScores['White'] || 0,
-        shakesDeductions: deductions['Red'] || 0,
-        friesDeductions: deductions['White'] || 0,
-        shakesBlocksTotal: wins['Red'] || 0,
-        friesBlocksTotal: wins['White'] || 0,
-        shakesTokenPoints: (tokensCount['Red'] || 0) * 2,
-        friesTokenPoints: (tokensCount['White'] || 0) * 2,
+        shakesFinal: finalScores[eventConfig.side1Name || 'Red'] || 0,
+        friesFinal: finalScores[eventConfig.side2Name || 'Blue'] || finalScores['White'] || 0,
+        shakesDeductions: deductions[eventConfig.side1Name || 'Red'] || 0,
+        friesDeductions: deductions[eventConfig.side2Name || 'Blue'] || deductions['White'] || 0,
+        shakesBlocksTotal: wins[eventConfig.side1Name || 'Red'] || 0,
+        friesBlocksTotal: wins[eventConfig.side2Name || 'Blue'] || wins['White'] || 0,
+        shakesTokenPoints: (tokensCount[eventConfig.side1Name || 'Red'] || 0) * 2,
+        friesTokenPoints: (tokensCount[eventConfig.side2Name || 'Blue'] || tokensCount['White'] || 0) * 2,
         winner: leadColor
       };
     }

@@ -156,11 +156,11 @@ export default function ScoreboardTab({
                   fontWeight: '700',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  background: (scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red') ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 145, 0, 0.15)',
-                  border: (scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red') ? '1px solid rgba(0, 176, 255, 0.3)' : '1px solid rgba(255, 145, 0, 0.3)',
-                  color: (scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red') ? 'var(--color-side1)' : 'var(--color-side2)'
+                  background: (scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red' || scoreCalculations.winner === side1Name) ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 145, 0, 0.15)',
+                  border: (scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red' || scoreCalculations.winner === side1Name) ? '1px solid rgba(0, 176, 255, 0.3)' : '1px solid rgba(255, 145, 0, 0.3)',
+                  color: (scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red' || scoreCalculations.winner === side1Name) ? 'var(--color-side1)' : 'var(--color-side2)'
                 }}>
-                  {((scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red') ? side1Name : side2Name).toUpperCase()} LEADING
+                  {((scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red' || scoreCalculations.winner === side1Name) ? side1Name : side2Name).toUpperCase()} LEADING
                 </span>
               )}
             </div>
@@ -169,7 +169,7 @@ export default function ScoreboardTab({
               <div>
                 <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-side1)', textTransform: 'uppercase' }}>{side1Name}</p>
                 <p style={{ lineHeight: '1', margin: 0 }}>
-                  <span className="score-digit" style={(scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red') ? { textShadow: '0 0 20px rgba(96,165,250,0.5)' } : {}}>{scoreCalculations.shakesFinal}</span>
+                  <span className="score-digit" style={(scoreCalculations.winner === 'SIDE1' || scoreCalculations.winner === 'SHAKES' || scoreCalculations.winner === 'Red' || scoreCalculations.winner === side1Name) ? { textShadow: '0 0 20px rgba(96,165,250,0.5)' } : {}}>{scoreCalculations.shakesFinal}</span>
                 </p>
               </div>
               <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
@@ -178,7 +178,7 @@ export default function ScoreboardTab({
               <div style={{ textAlign: 'right' }}>
                 <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-side2)', textTransform: 'uppercase' }}>{side2Name}</p>
                 <p style={{ lineHeight: '1', margin: 0 }}>
-                  <span className="score-digit" style={(scoreCalculations.winner === 'SIDE2' || scoreCalculations.winner === 'FRIES' || scoreCalculations.winner === 'White') ? { textShadow: '0 0 20px rgba(96,165,250,0.5)' } : {}}>{scoreCalculations.friesFinal}</span>
+                  <span className="score-digit" style={(scoreCalculations.winner === 'SIDE2' || scoreCalculations.winner === 'FRIES' || scoreCalculations.winner === 'White' || scoreCalculations.winner === 'Blue' || scoreCalculations.winner === side2Name) ? { textShadow: '0 0 20px rgba(96,165,250,0.5)' } : {}}>{scoreCalculations.friesFinal}</span>
                 </p>
               </div>
             </div>
