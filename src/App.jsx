@@ -926,7 +926,7 @@ export default function App() {
     const urlCheckin = searchParams.get('checkin');
 
     if (urlEvent && urlCheckin === '1') {
-      const code = urlEvent.toUpperCase();
+      const code = urlEvent.trim().toLowerCase().replace(/\s+/g, '_');
       setCurrentEventCode(code);
       localStorage.setItem('vbt_current_event', code);
       // Clean up the URL so it doesn't run again on refresh
