@@ -490,12 +490,12 @@ export default function ScheduleTab({
               if (options.length === 0) return null;
               return (
                 <div style={{ borderTop: '1px solid rgba(41, 182, 246, 0.15)', paddingTop: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <select
                       id="switch-assignment-select"
                       defaultValue=""
                       style={{
-                        flex: 1, padding: '7px 10px', borderRadius: '8px',
+                        flex: '1 1 200px', minWidth: '200px', padding: '7px 10px', borderRadius: '8px',
                         background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(41, 182, 246, 0.25)',
                         color: '#ffffff', fontSize: '0.75rem', fontWeight: '600', outline: 'none'
                       }}
@@ -536,6 +536,7 @@ export default function ScheduleTab({
                         sel.value = '';
                       }}
                       style={{
+                        flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         padding: '7px 14px', borderRadius: '8px', border: '1px solid rgba(249, 115, 22, 0.4)',
                         background: 'rgba(249, 115, 22, 0.12)', color: '#fb923c',
                         fontSize: '0.72rem', fontWeight: '800', cursor: 'pointer',
