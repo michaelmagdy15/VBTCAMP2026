@@ -1185,7 +1185,11 @@ export default function App() {
   const handleCheckInEnterAsAssigned = async () => {
     if (!autoAssignedInfo) return;
     try {
-      await signInAnonymously(auth);
+      try {
+        await signInAnonymously(auth);
+      } catch (authErr) {
+        console.warn("Anonymous sign-in failed or not configured during assigned enter:", authErr);
+      }
       
       let dbSide = '';
       let dbAssignedGames = [];
@@ -1222,7 +1226,11 @@ export default function App() {
 
   const handleCheckInEnterAsGuest = async () => {
     try {
-      await signInAnonymously(auth);
+      try {
+        await signInAnonymously(auth);
+      } catch (authErr) {
+        console.warn("Anonymous sign-in failed or not configured during guest enter:", authErr);
+      }
       const user = {
         id: 's_guest_' + Date.now(),
         name: newServantName.trim() || 'Guest Servant',
