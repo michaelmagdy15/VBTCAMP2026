@@ -326,6 +326,24 @@ const styles = {
 
 export default function DynamicConfigurator({ eventConfig, onSaveConfig, campData, campState }) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [showToast, setShowToast] = useState(false);
+  const [localSaving, setLocalSaving] = useState(false);
+
+  const handleSectionSave = async () => {
+    if (!onSaveConfig) return;
+    setLocalSaving(true);
+    try {
+      await onSaveConfig(buildConfig());
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Error saving configuration: " + err.message);
+    } finally {
+      setLocalSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -613,6 +631,27 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             </div>
           </div>
         ))}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={handleSectionSave}
+            disabled={localSaving}
+            style={{
+              ...styles.btn,
+              ...styles.btnPrimary,
+              padding: '10px 20px',
+              fontSize: '0.8rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: localSaving ? 0.7 : 1
+            }}
+          >
+            <Save size={14} />
+            <span>{localSaving ? 'Saving...' : 'Save Teams'}</span>
+          </button>
+        </div>
       </div>
 
       {/* ═══════ Section 2: Score Categories ═══════ */}
@@ -705,6 +744,27 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
         <div style={{ marginTop: 12, fontSize: 12, color: COLORS.textSecondary }}>
           Examples: Bible Verse Memorization (10pts), Spirit Award (5pts), Clean-up (3pts)
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={handleSectionSave}
+            disabled={localSaving}
+            style={{
+              ...styles.btn,
+              ...styles.btnPrimary,
+              padding: '10px 20px',
+              fontSize: '0.8rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: localSaving ? 0.7 : 1
+            }}
+          >
+            <Save size={14} />
+            <span>{localSaving ? 'Saving...' : 'Save Categories'}</span>
+          </button>
+        </div>
       </div>
 
       {/* ═══════ Section 3: Service Time Profile ═══════ */}
@@ -785,6 +845,27 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             </div>
           </div>
         )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={handleSectionSave}
+            disabled={localSaving}
+            style={{
+              ...styles.btn,
+              ...styles.btnPrimary,
+              padding: '10px 20px',
+              fontSize: '0.8rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: localSaving ? 0.7 : 1
+            }}
+          >
+            <Save size={14} />
+            <span>{localSaving ? 'Saving...' : 'Save Time Profile'}</span>
+          </button>
+        </div>
       </div>
 
       {/* ═══════ Section 4: Template Management ═══════ */}
@@ -1062,6 +1143,27 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
             Reset to Default Locations
           </button>
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={handleSectionSave}
+            disabled={localSaving}
+            style={{
+              ...styles.btn,
+              ...styles.btnPrimary,
+              padding: '10px 20px',
+              fontSize: '0.8rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: localSaving ? 0.7 : 1
+            }}
+          >
+            <Save size={14} />
+            <span>{localSaving ? 'Saving...' : 'Save Locations'}</span>
+          </button>
+        </div>
       </div>
 
       {/* ═══════ Save Button ═══════ */}
@@ -1076,12 +1178,39 @@ export default function DynamicConfigurator({ eventConfig, onSaveConfig, campDat
           fontSize: 15,
           borderRadius: 14,
           marginBottom: 32,
+          opacity: localSaving ? 0.7 : 1,
+          pointerEvents: localSaving ? 'none' : 'auto'
         }}
-        onClick={() => onSaveConfig && onSaveConfig(buildConfig())}
+        onClick={handleSectionSave}
       >
         <Save size={16} />
-        Save Configuration
+        {localSaving ? 'Saving Configuration...' : 'Save Configuration'}
       </button>
+
+      {/* Toast Notification Banner */}
+      {showToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(34, 197, 94, 0.95)',
+          color: '#ffffff',
+          padding: '12px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), 0 0 15px rgba(34, 197, 94, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.9rem',
+          fontWeight: '700',
+          zIndex: 9999,
+          backdropFilter: 'blur(8px)',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <span>✓ Everything has been updated in the database!</span>
+        </div>
+      )}
     </div>
   );
 }
