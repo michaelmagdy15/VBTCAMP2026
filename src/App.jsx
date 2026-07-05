@@ -1754,29 +1754,49 @@ export default function App() {
         const defaultData = {
           serviceBrief: "Welcome to today's VBT Sports Outreach Service! Today we are visiting Ard el Golf to share the joy of sports, run active game stations, and share a Bible lesson on Faith and Teamwork. Let's make sure every child has a wonderful, safe, and inspiring experience!",
           groups: [
-            { leaderName: "Mina Magdy", kidCount: 15 },
-            { leaderName: "Fady Shenouda", kidCount: 12 },
-            { leaderName: "Joy Michael", kidCount: 18 },
-            { leaderName: "Sarah Gamil", kidCount: 14 }
+            { leaderName: "Andrew & Sherry (Red 1)", kidCount: 20 },
+            { leaderName: "Amberto & Youstina (Red 2)", kidCount: 20 },
+            { leaderName: "Youssef & Tony (White 1)", kidCount: 20 },
+            { leaderName: "Seif & Rougy (White 2)", kidCount: 20 },
+            { leaderName: "Tony Tafaya & Sandra (Black 1)", kidCount: 20 },
+            { leaderName: "Kirollos & Martina (Black 2)", kidCount: 20 }
           ],
           games: [
-            { 
-              name: "Relay Race", 
-              location: "Main Field", 
-              howToPlay: "Divide kids into equal lines. First player runs to the cone, grabs a tennis ball, runs back, and tags the next player. The fastest team to complete wins!", 
-              lesson: "Faithfulness & Perseverance (Hebrews 12:1-2) — Just like a relay race, we run our race of faith with patience, looking unto Jesus." 
+            {
+              name: "Blind Builder",
+              location: "Station 1 (Micho, Emily)",
+              howToPlay: "One player is blindfolded and is given plastic cups. They must build a pyramid through verbal instructions from teammates. Each teammate stays stacking until he stacks a full pyramid, then the next team member takes his turn.",
+              lesson: "Teamwork & Trust — We listen closely to our guide to build together, just as we follow God's voice."
             },
-            { 
-              name: "Target Throw", 
-              location: "Court Yard", 
-              howToPlay: "Each child gets 3 attempts to throw beanbags into the colored hula hoops placed at different distances. Hoops have different point values (10, 20, 30).", 
-              lesson: "Aiming High & Focus (Philippians 3:14) — We press toward the mark for the prize of the high calling of God in Christ Jesus." 
+            {
+              name: "Skee Ball",
+              location: "Station 2 (Macarious, Dani)",
+              howToPlay: "Each team member gets a try at throwing the ball and dropping it in the holes. Team with the highest accumulated score wins.",
+              lesson: "Aiming High & Precision — Working together to accumulate points, focusing on our goal."
             },
-            { 
-              name: "Bible Trivia Battle", 
-              location: "Shaded Tree Area", 
-              howToPlay: "Ask questions from today's lesson. First child/group to raise their hand gets to answer. Each correct answer wins a point.", 
-              lesson: "Treasuring God's Word (Psalm 119:11) — Thy word have I hid in mine heart, that I might not sin against thee." 
+            {
+              name: "Minefield",
+              location: "Station 3 (Nathalie, Kiro)",
+              howToPlay: "One player from each team is blindfolded and must cross from one point to the other with obstacles placed throughout. One team member is chosen to guide him or the whole team does. At the end of obstacle, the blindfolded team member places a cone with his team’s color in an xo game. Most XO wins.",
+              lesson: "Navigating Obstacles — Trusting the voices of our guides to lead us safely through the minefield of life."
+            },
+            {
+              name: "Helium Stick & Human Chairs",
+              location: "Station 4 (Karim, John, Cinderella, Patrick)",
+              howToPlay: "Shabab for game 4 (3ashan law had etlaghbat):\nEach team of 10 is split into 3 groups:\n1. 4 boys or 4 girls (Human Chairs)\n2. 1 group of 3 (Helium Stick)\n3. 1 group of 3 (Helium Stick)\n\nInstructions:\n- Helium Stick: Lower a broomstick together using only two fingers each.\n- Human Chairs Circle: Team members build a circle by lying on each other's laps, then chairs are removed.",
+              lesson: "Supporting Each Other — Every single member is vital to support the group and achieve the impossible."
+            },
+            {
+              name: "Whiffle Ball",
+              location: "Station 5 (Joice, Jessica)",
+              howToPlay: "Each team member is given a colored ball and must throw it in its corresponding colored hole. Each team member gets one try. Team with the most goals wins.",
+              lesson: "Color Alignment & Directing Goals — Directing our efforts toward the correct target."
+            },
+            {
+              name: "Blind Shape",
+              location: "Station 6 (Bassem, Sara)",
+              howToPlay: "Each team is given a rope and are blindfolded, they are told to create a shape with the rope. Team with the highest amount of shapes wins.",
+              lesson: "Creating Harmony — Communicating effectively to form perfect shapes when we cannot see."
             }
           ]
         };
