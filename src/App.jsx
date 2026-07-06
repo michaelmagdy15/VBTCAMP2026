@@ -3785,6 +3785,54 @@ export default function App() {
     }
   };
 
+  const handleSaveEventConfigOnly = async () => {
+    if (!currentEventCode || !editEventConfig) return;
+    setSavingEventConfig(true);
+    try {
+      let finalDaysCount = parseInt(editDaysCount, 10) || 1;
+      let finalEventType = editEventConfig.eventType;
+      if (finalEventType === 'service' && finalDaysCount > 1) {
+        alert("⛪ Service Mode is only supported for 1-day events. Switching event to 🏕️ Summer Camp Mode.");
+        finalEventType = 'camp';
+      }
+
+      const updatedConfig = {
+        ...editEventConfig,
+        eventType: finalEventType,
+        kidCount: parseInt(editKidCount, 10) || 100,
+        daysCount: finalDaysCount,
+        activeServants: editAttending,
+        servantAssignments: editRoles,
+        teamNames: {
+          red: editTeamRed.trim() || 'Red',
+          white: editTeamWhite.trim() || 'White',
+          black: editTeamBlack.trim() || 'Black',
+          blue: editTeamBlue.trim() || 'Blue'
+        },
+        stations: editStations,
+        bigGameName: editBigGameName,
+        bigGameLocation: editBigGameLocation,
+        bigGameHowToPlay: editBigGameHowToPlay,
+        bigGameLesson: editBigGameLesson,
+        reflectionName: editReflectionName,
+        reflectionLocation: editReflectionLocation,
+        defaultMatchupSortMode: editDefaultMatchupSortMode
+      };
+      
+      await updateEventConfig(currentEventCode, updatedConfig);
+      
+      if (!isOfflineMode) {
+        await addAnnouncement(currentEventCode, "updated the event configuration and roster", currentUser.name, 'system');
+      }
+      
+      alert("💾 Event configuration and roster saved successfully (Matchups and scores kept!)");
+    } catch (err) {
+      alert("Failed to save configuration: " + err.message);
+    } finally {
+      setSavingEventConfig(false);
+    }
+  };
+
   const handleSaveAndRegenerateSchedule = async () => {
     if (!currentEventCode || !editEventConfig) return;
     setSavingEventConfig(true);
@@ -8415,14 +8463,14 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleSaveAndRegenerateSchedule}
+                  onClick={handleSaveEventConfigOnly}
                   disabled={savingEventConfig}
                   className="btn-glow"
                   style={{
                     width: '100%',
                     padding: '14px',
                     borderRadius: '12px',
-                    background: 'var(--gradient-vbt)',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     border: 'none',
                     color: '#ffffff',
                     fontFamily: 'var(--font-title)',
@@ -8430,10 +8478,37 @@ export default function App() {
                     fontSize: '0.95rem',
                     cursor: savingEventConfig ? 'not-allowed' : 'pointer',
                     opacity: savingEventConfig ? 0.7 : 1,
-                    boxShadow: '0 4px 15px rgba(124,58,237,0.3)'
+                    boxShadow: '0 4px 15px rgba(16,185,129,0.3)',
+                    marginBottom: '8px'
                   }}
                 >
-                  {savingEventConfig ? 'Saving & Recalculating...' : '🔄 Save Roster & Regenerate Schedule'}
+                  {savingEventConfig ? 'Saving...' : '💾 Save Roster & Config Only'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("⚠️ WARNING: Regenerating the schedule will wipe all currently recorded scores/matchups and recreate them from scratch. Proceed?")) {
+                      handleSaveAndRegenerateSchedule();
+                    }
+                  }}
+                  disabled={savingEventConfig}
+                  className="glass-btn"
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#ef4444',
+                    fontFamily: 'var(--font-title)',
+                    fontWeight: '800',
+                    fontSize: '0.95rem',
+                    cursor: savingEventConfig ? 'not-allowed' : 'pointer',
+                    opacity: savingEventConfig ? 0.7 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {savingEventConfig ? 'Regenerating...' : '🔄 Regenerate Matchups (Wipes Scores!)'}
                 </button>
               </div>
             </div>
