@@ -150,24 +150,24 @@ const FALLBACK_SERVANT_ASSIGNMENTS = {
   // Team Leaders
   'andrew': 'team_red_1',
   'andrew essam': 'team_red_1',
-  'sherry': 'team_red_1',
-  'sherry wael': 'team_red_1',
+  'sherry': 'team_blue_1',
+  'sherry wael': 'team_blue_1',
   'amberto': 'team_red_2',
-  'youstina': 'team_red_2',
-  'youssef': 'team_white_1',
-  'youssef wael': 'team_white_1',
-  'tony': 'team_white_1',
-  'seif': 'team_white_2',
-  'seif samer': 'team_white_2',
-  'rougy': 'team_white_2',
-  'rougy adel': 'team_white_2',
-  'tony tafaya': 'team_black_1',
-  'sandra': 'team_black_1',
-  'sandra wael': 'team_black_1',
-  'kirollos': 'team_black_2',
-  'kirollos remon': 'team_black_2',
-  'martina': 'team_black_2',
-  'martina rizk': 'team_black_2',
+  'youstina': 'team_blue_2',
+  'youssef': 'team_red_3',
+  'youssef wael': 'team_red_3',
+  'tony': 'team_blue_3',
+  'seif': 'team_red_4',
+  'seif samer': 'team_red_4',
+  'rougy': 'team_blue_4',
+  'rougy adel': 'team_blue_4',
+  'tony tafaya': 'team_red_5',
+  'sandra': 'team_blue_5',
+  'sandra wael': 'team_blue_5',
+  'kirollos': 'team_red_6',
+  'kirollos remon': 'team_red_6',
+  'martina': 'team_blue_6',
+  'martina rizk': 'team_blue_6',
   
   // Game Leaders / Referees
   'michel remon': 'station_1',
@@ -4188,6 +4188,37 @@ export default function App() {
 
     const newBlockScores = { ...(campState.blockScores || {}), [key]: newWinner };
     await handleUpdateCampState({ blockScores: newBlockScores });
+
+    // Automatically update the matchup scores in Firestore for consistency!
+    if (campData && campData.matchups) {
+      const match = campData.matchups.find(item => 
+        String(item.block) === String(block) && 
+        String(item.round) === String(round) && 
+        item.game === game
+      );
+      if (match) {
+        const maxPoints = campData.gamePoints?.[game] || 15;
+        let scoreA = 0;
+        let scoreB = 0;
+        if (newWinner === 'teamA' || newWinner === 'Shakes') {
+          scoreA = maxPoints;
+          scoreB = 0;
+        } else if (newWinner === 'teamB' || newWinner === 'Fries') {
+          scoreA = 0;
+          scoreB = maxPoints;
+        } else if (newWinner === 'TIE' || newWinner === 'Tie') {
+          scoreA = maxPoints;
+          scoreB = maxPoints;
+        }
+        
+        await handleUpdateMatchupTime(match, {
+          teamAScore: scoreA,
+          teamBScore: scoreB,
+          shakesScore: scoreA,
+          friesScore: scoreB
+        });
+      }
+    }
 
     if (currentUser) {
       const msg = `updated ${game} (Block ${block}, Rd ${round}) winner to ${newWinner.toUpperCase()}`;

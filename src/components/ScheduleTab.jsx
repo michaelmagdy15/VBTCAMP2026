@@ -6,24 +6,24 @@ const FALLBACK_SERVANT_ASSIGNMENTS = {
   // Team Leaders
   'andrew': 'team_red_1',
   'andrew essam': 'team_red_1',
-  'sherry': 'team_red_1',
-  'sherry wael': 'team_red_1',
+  'sherry': 'team_blue_1',
+  'sherry wael': 'team_blue_1',
   'amberto': 'team_red_2',
-  'youstina': 'team_red_2',
-  'youssef': 'team_white_1',
-  'youssef wael': 'team_white_1',
-  'tony': 'team_white_1',
-  'seif': 'team_white_2',
-  'seif samer': 'team_white_2',
-  'rougy': 'team_white_2',
-  'rougy adel': 'team_white_2',
-  'tony tafaya': 'team_black_1',
-  'sandra': 'team_black_1',
-  'sandra wael': 'team_black_1',
-  'kirollos': 'team_black_2',
-  'kirollos remon': 'team_black_2',
-  'martina': 'team_black_2',
-  'martina rizk': 'team_black_2',
+  'youstina': 'team_blue_2',
+  'youssef': 'team_red_3',
+  'youssef wael': 'team_red_3',
+  'tony': 'team_blue_3',
+  'seif': 'team_red_4',
+  'seif samer': 'team_red_4',
+  'rougy': 'team_blue_4',
+  'rougy adel': 'team_blue_4',
+  'tony tafaya': 'team_red_5',
+  'sandra': 'team_blue_5',
+  'sandra wael': 'team_blue_5',
+  'kirollos': 'team_red_6',
+  'kirollos remon': 'team_red_6',
+  'martina': 'team_blue_6',
+  'martina rizk': 'team_blue_6',
   
   // Game Leaders / Referees
   'michel remon': 'station_1',
@@ -1250,90 +1250,112 @@ export default function ScheduleTab({
                         </div>
 
                         {/* Simple point adjuster logic */}
-                        {/* Scoring Section */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.04)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                          {/* teamA side */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-                            <span style={{ fontSize: '0.72rem', color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '800', textAlign: 'center' }}>
+                        {/* Scoring Section - Simple Winner Selection (Win/Lose) */}
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          gap: '10px',
+                          background: 'rgba(255, 255, 255, 0.04)', 
+                          padding: '12px', 
+                          borderRadius: '8px', 
+                          border: '1px solid rgba(255,255,255,0.06)' 
+                        }}>
+                          {/* Display current scores */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '800', color: getTeamColorHex(m.teamA || m.shakes) }}>
                               {(m.teamA || m.shakes || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase()) || 'Team A'}
-                            </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <button
-                                onClick={() => handleUpdateMatchupScore(m, 'teamA', -1)}
-                                style={{
-                                  width: '34px', height: '34px', borderRadius: '50%',
-                                  background: 'rgba(239, 68, 68, 0.25)', border: '2px solid rgba(239, 68, 68, 0.5)',
-                                  color: '#f87171', fontWeight: '900', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                −
-                              </button>
-                              <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#ffffff', minWidth: '28px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                {m.teamAScore || m.shakesScore || 0}
+                              <span style={{ marginLeft: '8px', fontSize: '0.95rem', color: '#ffffff', fontFamily: 'monospace' }}>
+                                ({m.teamAScore || m.shakesScore || 0} pts)
                               </span>
-                              <button
-                                onClick={() => handleUpdateMatchupScore(m, 'teamA', 1)}
-                                style={{
-                                  width: '34px', height: '34px', borderRadius: '50%',
-                                  background: 'rgba(74, 222, 128, 0.25)', border: '2px solid rgba(74, 222, 128, 0.5)',
-                                  color: '#4ade80', fontWeight: '900', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                +
-                              </button>
-                            </div>
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700' }}>VS</span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '800', color: getTeamColorHex(m.teamB || m.fries) }}>
+                              <span style={{ marginRight: '8px', fontSize: '0.95rem', color: '#ffffff', fontFamily: 'monospace' }}>
+                                ({m.teamBScore || m.friesScore || 0} pts)
+                              </span>
+                              {(m.teamB || m.fries || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase()) || 'Team B'}
+                            </span>
                           </div>
 
-                          {/* teamB side - only show if there's an opposing team */}
-                          {(m.teamB || m.fries) && (
-                            <>
-                              {/* Divider */}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', margin: '0 6px' }}>
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700' }}>VS</span>
-                                <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.1)' }} />
-                              </div>
+                          {/* Quick selection buttons */}
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamA')}
+                              style={{
+                                flex: 1,
+                                padding: '10px 6px',
+                                borderRadius: '8px',
+                                background: winner === 'teamA' || winner === 'Shakes' 
+                                  ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' 
+                                  : 'rgba(239, 68, 68, 0.08)',
+                                border: '1px solid',
+                                borderColor: winner === 'teamA' || winner === 'Shakes' ? '#ef4444' : 'rgba(239, 68, 68, 0.25)',
+                                color: winner === 'teamA' || winner === 'Shakes' ? '#ffffff' : '#f87171',
+                                fontWeight: '800',
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                boxShadow: winner === 'teamA' || winner === 'Shakes' ? '0 0 10px rgba(239, 68, 68, 0.3)' : 'none'
+                              }}
+                            >
+                              🔴 Red Wins
+                            </button>
 
-                              {/* teamB */}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-                                <span style={{ fontSize: '0.72rem', color: getTeamColorHex(m.teamB || m.fries), fontWeight: '800', textAlign: 'center' }}>
-                                  {(m.teamB || m.fries || '').replace(/_/g, ' ').replace(/\bteam\b/gi, '').trim().replace(/\b\w/g, c => c.toUpperCase()) || 'Team B'}
-                                </span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <button
-                                    onClick={() => handleUpdateMatchupScore(m, 'teamB', -1)}
-                                    style={{
-                                      width: '34px', height: '34px', borderRadius: '50%',
-                                      background: 'rgba(239, 68, 68, 0.25)', border: '2px solid rgba(239, 68, 68, 0.5)',
-                                      color: '#f87171', fontWeight: '900', cursor: 'pointer',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    −
-                                  </button>
-                                  <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#ffffff', minWidth: '28px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                    {m.teamBScore || m.friesScore || 0}
-                                  </span>
-                                  <button
-                                    onClick={() => handleUpdateMatchupScore(m, 'teamB', 1)}
-                                    style={{
-                                      width: '34px', height: '34px', borderRadius: '50%',
-                                      background: 'rgba(74, 222, 128, 0.25)', border: '2px solid rgba(74, 222, 128, 0.5)',
-                                      color: '#4ade80', fontWeight: '900', cursor: 'pointer',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-                            </>
-                          )}
+                            <button
+                              onClick={() => handleToggleWinner(m.block, m.round, m.game, 'teamB')}
+                              style={{
+                                flex: 1,
+                                padding: '10px 6px',
+                                borderRadius: '8px',
+                                background: winner === 'teamB' || winner === 'Fries' 
+                                  ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                                  : 'rgba(59, 130, 246, 0.08)',
+                                border: '1px solid',
+                                borderColor: winner === 'teamB' || winner === 'Fries' ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)',
+                                color: winner === 'teamB' || winner === 'Fries' ? '#ffffff' : '#60a5fa',
+                                fontWeight: '800',
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                boxShadow: winner === 'teamB' || winner === 'Fries' ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none'
+                              }}
+                            >
+                              🔵 Blue Wins
+                            </button>
+
+                            <button
+                              onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                background: winner === 'TIE' || winner === 'Tie'
+                                  ? 'linear-gradient(135deg, #9ca3af 0%, #4b5563 100%)' 
+                                  : 'rgba(156, 163, 175, 0.08)',
+                                border: '1px solid',
+                                borderColor: winner === 'TIE' || winner === 'Tie' ? '#9ca3af' : 'rgba(156, 163, 175, 0.25)',
+                                color: winner === 'TIE' || winner === 'Tie' ? '#ffffff' : '#d1d5db',
+                                fontWeight: '800',
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                boxShadow: winner === 'TIE' || winner === 'Tie' ? '0 0 10px rgba(156, 163, 175, 0.3)' : 'none'
+                              }}
+                            >
+                              🤝 Tie
+                            </button>
+                          </div>
                         </div>
 
                         {/* Winner Indicator / Live Timer controls */}
