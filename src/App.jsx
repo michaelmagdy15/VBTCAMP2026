@@ -7086,6 +7086,7 @@ export default function App() {
             uniqueGames={uniqueGames}
             showOnboardingTip={showOnboardingTip}
             setShowServantDirectoryModal={setShowServantDirectoryModal}
+            setServantModalTab={setServantModalTab}
             setShowGamesLibraryModal={setShowGamesLibraryModal}
             setShowQRModal={setShowQRModal}
             setShowBackupModal={setShowBackupModal}
@@ -7897,17 +7898,57 @@ export default function App() {
       {/* ═══ SERVANTS DIRECTORY MODAL ════════════════════════ */}
       {showServantDirectoryModal && (
         <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',flexDirection:'column',background:'#080b18'}}>
-          <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)',flexWrap:'wrap'}}>
-            <button onClick={()=>setShowServantDirectoryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
-            <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>
-              {servantModalTab === 'roster' ? 'Servants Roster & Roles' : 'Servants Directory'}
-            </h2>
-            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>
-              {servantModalTab === 'roster' ? editAttending.length : globalServants.length}
-            </span>
-            <div style={{marginLeft:'auto',display:'flex',gap:'8px'}}>
-              <button onClick={handleRecalculateAttendance} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>🔄 Recalculate</button>
-              <button onClick={()=>setShowDirAddForm(!showDirAddForm)} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>{showDirAddForm?'Close Form':'+ Add Servant'}</button>
+          <div style={{
+            padding: '12px 16px',
+            paddingTop: `calc(12px + env(safe-area-inset-top))`,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(13,20,38,0.95)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            {/* Top row: Back button, title, count, and close/X */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button onClick={()=>setShowServantDirectoryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
+                <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>
+                  {servantModalTab === 'roster' ? 'Servants Roster & Roles' : 'Servants Directory'}
+                </h2>
+                <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>
+                  {servantModalTab === 'roster' ? editAttending.length : globalServants.length}
+                </span>
+              </div>
+              <button onClick={()=>setShowServantDirectoryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'1.2rem',cursor:'pointer',padding:'4px'}}>✕</button>
+            </div>
+
+            {/* Actions row */}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <button onClick={handleRecalculateAttendance} style={{flex: 1, background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.75rem',fontWeight:'700',padding:'8px 12px',borderRadius:'8px',cursor:'pointer', textAlign: 'center'}}>🔄 Recalculate</button>
+              <button 
+                onClick={() => {
+                  if (servantModalTab !== 'directory') {
+                    setServantModalTab('directory');
+                    setShowDirAddForm(true);
+                  } else {
+                    setShowDirAddForm(!showDirAddForm);
+                  }
+                }} 
+                style={{
+                  flex: 1, 
+                  background: showDirAddForm && servantModalTab === 'directory' ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#1441a1,#60a5fa)',
+                  border: showDirAddForm && servantModalTab === 'directory' ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                  color: '#fff',
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  cursor: 'pointer', 
+                  textAlign: 'center'
+                }}
+              >
+                {showDirAddForm && servantModalTab === 'directory' ? '✕ Close Form' : '➕ Add Servant'}
+              </button>
             </div>
           </div>
 
@@ -7935,7 +7976,7 @@ export default function App() {
               }}
               onClick={() => setServantModalTab('roster')}
             >
-              📋 Active Roster & Roles ({editAttending.length})
+              📋 Active Roster ({editAttending.length})
             </button>
             <button
               style={{
@@ -7952,7 +7993,7 @@ export default function App() {
               }}
               onClick={() => setServantModalTab('directory')}
             >
-              📁 All Servants Directory ({globalServants.length})
+              📁 Directory ({globalServants.length})
             </button>
           </div>
 
@@ -7961,39 +8002,41 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               {/* Search + Action Buttons Row */}
               <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     value={servantRosterSearch}
                     onChange={e => setServantRosterSearch(e.target.value)}
                     placeholder="Search in active roster..."
                     style={{
-                      flex: 1,
+                      width: '100%',
                       background: 'rgba(255,255,255,0.06)',
                       border: '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '10px',
                       padding: '10px 14px',
+                      paddingRight: '36px',
                       color: '#fff',
                       fontSize: '0.9rem',
+                      boxSizing: 'border-box',
                       outline: 'none'
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={handleLiveAutoAssign}
-                    className="btn-glow"
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: '10px',
-                      border: '1px solid rgba(167,139,250,0.3)',
-                      background: 'rgba(167,139,250,0.15)',
-                      color: '#c4b5fd',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ✨ Live Auto-Assign
-                  </button>
+                  {servantRosterSearch && (
+                    <button 
+                      onClick={() => setServantRosterSearch('')}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
 
                 {/* Add existing servant search row */}
@@ -8001,7 +8044,7 @@ export default function App() {
                   <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#60a5fa', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                     ➕ Add Servant to Service
                   </span>
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input
                       type="text"
                       placeholder="Type name of existing servant to add..."
@@ -8013,12 +8056,30 @@ export default function App() {
                         border: '1px solid rgba(255,255,255,0.08)',
                         borderRadius: '8px',
                         padding: '8px 12px',
+                        paddingRight: '32px',
                         color: '#fff',
                         fontSize: '0.8rem',
                         boxSizing: 'border-box',
                         outline: 'none'
                       }}
                     />
+                    {quickRosterSearch && (
+                      <button 
+                        onClick={() => setQuickRosterSearch('')}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          background: 'none',
+                          border: 'none',
+                          color: 'rgba(255,255,255,0.4)',
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
                     {quickRosterSearch.trim().length >= 1 && (
                       <div style={{
                         position: 'absolute',
@@ -8238,7 +8299,26 @@ export default function App() {
               </div>
 
               {/* Bottom Sticky Action Bar */}
-              <div style={{ padding: '16px', background: 'rgba(13,20,38,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ padding: '16px', background: 'rgba(13,20,38,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleLiveAutoAssign}
+                  className="btn-glow"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(167,139,250,0.3)',
+                    background: 'rgba(167,139,250,0.15)',
+                    color: '#c4b5fd',
+                    fontFamily: 'var(--font-title)',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✨ Live Auto-Assign Roles
+                </button>
                 <button
                   type="button"
                   onClick={handleSaveAndRegenerateSchedule}
@@ -8269,22 +8349,42 @@ export default function App() {
           {servantModalTab === 'directory' && (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <input
-                  value={servantDirectorySearch}
-                  onChange={e => setServantDirectorySearch(e.target.value)}
-                  placeholder="Search in all servants..."
-                  style={{
-                    width: '100%',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '10px',
-                    padding: '10px 14px',
-                    color: '#fff',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    value={servantDirectorySearch}
+                    onChange={e => setServantDirectorySearch(e.target.value)}
+                    placeholder="Search in all servants..."
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      paddingRight: '36px',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  {servantDirectorySearch && (
+                    <button 
+                      onClick={() => setServantDirectorySearch('')}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Add form */}
@@ -8429,7 +8529,7 @@ export default function App() {
                     return (
                       <div key={s.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '14px', padding: '14px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setExpandedServant(expandedServant === s.id ? null : s.id)}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg,#1441a1,#60a5fa)', display: 'flex', alignItems: 'center', justify: 'center', fontWeight: '800', color: '#fff', fontSize: '1rem', flexShrink: 0 }}>{s.name?.[0]?.toUpperCase() || '?'}</div>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg,#1441a1,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: '#fff', fontSize: '1rem', flexShrink: 0 }}>{s.name?.[0]?.toUpperCase() || '?'}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.9rem' }}>{s.name}</div>
                             <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{s.servicesAttended?.length || 0} services &nbsp;&#183;&nbsp; {s.defaultRole || 'volunteer'}</div>

@@ -50,6 +50,7 @@ export default function SettingsTab({
   uniqueGames,
   showOnboardingTip,
   setShowServantDirectoryModal,
+  setServantModalTab,
   setShowGamesLibraryModal,
   setShowQRModal,
   setShowBackupModal,
@@ -103,7 +104,7 @@ export default function SettingsTab({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '4px' }}>
         {[
-          ['&#128101; Servants', 'Roster & Dir', () => setShowServantDirectoryModal(true), '#60a5fa'],
+          ['&#128101; Servants', 'Roster & Dir', () => { setServantModalTab('roster'); setShowServantDirectoryModal(true); }, '#60a5fa'],
           ['&#127918; Games', 'Library', () => setShowGamesLibraryModal(true), '#a78bfa'],
           ['&#128247; QR Check-in', 'Self check-in', () => setShowQRModal(true), '#4ade80'],
           ['&#128190; Backup', 'Offline sync', () => setShowBackupModal(true), '#10b981'],
@@ -656,7 +657,7 @@ export default function SettingsTab({
                       </p>
                       <button
                         type="button"
-                        onClick={() => setShowServantDirectoryModal(true)}
+                        onClick={() => { setServantModalTab('roster'); setShowServantDirectoryModal(true); }}
                         className="btn-glow"
                         style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--gradient-vbt)', color: '#ffffff', fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.85rem', cursor: 'pointer' }}
                       >
