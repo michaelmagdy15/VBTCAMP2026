@@ -21,6 +21,7 @@ const FALLBACK_SERVANT_ASSIGNMENTS = {
   'youssef': 'team_red_3',
   'youssef wael': 'team_red_3',
   'tony': 'team_blue_3',
+  'tony_tafaya_blue': 'team_blue_3',
   'tony tafaya blue': 'team_blue_3',
   'tony tafaya (blue)': 'team_blue_3',
   'seif': 'team_red_4',
@@ -28,6 +29,7 @@ const FALLBACK_SERVANT_ASSIGNMENTS = {
   'rougy': 'team_blue_4',
   'rougy adel': 'team_blue_4',
   'tony tafaya': 'team_red_5',
+  'tony_tafaya_red': 'team_red_5',
   'tony tafaya red': 'team_red_5',
   'tony tafaya (red)': 'team_red_5',
   'sandra': 'team_blue_5',
@@ -348,6 +350,27 @@ function getEffectiveRole(servant, eventConfig) {
   return servant.role || '';
 }
 
+function getTeamLabel(servant, eventConfig) {
+  const role = getEffectiveRole(servant, eventConfig);
+  if (!role) return '';
+  const match = role.match(/^team_(red|blue)_(\d+)$/i);
+  if (match) {
+    const color = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+    const num = match[2];
+    return ` (${color} ${num})`;
+  }
+  return '';
+}
+
+function getGameLabel(servant, eventConfig) {
+  const roleCode = getEffectiveRole(servant, eventConfig);
+  if (roleCode && roleCode.startsWith('station_')) {
+    const station = eventConfig?.stations?.[roleCode];
+    if (station?.name) return ` (${station.name})`;
+  }
+  return '';
+}
+
 function filterServants(globalServants, rolePrefixes, eventConfig) {
   if (!Array.isArray(globalServants)) return [];
   const prefixes = Array.isArray(rolePrefixes) ? rolePrefixes : [rolePrefixes];
@@ -530,10 +553,10 @@ export default function RoleLogin({
     }
 
     // Build user object
-    const matchedServant = (globalServants || []).find(s => s.name && s.name.trim().toLowerCase() === name.trim().toLowerCase());
+    const matchedServant = (globalServants || []).find(s => s.id === name || (s.name && s.name.trim().toLowerCase() === name.trim().toLowerCase()));
     const user = {
       id: matchedServant ? matchedServant.id : name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      name: name.trim(),
+      name: matchedServant ? matchedServant.name : name.trim(),
       role: selectedRole,
       passcode,
       assignedGames: [],
@@ -542,12 +565,12 @@ export default function RoleLogin({
 
     // 2. Game Leader Login
     if (selectedRole === ROLES.GAME_LEADER) {
-      const servant = refereeServants.find((s) => s.name === name.trim());
+      const servant = refereeServants.find((s) => s.id === name || s.name === name.trim());
       user.assignedGames = extractAssignedGames(servant, eventConfig);
     }
     // 3. Team Leader Login
     if (selectedRole === ROLES.TEAM_LEADER) {
-      const servant = leaderServants.find((s) => s.name === name.trim());
+      const servant = leaderServants.find((s) => s.id === name || s.name === name.trim());
       user.assignedTeams = extractAssignedTeams(servant, eventConfig);
     }
     // 4. Service Leader Login
@@ -736,8 +759,8 @@ export default function RoleLogin({
                   >
                     <option value="">Select your name…</option>
                     {refereeServants.map((s) => (
-                      <option key={s.name} value={s.name}>
-                        {s.name}
+                      <option key={s.id || s.name} value={s.id || s.name}>
+                        {s.name}{getGameLabel(s, eventConfig)}
                       </option>
                     ))}
                   </select>
@@ -794,8 +817,8 @@ export default function RoleLogin({
                   >
                     <option value="">Select your name…</option>
                     {leaderServants.map((s) => (
-                      <option key={s.name} value={s.name}>
-                        {s.name}
+                      <option key={s.id || s.name} value={s.id || s.name}>
+                        {s.name}{getTeamLabel(s, eventConfig)}
                       </option>
                     ))}
                   </select>
@@ -831,7 +854,7 @@ export default function RoleLogin({
                   >
                     <option value="">Select your name…</option>
                     {serviceLeaderServants.map((s) => (
-                      <option key={s.name} value={s.name}>
+                      <option key={s.id || s.name} value={s.id || s.name}>
                         {s.name}
                       </option>
                     ))}
@@ -889,7 +912,7 @@ export default function RoleLogin({
                   >
                     <option value="">Select your name…</option>
                     {coordinatorServants.map((s) => (
-                      <option key={s.name} value={s.name}>
+                      <option key={s.id || s.name} value={s.id || s.name}>
                         {s.name}
                       </option>
                     ))}

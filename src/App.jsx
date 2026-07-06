@@ -157,6 +157,7 @@ const FALLBACK_SERVANT_ASSIGNMENTS = {
   'youssef': 'team_red_3',
   'youssef wael': 'team_red_3',
   'tony': 'team_blue_3',
+  'tony_tafaya_blue': 'team_blue_3',
   'tony tafaya blue': 'team_blue_3',
   'tony tafaya (blue)': 'team_blue_3',
   'seif': 'team_red_4',
@@ -164,6 +165,7 @@ const FALLBACK_SERVANT_ASSIGNMENTS = {
   'rougy': 'team_blue_4',
   'rougy adel': 'team_blue_4',
   'tony tafaya': 'team_red_5',
+  'tony_tafaya_red': 'team_red_5',
   'tony tafaya red': 'team_red_5',
   'tony tafaya (red)': 'team_red_5',
   'sandra': 'team_blue_5',
@@ -3416,7 +3418,7 @@ export default function App() {
         return;
       }
       const newNames = [
-        "Andrew Essam", "Sherry Wael", "Amberto", "Youstina", "Youssef Wael", "Tony Tafaya (Blue)", "Seif Samer", "Rougy Adel", "Tony Tafaya (Red)", "Sandra Wael", "Kirollos Remon", "Martina Rizk",
+        "Andrew Essam", "Sherry Wael", "Amberto", "Youstina", "Youssef Wael", "Tony Tafaya", "Seif Samer", "Rougy Adel", "Tony tafaya", "Sandra Wael", "Kirollos Remon", "Martina Rizk",
         "Daniel El Masry", "Emily Boshra", "Michel Remon", "Nathalie Hazem", "Kiro Wagdy", "Jessica Nossier", "John Kamel", "Cinderella", "Patrick Sameh", "Karim Hany", "Bassem Khella", "Sara Zaki",
         "Macarious", "Passant", "Andrew Nader", "Michael Mitry", "System Admin", "Amy Ramy", "Michel Ghobrial"
       ];
@@ -3430,10 +3432,10 @@ export default function App() {
       servantAssignments['amberto'] = 'team_red_2';
       servantAssignments['youstina'] = 'team_blue_2';
       servantAssignments['youssef_wael'] = 'team_red_3';
-      servantAssignments['tony_tafaya__blue_'] = 'team_blue_3';
+      servantAssignments['tony_tafaya_blue'] = 'team_blue_3';
       servantAssignments['seif_samer'] = 'team_red_4';
       servantAssignments['rougy_adel'] = 'team_blue_4';
-      servantAssignments['tony_tafaya__red_'] = 'team_red_5';
+      servantAssignments['tony_tafaya_red'] = 'team_red_5';
       servantAssignments['sandra_wael'] = 'team_blue_5';
       servantAssignments['kirollos_remon'] = 'team_red_6';
       servantAssignments['martina_rizk'] = 'team_blue_6';
@@ -3452,7 +3454,9 @@ export default function App() {
       servantAssignments['daniel_el_masry'] = 'reflection';
 
       for (let name of newNames) {
-        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        let id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        if (name === "Tony Tafaya") id = "tony_tafaya_blue";
+        if (name === "Tony tafaya") id = "tony_tafaya_red";
         const role = servantAssignments[id] || 'volunteer';
         await setDoc(doc(db, 'vbt_servants', id), { 
             id, 
@@ -3529,10 +3533,10 @@ export default function App() {
         'team_red_2':   { code: 'team_red_2',   name: 'Red 2',   leaders: 'Amberto',        side: 'Red',   kidCount: 10 },
         'team_blue_2':  { code: 'team_blue_2',  name: 'Blue 2',  leaders: 'Youstina',       side: 'Blue',  kidCount: 10 },
         'team_red_3':   { code: 'team_red_3',   name: 'Red 3',   leaders: 'Youssef Wael',   side: 'Red',   kidCount: 10 },
-        'team_blue_3':  { code: 'team_blue_3',  name: 'Blue 3',  leaders: 'Tony Tafaya (Blue)', side: 'Blue', kidCount: 10 },
+        'team_blue_3':  { code: 'team_blue_3',  name: 'Blue 3',  leaders: 'Tony Tafaya',    side: 'Blue',  kidCount: 10 },
         'team_red_4':   { code: 'team_red_4',   name: 'Red 4',   leaders: 'Seif Samer',     side: 'Red',   kidCount: 10 },
         'team_blue_4':  { code: 'team_blue_4',  name: 'Blue 4',  leaders: 'Rougy Adel',     side: 'Blue',  kidCount: 10 },
-        'team_red_5':   { code: 'team_red_5',   name: 'Red 5',   leaders: 'Tony Tafaya (Red)',  side: 'Red',  kidCount: 10 },
+        'team_red_5':   { code: 'team_red_5',   name: 'Red 5',   leaders: 'Tony tafaya',    side: 'Red',   kidCount: 10 },
         'team_blue_5':  { code: 'team_blue_5',  name: 'Blue 5',  leaders: 'Sandra Wael',    side: 'Blue',  kidCount: 10 },
         'team_red_6':   { code: 'team_red_6',   name: 'Red 6',   leaders: 'Kirollos Remon',  side: 'Red',   kidCount: 10 },
         'team_blue_6':  { code: 'team_blue_6',  name: 'Blue 6',  leaders: 'Martina Rizk',   side: 'Blue',  kidCount: 10 }
