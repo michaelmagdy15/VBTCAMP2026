@@ -584,6 +584,184 @@ export default function ScheduleTab({
         );
       })()}
 
+      {/* ── LARGE CURRENT/NEXT GAME BANNER FOR TEAM LEADERS ── */}
+      {currentUser && currentUser.role === 'leader' && currentUser.teamCode && (() => {
+        // Find matchups for this team
+        const teamMatchups = (campData?.matchups || []).filter(m => 
+          (m.teamA && m.teamA.toLowerCase() === currentUser.teamCode?.toLowerCase()) || 
+          (m.teamB && m.teamB.toLowerCase() === currentUser.teamCode?.toLowerCase())
+        );
+
+        // Sort by time predictably
+        const sortedTeamMatchups = [...teamMatchups].sort((a, b) => {
+          const timeA = a.time ? a.time.split(' - ')[0] : '00:00';
+          const timeB = b.time ? b.time.split(' - ')[0] : '00:00';
+          return parseTimeToMs(timeA) - parseTimeToMs(timeB);
+        });
+
+        // Determine current day
+        const currentDay = String(getEventCurrentDay(eventConfig));
+
+        // Find active matchup
+        const activeMatch = sortedTeamMatchups.find(m => {
+          const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+          return String(mDay) === currentDay && isTimeSlotActive(m.time, `Block ${m.block}`, mDay);
+        });
+
+        // Find next matchup
+        const now = new Date();
+        const timeShift = getEffectiveTimeShift(eventConfig);
+        const shiftedNow = new Date(now.getTime() + timeShift * 60 * 1000);
+        const nowMs = (shiftedNow.getHours() * 3600 + shiftedNow.getMinutes() * 60 + shiftedNow.getSeconds()) * 1000;
+
+        let nextMatch = sortedTeamMatchups.find(m => {
+          const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+          if (String(mDay) !== currentDay) return false;
+          const startTimeStr = m.time ? m.time.split(' - ')[0] : '00:00';
+          const startMs = parseTimeToMs(startTimeStr);
+          return startMs > nowMs;
+        });
+
+        // Fallback: search subsequent days
+        if (!nextMatch) {
+          nextMatch = sortedTeamMatchups.find(m => {
+            const mDay = m.day || (eventConfig.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+            if (Number(mDay) > Number(currentDay)) return true;
+            if (String(mDay) === currentDay) {
+              const startTimeStr = m.time ? m.time.split(' - ')[0] : '00:00';
+              const startMs = parseTimeToMs(startTimeStr);
+              return startMs > nowMs;
+            }
+            return false;
+          });
+        }
+
+        // Render the banner
+        if (activeMatch) {
+          const isA = activeMatch.teamA?.toLowerCase() === currentUser.teamCode?.toLowerCase();
+          const opponent = isA ? activeMatch.teamB : activeMatch.teamA;
+          const cleanOpponent = opponent ? opponent.replace(/^team_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+          
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(244, 63, 94, 0.1) 100%)',
+              border: '2px solid rgb(239, 68, 68)',
+              borderRadius: '16px',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2)',
+              animation: 'rl-pulse 2s infinite ease-in-out',
+              zIndex: 10
+            }}>
+              <style>{`
+                @keyframes rl-pulse {
+                  0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.2); }
+                  50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.5); }
+                }
+              `}</style>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: 'rgb(239, 68, 68)',
+                  color: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: '900',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  🔴 Live Now
+                </span>
+                <span style={{ fontSize: '0.85rem', color: '#fda4af', fontWeight: '700' }}>
+                  {activeMatch.time}
+                </span>
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0', lineHeight: '1.15' }}>
+                  {activeMatch.game}
+                </h2>
+                <p style={{ fontSize: '1rem', color: '#fecdd3', margin: 0, fontWeight: '700' }}>
+                  📍 {activeMatch.location}
+                </p>
+                {cleanOpponent && (
+                  <p style={{ fontSize: '0.85rem', color: '#ffffff', marginTop: '8px', margin: '8px 0 0 0', opacity: 0.9 }}>
+                    VS ⚔️ <strong>{cleanOpponent}</strong>
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        if (nextMatch) {
+          const isA = nextMatch.teamA?.toLowerCase() === currentUser.teamCode?.toLowerCase();
+          const opponent = isA ? nextMatch.teamB : nextMatch.teamA;
+          const cleanOpponent = opponent ? opponent.replace(/^team_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(251, 146, 60, 0.1) 100%)',
+              border: '2px solid rgb(249, 115, 22)',
+              borderRadius: '16px',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 8px 32px rgba(249, 115, 22, 0.15)',
+              zIndex: 10
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: 'rgb(249, 115, 22)',
+                  color: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: '900',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  ➔ Next Game
+                </span>
+                <span style={{ fontSize: '0.85rem', color: '#ffedd5', fontWeight: '700' }}>
+                  {nextMatch.time} (Shift {nextMatch.block})
+                </span>
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.65rem', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0', lineHeight: '1.2' }}>
+                  {nextMatch.game}
+                </h2>
+                <p style={{ fontSize: '0.95rem', color: '#fed7aa', margin: 0, fontWeight: '700' }}>
+                  📍 {nextMatch.location}
+                </p>
+                {cleanOpponent && (
+                  <p style={{ fontSize: '0.82rem', color: '#ffffff', marginTop: '6px', margin: '6px 0 0 0', opacity: 0.85 }}>
+                    VS ⚔️ {cleanOpponent}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.08) 100%)',
+            border: '1px dashed rgb(16, 185, 129)',
+            borderRadius: '16px',
+            padding: '20px',
+            textAlign: 'center',
+            color: '#a7f3d0'
+          }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🎉</span>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: '0 0 4px 0', color: '#ffffff' }}>All Shifts Done!</h3>
+            <p style={{ fontSize: '0.8rem', color: '#d1fae5', margin: 0 }}>You have completed all scheduled games for today.</p>
+          </div>
+        );
+      })()}
+
       {(isReferee || (currentUser && currentUser.role === 'leader' && currentUser.teamCode)) && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '4px' }}>
           <button
@@ -626,7 +804,7 @@ export default function ScheduleTab({
         </div>
       )}
 
-      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode && eventConfig?.eventType !== 'service')) || showFullSchedule) && (
+      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode)) || showFullSchedule) && (
         <>
           <ScheduleExporter
             scheduleData={campData}
@@ -1449,7 +1627,7 @@ export default function ScheduleTab({
         </div>
       )}
 
-      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode && eventConfig?.eventType !== 'service')) || showFullSchedule) && (
+      {((!isReferee && !(currentUser && currentUser.role === 'leader' && currentUser.teamCode)) || showFullSchedule) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredMatchups.length === 0 ? (
             <div className="empty-state">

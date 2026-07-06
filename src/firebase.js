@@ -771,14 +771,37 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     times.push(getShiftedTime(block * (roundDur + breakDur)));
   }
 
+  // Group active sub-teams by their team number (e.g. "1" from "Red 1") to pair Red & Blue
+  const teamNumbers = {}; // number -> { red: string, blue: string }
+  activeSubTeams.forEach(teamName => {
+    const parts = teamName.split(' ');
+    const num = parts[parts.length - 1]; // "1", "2", etc.
+    const nameWithoutNum = parts.slice(0, -1).join(' ').toLowerCase();
+    
+    if (!teamNumbers[num]) teamNumbers[num] = {};
+    if (nameWithoutNum.includes('red') || nameWithoutNum.includes(getCustomColorName('red').toLowerCase())) {
+      teamNumbers[num].red = teamName;
+    } else if (nameWithoutNum.includes('blue') || nameWithoutNum.includes(getCustomColorName('blue').toLowerCase())) {
+      teamNumbers[num].blue = teamName;
+    } else {
+      // Fallback
+      if (!teamNumbers[num].red) teamNumbers[num].red = teamName;
+      else teamNumbers[num].blue = teamName;
+    }
+  });
+
+  const sortedNums = Object.keys(teamNumbers).sort((a,b) => Number(a) - Number(b));
+  const P = sortedNums.length || 6;
+
   const matchups = [];
   let idx = 0;
   for (let block = 1; block <= numBlocks; block++) {
     for (let station = 1; station <= 6; station++) {
-      let teamIdx = (station - 1 - (block - 1)) % T;
-      if (teamIdx < 0) teamIdx += T;
+      let pairIdx = (station - 1 - (block - 1)) % P;
+      if (pairIdx < 0) pairIdx += P;
 
-      const teamName = activeSubTeams[teamIdx];
+      const num = sortedNums[pairIdx];
+      const pair = teamNumbers[num] || {};
 
       matchups.push({
         id: 'b' + block + '_s' + station + '_' + Date.now() + '_' + (idx++),
@@ -788,8 +811,8 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
         time: times[block - 1],
         location: locationsList[station - 1] || ('Station ' + station),
         game: gamesList[station - 1],
-        teamA: teamName,
-        teamB: ''
+        teamA: pair.red || '',
+        teamB: pair.blue || ''
       });
     }
   }
