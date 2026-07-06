@@ -369,17 +369,19 @@ export default function ScoreboardTab({
                                 </div>
                                 <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: '800' }}>
                                   {winner === 'NA' ? (
-                                    <span style={{ color: 'var(--text-muted)' }}>Pending</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>Not Played</span>
                                   ) : winner === 'teamA' || winner === 'Shakes' ? (
-                                    <span style={{ color: getTeamColorHex(m.teamA || m.shakes) }}>
-                                      {m.teamA || m.shakes} Win
+                                    <span style={{ color: getTeamColorHex(m.teamA || m.shakes), fontWeight: '600' }}>
+                                      {m.teamA || m.shakes} Won
                                     </span>
                                   ) : winner === 'teamB' || winner === 'Fries' ? (
-                                    <span style={{ color: getTeamColorHex(m.teamB || m.fries) }}>
-                                      {m.teamB || m.fries} Win
+                                    <span style={{ color: getTeamColorHex(m.teamB || m.fries), fontWeight: '600' }}>
+                                      {m.teamB || m.fries} Won
                                     </span>
                                   ) : (
-                                    <span style={{ color: 'var(--color-tie)' }}>Tie</span>
+                                    <span style={{ color: eventConfig.eventType === 'service' ? '#10b981' : 'var(--color-tie)', fontWeight: '600' }}>
+                                      {eventConfig.eventType === 'service' ? 'Both Won' : 'Tie'}
+                                    </span>
                                   )}
                                 </div>
                               </div>
@@ -408,14 +410,17 @@ export default function ScoreboardTab({
                                     {m.teamA || m.shakes}
                                   </button>
                                   <button 
-                                    className={`winner-option ${winner === 'TIE' ? 'active' : ''}`}
+                                    className={`winner-option ${winner === 'TIE' ? (eventConfig.eventType === 'service' ? 'active-tie-service' : 'active') : ''}`}
                                     style={{
+                                      background: winner === 'TIE' ? (eventConfig.eventType === 'service' ? 'linear-gradient(135deg, #10b981, #059669)' : '') : 'transparent',
+                                      color: winner === 'TIE' ? '#ffffff' : (eventConfig.eventType === 'service' ? '#10b981' : ''),
+                                      border: eventConfig.eventType === 'service' ? '1px solid #10b981' : '',
                                       borderRadius: '4px',
                                       padding: '4px 8px'
                                     }}
                                     onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
                                   >
-                                    Tie
+                                    {eventConfig.eventType === 'service' ? 'Both' : 'Tie'}
                                   </button>
                                   <button 
                                     className={`winner-option ${winner === 'teamB' || winner === 'Fries' ? 'active' : ''}`}
@@ -514,7 +519,9 @@ export default function ScoreboardTab({
                               {m.teamB || m.fries} Win
                             </span>
                           ) : (
-                            <span style={{ color: 'var(--color-tie)' }}>Tie</span>
+                            <span style={{ color: eventConfig.eventType === 'service' ? '#10b981' : 'var(--color-tie)', fontWeight: '600' }}>
+                              {eventConfig.eventType === 'service' ? 'Both' : 'Tie'}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -543,14 +550,17 @@ export default function ScoreboardTab({
                             {m.teamA || m.shakes}
                           </button>
                           <button 
-                            className={`winner-option ${winner === 'TIE' ? 'active-tie' : ''}`}
+                            className={`winner-option ${winner === 'TIE' ? (eventConfig.eventType === 'service' ? 'active-tie-service' : 'active-tie') : ''}`}
                             style={{
+                              background: winner === 'TIE' ? (eventConfig.eventType === 'service' ? 'linear-gradient(135deg, #10b981, #059669)' : '') : 'transparent',
+                              color: winner === 'TIE' ? '#ffffff' : (eventConfig.eventType === 'service' ? '#10b981' : ''),
+                              border: eventConfig.eventType === 'service' ? '1px solid #10b981' : '',
                               borderRadius: '4px',
                               padding: '4px 8px'
                             }}
                             onClick={() => handleToggleWinner(m.block, m.round, m.game, 'TIE')}
                           >
-                            Tie
+                            {eventConfig.eventType === 'service' ? 'Both' : 'Tie'}
                           </button>
                           <button 
                             className={`winner-option ${winner === 'teamB' || winner === 'Fries' ? 'active-fries' : ''}`}

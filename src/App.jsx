@@ -1936,7 +1936,7 @@ export default function App() {
           } else if (type === 'announcement' || type === 'round_start' || type === 'schedule') {
             // Important announcement — bell chime + medium vibration
             playChime(type === 'round_start' ? 'round_start' : type === 'schedule' ? 'schedule' : 'announcement');
-            vibrate(VIBRATE_ANNOUNCEMENT);
+            vibrate(type === 'round_start' ? VIBRATE_URGENT : VIBRATE_ANNOUNCEMENT);
 
           } else {
             // Regular feed item (photo, reaction, etc.) — soft chime + subtle vibration
@@ -3657,7 +3657,7 @@ export default function App() {
     });
     
     const startMsg = `⏱️ ${m.game} has started at ${new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`;
-    await addAnnouncement(currentEventCode, startMsg, currentUser?.name || 'System', 'system');
+    await addAnnouncement(currentEventCode, startMsg, currentUser?.name || 'System', 'round_start');
   };
 
   const handleStopMatchupTimer = async (m) => {
@@ -3702,7 +3702,7 @@ export default function App() {
       alertMsg = `✅ ${m.game} completed on schedule (took ${actualMins}m ${actualSecs}s).`;
     }
     
-    await addAnnouncement(currentEventCode, alertMsg, currentUser?.name || 'System', 'system');
+    await addAnnouncement(currentEventCode, alertMsg, currentUser?.name || 'System', 'round_start');
     await triggerRemotePushNotification("Schedule Update", alertMsg);
   };
 
@@ -3907,7 +3907,7 @@ export default function App() {
           const teamA = m.teamA || m.shakes;
           const teamB = m.teamB || m.fries;
           if (teamA === "All Teams") {
-            if (winner === 'Shakes' || winner === 'teamA') {
+            if (winner === 'Shakes' || winner === 'teamA' || winner === 'TIE') {
               colors.forEach(c => { wins[c] += points; });
             }
           } else {
@@ -3920,6 +3920,15 @@ export default function App() {
               const team = campData.teams?.[teamB];
               if (team && colors.includes(team.side)) {
                 wins[team.side] += points;
+              }
+            } else if (winner === 'TIE') {
+              const team1 = campData.teams?.[teamA];
+              if (team1 && colors.includes(team1.side)) {
+                wins[team1.side] += points;
+              }
+              const team2 = campData.teams?.[teamB];
+              if (team2 && colors.includes(team2.side)) {
+                wins[team2.side] += points;
               }
             }
           }
@@ -3961,7 +3970,7 @@ export default function App() {
             const teamA = m.teamA || m.shakes;
             const teamB = m.teamB || m.fries;
             if (teamA === "All Teams") {
-              if (winner === 'Shakes' || winner === 'teamA') {
+              if (winner === 'Shakes' || winner === 'teamA' || winner === 'TIE') {
                 colors.forEach(c => { blockWins[c] += points; });
               }
             } else {
@@ -3974,6 +3983,15 @@ export default function App() {
                 const team = campData.teams?.[teamB];
                 if (team && colors.includes(team.side)) {
                   blockWins[team.side] += points;
+                }
+              } else if (winner === 'TIE') {
+                const team1 = campData.teams?.[teamA];
+                if (team1 && colors.includes(team1.side)) {
+                  blockWins[team1.side] += points;
+                }
+                const team2 = campData.teams?.[teamB];
+                if (team2 && colors.includes(team2.side)) {
+                  blockWins[team2.side] += points;
                 }
               }
             }

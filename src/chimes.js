@@ -41,7 +41,7 @@ const sounds = {
   score        : makeHowl('score',        0.65),
   urgent       : makeHowl('urgent',       0.9),
   schedule     : makeHowl('schedule',     0.65),
-  round_start  : makeHowl('round_start',  0.8),
+  round_start  : makeHowl('round_start',  1.0),
   walkie       : makeHowl('walkie',       0.6),
   notification : makeHowl('notification', 0.55),
   success      : makeHowl('success',      0.65),
