@@ -13,37 +13,59 @@ import { ROLES } from '../permissions';
 const FALLBACK_SERVANT_ASSIGNMENTS = {
   // Team Leaders
   'andrew': 'team_red_1',
+  'andrew essam': 'team_red_1',
   'sherry': 'team_red_1',
+  'sherry wael': 'team_red_1',
   'amberto': 'team_red_2',
   'youstina': 'team_red_2',
   'youssef': 'team_white_1',
+  'youssef wael': 'team_white_1',
   'tony': 'team_white_1',
   'seif': 'team_white_2',
+  'seif samer': 'team_white_2',
   'rougy': 'team_white_2',
+  'rougy adel': 'team_white_2',
   'tony tafaya': 'team_black_1',
   'sandra': 'team_black_1',
+  'sandra wael': 'team_black_1',
   'kirollos': 'team_black_2',
+  'kirollos remon': 'team_black_2',
   'martina': 'team_black_2',
+  'martina rizk': 'team_black_2',
   
   // Game Leaders / Referees
+  'michel remon': 'station_1',
   'micho': 'station_1',
+  'emily boshra': 'station_1',
   'emily': 'station_1',
   'macarious': 'station_2',
-  'dani': 'station_2',
+  'passant': 'station_2',
+  'dani': 'reflection',
+  'nathalie hazem': 'station_3',
   'nathalie': 'station_3',
+  'kiro wagdy': 'station_3',
   'kiro': 'station_3',
+  'karim hany': 'station_4',
   'karim': 'station_4',
+  'john kamel': 'station_4',
   'john': 'station_4',
   'cinderella': 'station_4',
+  'patrick sameh': 'station_4',
   'patrick': 'station_4',
-  'joice': 'station_5',
+  'andrew nader': 'station_5',
+  'jessica nossier': 'station_5',
   'jessica': 'station_5',
+  'joice': 'station_5',
+  'bassem khella': 'station_6',
   'bassem': 'station_6',
+  'sara zaki': 'station_6',
   'sara': 'station_6',
   
   // Other roles
   'michael mitry': 'media',
-  'amy': 'equipment'
+  'amy ramy': 'equipment',
+  'amy': 'equipment',
+  'daniel el masry': 'reflection'
 };
 
 // ─── Constants ───────────────────────────────────────────────

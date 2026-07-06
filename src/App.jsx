@@ -149,37 +149,59 @@ const WEBPUSH_VAPID_KEY = "BBWNlIKCRTY40ybSED7bBc5AUlRT7IHvZ0EajhdPVnxDcuSnZ7_3I
 const FALLBACK_SERVANT_ASSIGNMENTS = {
   // Team Leaders
   'andrew': 'team_red_1',
+  'andrew essam': 'team_red_1',
   'sherry': 'team_red_1',
+  'sherry wael': 'team_red_1',
   'amberto': 'team_red_2',
   'youstina': 'team_red_2',
   'youssef': 'team_white_1',
+  'youssef wael': 'team_white_1',
   'tony': 'team_white_1',
   'seif': 'team_white_2',
+  'seif samer': 'team_white_2',
   'rougy': 'team_white_2',
+  'rougy adel': 'team_white_2',
   'tony tafaya': 'team_black_1',
   'sandra': 'team_black_1',
+  'sandra wael': 'team_black_1',
   'kirollos': 'team_black_2',
+  'kirollos remon': 'team_black_2',
   'martina': 'team_black_2',
+  'martina rizk': 'team_black_2',
   
   // Game Leaders / Referees
+  'michel remon': 'station_1',
   'micho': 'station_1',
+  'emily boshra': 'station_1',
   'emily': 'station_1',
   'macarious': 'station_2',
-  'dani': 'station_2',
+  'passant': 'station_2',
+  'dani': 'reflection',
+  'nathalie hazem': 'station_3',
   'nathalie': 'station_3',
+  'kiro wagdy': 'station_3',
   'kiro': 'station_3',
+  'karim hany': 'station_4',
   'karim': 'station_4',
+  'john kamel': 'station_4',
   'john': 'station_4',
   'cinderella': 'station_4',
+  'patrick sameh': 'station_4',
   'patrick': 'station_4',
-  'joice': 'station_5',
+  'andrew nader': 'station_5',
+  'jessica nossier': 'station_5',
   'jessica': 'station_5',
+  'joice': 'station_5',
+  'bassem khella': 'station_6',
   'bassem': 'station_6',
+  'sara zaki': 'station_6',
   'sara': 'station_6',
   
   // Other roles
   'michael mitry': 'media',
-  'amy': 'equipment'
+  'amy ramy': 'equipment',
+  'amy': 'equipment',
+  'daniel el masry': 'reflection'
 };
 
 // Default state when Firestore is empty
@@ -2304,47 +2326,47 @@ export default function App() {
         const defaultData = {
           serviceBrief: "Welcome to today's VBT Sports Outreach Service! Today we are visiting Ard el Golf to share the joy of sports, run active game stations, and share a Bible lesson on Faith and Teamwork. Let's make sure every child has a wonderful, safe, and inspiring experience!",
           groups: [
-            { leaderName: "Andrew & Sherry (Red 1)", kidCount: 20 },
+            { leaderName: "Andrew Essam & Sherry Wael (Red 1)", kidCount: 20 },
             { leaderName: "Amberto & Youstina (Red 2)", kidCount: 20 },
-            { leaderName: "Youssef & Tony (White 1)", kidCount: 20 },
-            { leaderName: "Seif & Rougy (White 2)", kidCount: 20 },
-            { leaderName: "Tony Tafaya & Sandra (Black 1)", kidCount: 20 },
-            { leaderName: "Kirollos & Martina (Black 2)", kidCount: 20 }
+            { leaderName: "Youssef Wael & Tony Tafaya (White 1)", kidCount: 20 },
+            { leaderName: "Seif Samer & Rougy Adel (White 2)", kidCount: 20 },
+            { leaderName: "Tony Tafaya & Sandra Wael (Black 1)", kidCount: 20 },
+            { leaderName: "Kirollos Remon & Martina Rizk (Black 2)", kidCount: 20 }
           ],
           games: [
             {
               name: "Blind Builder",
-              location: "Station 1 (Micho, Emily)",
+              location: "Station 1 (Michel Remon, Emily Boshra)",
               howToPlay: "One player is blindfolded and is given plastic cups. They must build a pyramid through verbal instructions from teammates. Each teammate stays stacking until he stacks a full pyramid, then the next team member takes his turn.",
               lesson: "Teamwork & Trust — We listen closely to our guide to build together, just as we follow God's voice."
             },
             {
               name: "Skee Ball",
-              location: "Station 2 (Macarious, Dani)",
+              location: "Station 2 (Macarious, Passant)",
               howToPlay: "Each team member gets a try at throwing the ball and dropping it in the holes. Team with the highest accumulated score wins.",
               lesson: "Aiming High & Precision — Working together to accumulate points, focusing on our goal."
             },
             {
               name: "Minefield",
-              location: "Station 3 (Nathalie, Kiro)",
+              location: "Station 3 (Nathalie Hazem, Kiro Wagdy)",
               howToPlay: "One player from each team is blindfolded and must cross from one point to the other with obstacles placed throughout. One team member is chosen to guide him or the whole team does. At the end of obstacle, the blindfolded team member places a cone with his team’s color in an xo game. Most XO wins.",
               lesson: "Navigating Obstacles — Trusting the voices of our guides to lead us safely through the minefield of life."
             },
             {
               name: "Helium Stick & Human Chairs",
-              location: "Station 4 (Karim, John, Cinderella, Patrick)",
+              location: "Station 4 (Karim Hany, John Kamel, Cinderella, Patrick Sameh)",
               howToPlay: "Shabab for game 4 (3ashan law had etlaghbat):\nEach team of 10 is split into 3 groups:\n1. 4 boys or 4 girls (Human Chairs)\n2. 1 group of 3 (Helium Stick)\n3. 1 group of 3 (Helium Stick)\n\nInstructions:\n- Helium Stick: Lower a broomstick together using only two fingers each.\n- Human Chairs Circle: Team members build a circle by lying on each other's laps, then chairs are removed.",
               lesson: "Supporting Each Other — Every single member is vital to support the group and achieve the impossible."
             },
             {
               name: "Whiffle Ball",
-              location: "Station 5 (Joice, Jessica)",
+              location: "Station 5 (Andrew Nader, Jessica Nossier)",
               howToPlay: "Each team member is given a colored ball and must throw it in its corresponding colored hole. Each team member gets one try. Team with the most goals wins.",
               lesson: "Color Alignment & Directing Goals — Directing our efforts toward the correct target."
             },
             {
               name: "Blind Shape",
-              location: "Station 6 (Bassem, Sara)",
+              location: "Station 6 (Bassem Khella, Sara Zaki)",
               howToPlay: "Each team is given a rope and are blindfolded, they are told to create a shape with the rope. Team with the highest amount of shapes wins.",
               lesson: "Creating Harmony — Communicating effectively to form perfect shapes when we cannot see."
             }
@@ -2378,22 +2400,36 @@ export default function App() {
       setWizardAttending(allIds);
       
       const defaultAssignments = {
-        michel_ghobrial: "station_1",
-        phelo: "station_2",
-        emily_boshra: "station_3",
-        john_kamal: "station_4",
-        amberto: "big_game_1",
-        daniel_el_masry: "reflection",
-        kirollos_remon: "big_game_2",
-        julina: "team_white_1",
-        karen_oberoi: "team_white_2",
-        sara_zaki: "team_black_1",
-        michel_remon: "team_black_2",
-        kiro_wagdy: "team_red_1",
-        martina_rizk: "team_red_2",
-        martina_sobhy: "team_blue_1",
-        andrew: "team_blue_2",
-        michael_mitry: "media"
+        michel_ghobrial: "station_1", // Service Day Leader
+        michel_remon: "station_1",
+        emily_boshra: "station_1",
+        macarious: "station_2",
+        passant: "station_2",
+        nathalie_hazem: "station_3",
+        kiro_wagdy: "station_3",
+        karim_hany: "station_4",
+        john_kamel: "station_4",
+        cinderella: "station_4",
+        patrick_sameh: "station_4",
+        andrew_nader: "station_5",
+        jessica_nossier: "station_5",
+        bassem_khella: "station_6",
+        sara_zaki: "station_6",
+        andrew_essam: "team_red_1",
+        sherry_wael: "team_blue_1",
+        amberto: "team_red_2",
+        youstina: "team_blue_2",
+        youssef_wael: "team_red_3",
+        tony: "team_blue_3",
+        seif_samer: "team_red_4",
+        rougy_adel: "team_blue_4",
+        tony_tafaya: "team_red_5",
+        sandra_wael: "team_blue_5",
+        kirollos_remon: "team_red_6",
+        martina_rizk: "team_blue_6",
+        michael_mitry: "media",
+        amy_ramy: "equipment",
+        daniel_el_masry: "reflection"
       };
       
       const roles = {};
@@ -3376,39 +3412,40 @@ export default function App() {
         return;
       }
       const newNames = [
-        "Andrew", "Sherry", "Amberto", "Youstina", "Youssef", "Tony", "Seif", "Rougy", "Tony tafaya", "Sandra", "Kirollos", "Martina",
-        "Dani", "Emily", "Micho", "Nathalie", "Kiro", "Jessica", "John", "Cinderella", "Patrick", "Joice", "Karim", "Bassem", "Sara",
-        "Macarious", "Michael Mitry", "System Admin", "Amy", "Michel Ghobrial"
+        "Andrew Essam", "Sherry Wael", "Amberto", "Youstina", "Youssef Wael", "Tony", "Seif Samer", "Rougy Adel", "Tony tafaya", "Sandra Wael", "Kirollos Remon", "Martina Rizk",
+        "Daniel El Masry", "Emily Boshra", "Michel Remon", "Nathalie Hazem", "Kiro Wagdy", "Jessica Nossier", "John Kamel", "Cinderella", "Patrick Sameh", "Karim Hany", "Bassem Khella", "Sara Zaki",
+        "Macarious", "Passant", "Andrew Nader", "Michael Mitry", "System Admin", "Amy Ramy", "Michel Ghobrial"
       ];
       
       const servantAssignments = {};
       const activeServants = [];
 
       // Group leaders mapped to Red and Blue sub-teams (Group X -> Red X and Blue X)
-      servantAssignments['andrew'] = 'team_red_1';
-      servantAssignments['sherry'] = 'team_blue_1';
+      servantAssignments['andrew_essam'] = 'team_red_1';
+      servantAssignments['sherry_wael'] = 'team_blue_1';
       servantAssignments['amberto'] = 'team_red_2';
       servantAssignments['youstina'] = 'team_blue_2';
-      servantAssignments['youssef'] = 'team_red_3';
+      servantAssignments['youssef_wael'] = 'team_red_3';
       servantAssignments['tony'] = 'team_blue_3';
-      servantAssignments['seif'] = 'team_red_4';
-      servantAssignments['rougy'] = 'team_blue_4';
+      servantAssignments['seif_samer'] = 'team_red_4';
+      servantAssignments['rougy_adel'] = 'team_blue_4';
       servantAssignments['tony_tafaya'] = 'team_red_5';
-      servantAssignments['sandra'] = 'team_blue_5';
-      servantAssignments['kirollos'] = 'team_red_6';
-      servantAssignments['martina'] = 'team_blue_6';
+      servantAssignments['sandra_wael'] = 'team_blue_5';
+      servantAssignments['kirollos_remon'] = 'team_red_6';
+      servantAssignments['martina_rizk'] = 'team_blue_6';
 
-      ['micho', 'emily'].forEach(id => servantAssignments[id] = 'station_1');
-      ['macarious', 'dani'].forEach(id => servantAssignments[id] = 'station_2');
-      ['nathalie', 'kiro'].forEach(id => servantAssignments[id] = 'station_3');
-      ['karim', 'john', 'cinderella', 'patrick'].forEach(id => servantAssignments[id] = 'station_4');
-      ['joice', 'jessica'].forEach(id => servantAssignments[id] = 'station_5');
-      ['bassem', 'sara'].forEach(id => servantAssignments[id] = 'station_6');
+      ['michel_remon', 'emily_boshra'].forEach(id => servantAssignments[id] = 'station_1');
+      ['macarious', 'passant'].forEach(id => servantAssignments[id] = 'station_2');
+      ['nathalie_hazem', 'kiro_wagdy'].forEach(id => servantAssignments[id] = 'station_3');
+      ['karim_hany', 'john_kamel', 'cinderella', 'patrick_sameh'].forEach(id => servantAssignments[id] = 'station_4');
+      ['andrew_nader', 'jessica_nossier'].forEach(id => servantAssignments[id] = 'station_5');
+      ['bassem_khella', 'sara_zaki'].forEach(id => servantAssignments[id] = 'station_6');
       
       servantAssignments['michael_mitry'] = 'coordinator';
       servantAssignments['system_admin'] = 'coordinator';
-      servantAssignments['amy'] = 'coordinator';
+      servantAssignments['amy_ramy'] = 'coordinator';
       servantAssignments['michel_ghobrial'] = 'service_day_leader';
+      servantAssignments['daniel_el_masry'] = 'reflection';
 
       for (let name of newNames) {
         const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -3483,18 +3520,18 @@ export default function App() {
       
       // Build teams map so scoring can aggregate by color side
       const teamsMap = {
-        'team_red_1':   { code: 'team_red_1',   name: 'Red 1',   leaders: 'Andrew',         side: 'Red',   kidCount: 10 },
-        'team_blue_1':  { code: 'team_blue_1',  name: 'Blue 1',  leaders: 'Sherry',         side: 'Blue',  kidCount: 10 },
+        'team_red_1':   { code: 'team_red_1',   name: 'Red 1',   leaders: 'Andrew Essam',   side: 'Red',   kidCount: 10 },
+        'team_blue_1':  { code: 'team_blue_1',  name: 'Blue 1',  leaders: 'Sherry Wael',    side: 'Blue',  kidCount: 10 },
         'team_red_2':   { code: 'team_red_2',   name: 'Red 2',   leaders: 'Amberto',        side: 'Red',   kidCount: 10 },
         'team_blue_2':  { code: 'team_blue_2',  name: 'Blue 2',  leaders: 'Youstina',       side: 'Blue',  kidCount: 10 },
-        'team_red_3':   { code: 'team_red_3',   name: 'Red 3',   leaders: 'Youssef',        side: 'Red',   kidCount: 10 },
-        'team_blue_3':  { code: 'team_blue_3',  name: 'Blue 3',  leaders: 'Tony',           side: 'Blue',  kidCount: 10 },
-        'team_red_4':   { code: 'team_red_4',   name: 'Red 4',   leaders: 'Seif',           side: 'Red',   kidCount: 10 },
-        'team_blue_4':  { code: 'team_blue_4',  name: 'Blue 4',  leaders: 'Rougy',          side: 'Blue',  kidCount: 10 },
+        'team_red_3':   { code: 'team_red_3',   name: 'Red 3',   leaders: 'Youssef Wael',   side: 'Red',   kidCount: 10 },
+        'team_blue_3':  { code: 'team_blue_3',  name: 'Blue 3',  leaders: 'Tony Tafaya',    side: 'Blue',  kidCount: 10 },
+        'team_red_4':   { code: 'team_red_4',   name: 'Red 4',   leaders: 'Seif Samer',     side: 'Red',   kidCount: 10 },
+        'team_blue_4':  { code: 'team_blue_4',  name: 'Blue 4',  leaders: 'Rougy Adel',     side: 'Blue',  kidCount: 10 },
         'team_red_5':   { code: 'team_red_5',   name: 'Red 5',   leaders: 'Tony Tafaya',    side: 'Red',   kidCount: 10 },
-        'team_blue_5':  { code: 'team_blue_5',  name: 'Blue 5',  leaders: 'Sandra',         side: 'Blue',  kidCount: 10 },
-        'team_red_6':   { code: 'team_red_6',   name: 'Red 6',   leaders: 'Kirollos',       side: 'Red',   kidCount: 10 },
-        'team_blue_6':  { code: 'team_blue_6',  name: 'Blue 6',  leaders: 'Martina',        side: 'Blue',  kidCount: 10 }
+        'team_blue_5':  { code: 'team_blue_5',  name: 'Blue 5',  leaders: 'Sandra Wael',    side: 'Blue',  kidCount: 10 },
+        'team_red_6':   { code: 'team_red_6',   name: 'Red 6',   leaders: 'Kirollos Remon',  side: 'Red',   kidCount: 10 },
+        'team_blue_6':  { code: 'team_blue_6',  name: 'Blue 6',  leaders: 'Martina Rizk',   side: 'Blue',  kidCount: 10 }
       };
 
       // Points per game station
