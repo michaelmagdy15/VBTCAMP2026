@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vbt-app-v6';
+const CACHE_NAME = 'vbt-app-v7';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -65,8 +65,8 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  // Do NOT call self.skipWaiting() here — causes unwanted reload mid-session.
-  // Will be triggered explicitly via postMessage({ type: 'SKIP_WAITING' }).
+  // Force update immediately for all active devices
+  self.skipWaiting();
 });
 
 // Activate Event — clear old caches
