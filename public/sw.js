@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vbt-app-v7';
+const CACHE_NAME = 'vbt-app-v8';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
