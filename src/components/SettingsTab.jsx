@@ -103,7 +103,7 @@ export default function SettingsTab({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '4px' }}>
         {[
-          ['&#128101; Servants', 'Directory', () => setShowServantDirectoryModal(true), '#60a5fa'],
+          ['&#128101; Servants', 'Roster & Dir', () => setShowServantDirectoryModal(true), '#60a5fa'],
           ['&#127918; Games', 'Library', () => setShowGamesLibraryModal(true), '#a78bfa'],
           ['&#128247; QR Check-in', 'Self check-in', () => setShowQRModal(true), '#4ade80'],
           ['&#128190; Backup', 'Offline sync', () => setShowBackupModal(true), '#10b981'],
@@ -648,138 +648,20 @@ export default function SettingsTab({
                       </div>
                     </div>
 
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4 style={{ color: '#ffffff', fontSize: '0.82rem', fontWeight: '700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          👥 Leader Roster & Attendance
-                          <span style={{ fontSize: '0.65rem', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(34,197,94,0.3)', textTransform: 'none', letterSpacing: 'normal' }}>⚡ Autosaved</span>
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={handleLiveAutoAssign}
-                          className="btn-glow"
-                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.15)', color: '#c4b5fd', fontSize: '0.7rem', fontWeight: '700', cursor: 'pointer' }}
-                        >
-                          ✨ Live Auto-Assign
-                        </button>
-                      </div>
-                      
-                      <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                        {globalServants.sort((a, b) => a.name.localeCompare(b.name)).map(s => {
-                          const isAttending = editAttending.includes(s.id);
-                          return (
-                            <div key={s.id} style={{ 
-                              display: 'flex', 
-                              flexDirection: 'row', 
-                              flexWrap: 'wrap', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between',
-                              gap: '8px', 
-                              padding: '6px', 
-                              borderRadius: '6px', 
-                              background: isAttending ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.01)', 
-                              border: '1px solid ' + (isAttending ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.02)') 
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '150px' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={isAttending}
-                                  onChange={async () => {
-                                    const updated = editAttending.includes(s.id)
-                                      ? editAttending.filter(id => id !== s.id)
-                                      : [...editAttending, s.id];
-                                    setEditAttending(updated);
-                                    await handleAutoSaveRosterData(updated, editRoles);
-                                  }}
-                                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                                />
-                                <span style={{ fontSize: '0.8rem', color: '#ffffff', fontWeight: isAttending ? '700' : 'normal' }}>{s.name}</span>
-                              </div>
-                              
-                              {isAttending && (
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                  <select
-                                    value={editRoles[s.id] || 'volunteer'}
-                                    onChange={async (e) => {
-                                      const newRole = e.target.value;
-                                      const updatedRoles = { ...editRoles, [s.id]: newRole };
-                                      setEditRoles(updatedRoles);
-                                      await handleAutoSaveRosterData(editAttending, updatedRoles);
-                                    }}
-                                    style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', width: '100%', maxWidth: '160px', minHeight: '32px' }}
-                                  >
-                                    <option value="volunteer">Volunteer/Ref</option>
-                                    <option value="coordinator">Coordinator</option>
-                                    <option value="service_leader">Service Day Leader</option>
-                                    <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
-                                    <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
-                                    <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
-                                    <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
-                                    {eventConfig.gameEngineType === 'Shuffle' && (
-                                      <>
-                                        <option value="station_5">{(editStations.station_5?.name || 'Station 5') + ' Lead'}</option>
-                                        <option value="station_6">{(editStations.station_6?.name || 'Station 6') + ' Lead'}</option>
-                                      </>
-                                    )}
-                                    <option value="big_game_1">Big Game Lead 1</option>
-                                    <option value="big_game_2">Big Game Lead 2</option>
-                                    <option value="reflection">Reflection Lead</option>
-                                    <option value="team_red_1">{(editTeamRed || 'Red') + ' 1 Leader'}</option>
-                                    <option value="team_red_2">{(editTeamRed || 'Red') + ' 2 Leader'}</option>
-                                    <option value="team_white_1">{(editTeamWhite || 'White') + ' 1 Leader'}</option>
-                                    <option value="team_white_2">{(editTeamWhite || 'White') + ' 2 Leader'}</option>
-                                    <option value="team_black_1">{(editTeamBlack || 'Black') + ' 1 Leader'}</option>
-                                    <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
-                                    <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
-                                    <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
-                                    <option value="media">Media Coverage</option>
-                                  </select>
-                                  <select
-                                    value={s.uiMode || 'detailed'}
-                                    onChange={async (e) => {
-                                      await updateServant(s.id, { uiMode: e.target.value });
-                                    }}
-                                    style={{ padding: '6px 10px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', minHeight: '32px' }}
-                                  >
-                                    <option value="detailed">Detailed UI</option>
-                                    <option value="dumb">Simple UI (Dumb)</option>
-                                  </select>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Quick Add Servant form inside Controls tab */}
-                      <div style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#a78bfa' }}>➕ Add New Servant to Directory</span>
-                        <div className="quick-add-row" style={{ display: 'flex', gap: '6px' }}>
-                          <input
-                            type="text"
-                            value={quickServantName}
-                            onChange={(e) => setQuickServantName(e.target.value)}
-                            placeholder="Name"
-                            style={{ flex: 2, padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', outline: 'none' }}
-                          />
-                          <input
-                            type="text"
-                            value={quickServantPasscode}
-                            onChange={(e) => setQuickServantPasscode(e.target.value)}
-                            placeholder="Pass (1234)"
-                            style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', outline: 'none' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleQuickAddServant}
-                            disabled={quickServantLoading}
-                            className="btn-glow"
-                            style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: 'var(--gradient-vbt)', color: '#ffffff', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}
-                          >
-                            {quickServantLoading ? '...' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', textAlign: 'center' }}>
+                      <div style={{ fontSize: '2rem' }}>👥</div>
+                      <h4 style={{ color: '#ffffff', fontSize: '0.9rem', fontWeight: '700', margin: 0 }}>Roster & Dir</h4>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                        Roster check-ins, servant roles, and UI mode options have been moved to the fullscreen Servants tab for a wider and taller screen interface, resolving nested scroll bugs.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowServantDirectoryModal(true)}
+                        className="btn-glow"
+                        style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--gradient-vbt)', color: '#ffffff', fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.85rem', cursor: 'pointer' }}
+                      >
+                        👥 Open Servants & Roster Manager
+                      </button>
                     </div>
 
                     <button

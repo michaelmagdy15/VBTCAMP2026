@@ -815,6 +815,9 @@ export default function App() {
   const [savingEventConfig, setSavingEventConfig] = useState(false);
 
   // Servants Library (Directory) Additional States
+  const [servantModalTab, setServantModalTab] = useState('roster');
+  const [servantRosterSearch, setServantRosterSearch] = useState('');
+  const [quickRosterSearch, setQuickRosterSearch] = useState('');
   const [showDirAddForm, setShowDirAddForm] = useState(false);
   const [dirAddName, setDirAddName] = useState('');
   const [dirAddPhone, setDirAddPhone] = useState('');
@@ -7446,6 +7449,37 @@ export default function App() {
                 </button>
               )}
 
+              {/* Admin, Coordinator, or Service Leader: Servants & Roster */}
+              {currentUser && ['admin', 'coordinator', 'service_leader'].includes(currentUser.role) && (
+                <button
+                  className="more-drawer-item"
+                  onClick={() => {
+                    setServantModalTab('roster');
+                    setShowServantDirectoryModal(true);
+                    setShowMoreDrawer(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Users size={18} color="var(--vbt-sky)" /> Servants & Roster
+                </button>
+              )}
+
               {/* Admin specific: Controls */}
               {currentUser.role === 'admin' && (
                 <button
@@ -7865,192 +7899,622 @@ export default function App() {
         <div style={{position:'fixed',inset:0,zIndex:8000,display:'flex',flexDirection:'column',background:'#080b18'}}>
           <div style={{padding:'16px',paddingTop:`calc(16px + env(safe-area-inset-top))`,display:'flex',alignItems:'center',gap:'12px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(13,20,38,0.95)',backdropFilter:'blur(12px)',flexWrap:'wrap'}}>
             <button onClick={()=>setShowServantDirectoryModal(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:'1.4rem',cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>&#8592;</button>
-            <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>Servants Directory</h2>
-            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>{globalServants.length}</span>
+            <h2 style={{fontSize:'1rem',fontWeight:'800',color:'#fff',margin:0}}>
+              {servantModalTab === 'roster' ? 'Servants Roster & Roles' : 'Servants Directory'}
+            </h2>
+            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'8px'}}>
+              {servantModalTab === 'roster' ? editAttending.length : globalServants.length}
+            </span>
             <div style={{marginLeft:'auto',display:'flex',gap:'8px'}}>
               <button onClick={handleRecalculateAttendance} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>🔄 Recalculate</button>
               <button onClick={()=>setShowDirAddForm(!showDirAddForm)} style={{background:'linear-gradient(135deg,#1441a1,#60a5fa)',border:'none',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>{showDirAddForm?'Close Form':'+ Add Servant'}</button>
             </div>
           </div>
-          <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-            <input value={servantDirectorySearch} onChange={e=>setServantDirectorySearch(e.target.value)} placeholder='Search servants...' style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 14px',color:'#fff',fontSize:'0.9rem',boxSizing:'border-box',outline:'none'}} />
+
+          {/* Segmented Tab Headers */}
+          <div style={{
+            display: 'flex',
+            background: 'rgba(0,0,0,0.2)',
+            padding: '4px',
+            margin: '12px 16px 4px 16px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255, 255, 255, 0.08)'
+          }}>
+            <button
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                fontSize: '0.8rem',
+                fontWeight: '700',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                background: servantModalTab === 'roster' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
+                color: servantModalTab === 'roster' ? '#c4b5fd' : 'rgba(255, 255, 255, 0.6)',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => setServantModalTab('roster')}
+            >
+              📋 Active Roster & Roles ({editAttending.length})
+            </button>
+            <button
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                fontSize: '0.8rem',
+                fontWeight: '700',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                background: servantModalTab === 'directory' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
+                color: servantModalTab === 'directory' ? '#c4b5fd' : 'rgba(255, 255, 255, 0.6)',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => setServantModalTab('directory')}
+            >
+              📁 All Servants Directory ({globalServants.length})
+            </button>
           </div>
-          
-          {showDirAddForm && (
-            <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',padding:'16px',margin:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
-              <h3 style={{fontSize:'0.9rem',fontWeight:'800',color:'#fff',margin:0}}>Add New Servant</h3>
-              <div>
-                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Full Name</label>
-                <input value={dirAddName} onChange={e=>setDirAddName(e.target.value)} placeholder="Full Name" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
-              </div>
-              <div>
-                <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Phone Number</label>
-                <input value={dirAddPhone} onChange={e=>setDirAddPhone(e.target.value)} placeholder="Phone Number" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
-              </div>
-              <div style={{display:'flex',gap:'10px'}}>
-                <div style={{flex:1}}>
-                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Passcode</label>
-                  <input value={dirAddPasscode} onChange={e=>setDirAddPasscode(e.target.value)} placeholder="1234" style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}} />
+
+          {/* Roster Tab Content */}
+          {servantModalTab === 'roster' && (
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              {/* Search + Action Buttons Row */}
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    value={servantRosterSearch}
+                    onChange={e => setServantRosterSearch(e.target.value)}
+                    placeholder="Search in active roster..."
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLiveAutoAssign}
+                    className="btn-glow"
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(167,139,250,0.3)',
+                      background: 'rgba(167,139,250,0.15)',
+                      color: '#c4b5fd',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✨ Live Auto-Assign
+                  </button>
                 </div>
-                <div style={{flex:1}}>
-                  <label style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:'700'}}>Default Role</label>
-                  <select value={dirAddRole} onChange={e=>setDirAddRole(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box',outline:'none'}}>
-                    <option value="volunteer" style={{background:'#0d1426'}}>General Helper</option>
-                    <option value="referee" style={{background:'#0d1426'}}>Game Referee</option>
-                    <option value="leader" style={{background:'#0d1426'}}>Team Leader</option>
-                    <option value="service_leader" style={{background:'#0d1426'}}>Service Leader</option>
-                    <option value="admin" style={{background:'#0d1426'}}>Coordinator / Admin</option>
-                  </select>
+
+                {/* Add existing servant search row */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#60a5fa', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    ➕ Add Servant to Service
+                  </span>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="Type name of existing servant to add..."
+                      value={quickRosterSearch}
+                      onChange={e => setQuickRosterSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: '#fff',
+                        fontSize: '0.8rem',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                    {quickRosterSearch.trim().length >= 1 && (
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        zIndex: 9000,
+                        maxHeight: '180px',
+                        overflowY: 'auto',
+                        background: '#0a0e1c',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: '8px',
+                        marginTop: '4px'
+                      }}>
+                        {globalServants
+                          .filter(s => !editAttending.includes(s.id) && s.name?.toLowerCase().includes(quickRosterSearch.toLowerCase()))
+                          .map(s => (
+                            <div
+                              key={s.id}
+                              onClick={async () => {
+                                const newAttending = [...editAttending, s.id];
+                                const newRoles = { ...editRoles, [s.id]: s.defaultRole || 'volunteer' };
+                                setEditAttending(newAttending);
+                                setEditRoles(newRoles);
+                                await handleAutoSaveRosterData(newAttending, newRoles);
+                                setQuickRosterSearch('');
+                              }}
+                              style={{
+                                padding: '10px 14px',
+                                color: '#fff',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                textAlign: 'left',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <span>{s.name} <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>({s.defaultRole || 'volunteer'})</span></span>
+                              <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: '700' }}>+ Add to Service</span>
+                            </div>
+                          ))
+                        }
+                        {globalServants.filter(s => !editAttending.includes(s.id) && s.name?.toLowerCase().includes(quickRosterSearch.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '10px 14px', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', textAlign: 'center' }}>
+                            No matching directory servants found.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div style={{display:'flex',justifyContent:'flex-end',gap:'10px',marginTop:'4px'}}>
-                <button onClick={()=>{setShowDirAddForm(false); setDirAddName(''); setDirAddPhone('');}} style={{background:'rgba(255,255,255,0.05)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'600',padding:'8px 16px',borderRadius:'10px',cursor:'pointer'}}>Cancel</button>
-                <button onClick={async ()=>{
-                  if (!dirAddName.trim()) { alert('Please enter a name.'); return; }
-                  const sId = dirAddName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-                  try {
-                    await addServant({
-                      id: sId,
-                      name: dirAddName.trim(),
-                      phone: dirAddPhone.trim(),
-                      passcode: dirAddPasscode.trim() || '1234',
-                      defaultRole: dirAddRole,
-                      role: dirAddRole,
-                      createdAt: new Date().toISOString(),
-                      servicesAttended: []
-                    });
-                    setShowDirAddForm(false);
-                    setDirAddName('');
-                    setDirAddPhone('');
-                    setDirAddPasscode('1234');
-                  } catch (e) {
-                    alert('Error adding servant: ' + e.message);
-                  }
-                }} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.8rem',fontWeight:'700',padding:'8px 16px',borderRadius:'10px',cursor:'pointer'}}>Add Servant</button>
+
+              {/* Roster List Area */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+                {globalServants
+                  .filter(s => editAttending.includes(s.id) && (!servantRosterSearch || s.name?.toLowerCase().includes(servantRosterSearch.toLowerCase())))
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(s => {
+                    return (
+                      <div key={s.id} style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: '16px',
+                        padding: '14px',
+                        marginBottom: '10px',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        {/* Upper row: Name, Avatar, and Remove button */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg,#c4b5fd,#7c3aed)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: '800',
+                              color: '#fff',
+                              fontSize: '0.9rem'
+                            }}>
+                              {s.name?.[0]?.toUpperCase() || '?'}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.9rem' }}>{s.name}</div>
+                              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>
+                                Default: {s.defaultRole || 'volunteer'}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const updatedAttending = editAttending.filter(id => id !== s.id);
+                              const updatedRoles = { ...editRoles };
+                              delete updatedRoles[s.id];
+                              setEditAttending(updatedAttending);
+                              setEditRoles(updatedRoles);
+                              await handleAutoSaveRosterData(updatedAttending, updatedRoles);
+                            }}
+                            style={{
+                              background: 'rgba(239,68,68,0.1)',
+                              border: '1px solid rgba(239,68,68,0.2)',
+                              color: '#ef4444',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            ❌ Remove from Service
+                          </button>
+                        </div>
+
+                        {/* Dropdown controls row */}
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1, minWidth: '160px' }}>
+                            <label style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '4px', fontWeight: '700', textTransform: 'uppercase' }}>
+                              Assign Role
+                            </label>
+                            <select
+                              value={editRoles[s.id] || 'volunteer'}
+                              onChange={async (e) => {
+                                const newRole = e.target.value;
+                                const updatedRoles = { ...editRoles, [s.id]: newRole };
+                                setEditRoles(updatedRoles);
+                                await handleAutoSaveRosterData(editAttending, updatedRoles);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                background: 'rgba(0,0,0,0.3)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: '#ffffff',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                minHeight: '36px'
+                              }}
+                            >
+                              <option value="volunteer">Volunteer/Ref</option>
+                              <option value="coordinator">Coordinator</option>
+                              <option value="service_leader">Service Day Leader</option>
+                              <option value="station_1">{(editStations.station_1?.name || 'Station 1') + ' Lead'}</option>
+                              <option value="station_2">{(editStations.station_2?.name || 'Station 2') + ' Lead'}</option>
+                              <option value="station_3">{(editStations.station_3?.name || 'Station 3') + ' Lead'}</option>
+                              <option value="station_4">{(editStations.station_4?.name || 'Station 4') + ' Lead'}</option>
+                              {eventConfig?.gameEngineType === 'Shuffle' && (
+                                <>
+                                  <option value="station_5">{(editStations.station_5?.name || 'Station 5') + ' Lead'}</option>
+                                  <option value="station_6">{(editStations.station_6?.name || 'Station 6') + ' Lead'}</option>
+                                </>
+                              )}
+                              <option value="big_game_1">Big Game Lead 1</option>
+                              <option value="big_game_2">Big Game Lead 2</option>
+                              <option value="reflection">Reflection Lead</option>
+                              <option value="team_red_1">{(editTeamRed || 'Red') + ' 1 Leader'}</option>
+                              <option value="team_red_2">{(editTeamRed || 'Red') + ' 2 Leader'}</option>
+                              <option value="team_white_1">{(editTeamWhite || 'White') + ' 1 Leader'}</option>
+                              <option value="team_white_2">{(editTeamWhite || 'White') + ' 2 Leader'}</option>
+                              <option value="team_black_1">{(editTeamBlack || 'Black') + ' 1 Leader'}</option>
+                              <option value="team_black_2">{(editTeamBlack || 'Black') + ' 2 Leader'}</option>
+                              <option value="team_blue_1">{(editTeamBlue || 'Blue') + ' 1 Leader'}</option>
+                              <option value="team_blue_2">{(editTeamBlue || 'Blue') + ' 2 Leader'}</option>
+                              <option value="media">Media Coverage</option>
+                            </select>
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: '120px' }}>
+                            <label style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '4px', fontWeight: '700', textTransform: 'uppercase' }}>
+                              UI Mode
+                            </label>
+                            <select
+                              value={s.uiMode || 'detailed'}
+                              onChange={async (e) => {
+                                await updateServant(s.id, { uiMode: e.target.value });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                background: 'rgba(0,0,0,0.3)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: '#ffffff',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                minHeight: '36px'
+                              }}
+                            >
+                              <option value="detailed">Detailed UI</option>
+                              <option value="dumb">Simple UI (Dumb)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                
+                {globalServants.filter(s => editAttending.includes(s.id) && (!servantRosterSearch || s.name?.toLowerCase().includes(servantRosterSearch.toLowerCase()))).length === 0 && (
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.35)' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>👥</div>
+                    <div style={{ fontWeight: '700', fontSize: '1rem', color: '#fff', marginBottom: '4px' }}>No active roster servants</div>
+                    <p style={{ fontSize: '0.8rem', margin: 0 }}>Use the search tool above to add existing directory servants, or switch to the directory tab to register new ones.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Sticky Action Bar */}
+              <div style={{ padding: '16px', background: 'rgba(13,20,38,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  onClick={handleSaveAndRegenerateSchedule}
+                  disabled={savingEventConfig}
+                  className="btn-glow"
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    background: 'var(--gradient-vbt)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-title)',
+                    fontWeight: '800',
+                    fontSize: '0.95rem',
+                    cursor: savingEventConfig ? 'not-allowed' : 'pointer',
+                    opacity: savingEventConfig ? 0.7 : 1,
+                    boxShadow: '0 4px 15px rgba(124,58,237,0.3)'
+                  }}
+                >
+                  {savingEventConfig ? 'Saving & Recalculating...' : '🔄 Save Roster & Regenerate Schedule'}
+                </button>
               </div>
             </div>
           )}
 
-          {globalServants.length > 0 && (
-            <div style={{padding:'12px 16px 8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-              <p style={{fontSize:'0.7rem',color:'#f59e0b',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'10px'}}>Top Servants</p>
-              <div style={{display: 'flex', alignItems: 'center',gap:'8px',overflowX:'auto',paddingBottom:'4px'}}>
-                {[...globalServants].sort((a,b)=>(b.servicesAttended?.length||0)-(a.servicesAttended?.length||0)).slice(0,5).map((s,i)=>(
-                  <div key={s.id} style={{minWidth:'76px',textAlign:'center',background:'rgba(255,255,255,0.04)',borderRadius:'12px',padding:'10px 6px',flexShrink:0}}>
-                    <div style={{fontSize:'1.1rem',marginBottom:'4px'}}>{['🏆', '🥈', '🥉', '🏅', '🎖️'][i]}</div>
-                    <div style={{fontSize:'0.7rem',fontWeight:'700',color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'68px'}}>{s.name?.split(' ')[0]||'?'}</div>
-                    <div style={{fontSize:'0.6rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0}x</div>
+          {/* Directory Tab Content */}
+          {servantModalTab === 'directory' && (
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <input
+                  value={servantDirectorySearch}
+                  onChange={e => setServantDirectorySearch(e.target.value)}
+                  placeholder="Search in all servants..."
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Add form */}
+              {showDirAddForm && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px', margin: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: '800', color: '#fff', margin: 0 }}>Add New Servant</h3>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>Full Name</label>
+                    <input value={dirAddName} onChange={e => setDirAddName(e.target.value)} placeholder="Full Name" style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }} />
                   </div>
-                ))}
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>Phone Number</label>
+                    <input value={dirAddPhone} onChange={e => setDirAddPhone(e.target.value)} placeholder="Phone Number" style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>Passcode</label>
+                      <input value={dirAddPasscode} onChange={e => setDirAddPasscode(e.target.value)} placeholder="1234" style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>Default Role</label>
+                      <select value={dirAddRole} onChange={e => setDirAddRole(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }}>
+                        <option value="volunteer" style={{ background: '#0d1426' }}>General Helper</option>
+                        <option value="referee" style={{ background: '#0d1426' }}>Game Referee</option>
+                        <option value="leader" style={{ background: '#0d1426' }}>Team Leader</option>
+                        <option value="service_leader" style={{ background: '#0d1426' }}>Service Leader</option>
+                        <option value="admin" style={{ background: '#0d1426' }}>Coordinator / Admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                    <button onClick={() => { setShowDirAddForm(false); setDirAddName(''); setDirAddPhone(''); }} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: '600', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={async () => {
+                      if (!dirAddName.trim()) { alert('Please enter a name.'); return; }
+                      const sId = dirAddName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+                      try {
+                        await addServant({
+                          id: sId,
+                          name: dirAddName.trim(),
+                          phone: dirAddPhone.trim(),
+                          passcode: dirAddPasscode.trim() || '1234',
+                          defaultRole: dirAddRole,
+                          role: dirAddRole,
+                          createdAt: new Date().toISOString(),
+                          servicesAttended: []
+                        });
+                        
+                        // Smart auto-check-in when adding a servant from the directory
+                        const newAttending = [...editAttending, sId];
+                        const newRoles = { ...editRoles, [sId]: dirAddRole };
+                        setEditAttending(newAttending);
+                        setEditRoles(newRoles);
+                        await handleAutoSaveRosterData(newAttending, newRoles);
+
+                        setShowDirAddForm(false);
+                        setDirAddName('');
+                        setDirAddPhone('');
+                        setDirAddPasscode('1234');
+                      } catch (e) {
+                        alert('Error adding servant: ' + e.message);
+                      }
+                    }} style={{ background: 'linear-gradient(135deg,#10b981,#34d399)', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: '700', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer' }}>Add Servant</button>
+                  </div>
+                </div>
+              )}
+
+              {globalServants.length > 0 && !servantDirectorySearch && (
+                <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <p style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Top Servants</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {[...globalServants].sort((a, b) => (b.servicesAttended?.length || 0) - (a.servicesAttended?.length || 0)).slice(0, 5).map((s, i) => (
+                      <div key={s.id} style={{ minWidth: '76px', textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '10px 6px', flexShrink: 0 }}>
+                        <div style={{ fontSize: '1.1rem', marginBottom: '4px' }}>{['🏆', '🥈', '🥉', '🏅', '🎖️'][i]}</div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '68px' }}>{s.name?.split(' ')[0] || '?'}</div>
+                        <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)' }}>{s.servicesAttended?.length || 0}x</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Scrollable list */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: `calc(16px + env(safe-area-inset-bottom))` }}>
+                {globalServants
+                  .filter(s => !servantDirectorySearch || s.name?.toLowerCase().includes(servantDirectorySearch.toLowerCase()))
+                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                  .map(s => {
+                    const isEditing = editingServantId === s.id;
+                    const isAttending = editAttending.includes(s.id);
+                    
+                    if (isEditing) {
+                      return (
+                        <div key={s.id} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '14px', padding: '14px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.12)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '2px' }}>Name</label>
+                              <input value={editingServantName} onChange={e => setEditingServantName(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px 10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '2px' }}>Phone</label>
+                              <input value={editingServantPhone} onChange={e => setEditingServantPhone(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px 10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '2px' }}>Passcode</label>
+                                <input value={editingServantPasscode} onChange={e => setEditingServantPasscode(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px 10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '2px' }}>Default Role</label>
+                                <select value={editingServantRole} onChange={e => setEditingServantRole(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px 10px', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' }}>
+                                  <option value="volunteer">General Helper</option>
+                                  <option value="referee">Game Referee</option>
+                                  <option value="leader">Team Leader</option>
+                                  <option value="service_leader">Service Leader</option>
+                                  <option value="admin">Coordinator / Admin</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                              <button onClick={() => setEditingServantId(null)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: '600', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
+                              <button onClick={async () => {
+                                if (!editingServantName.trim()) { alert('Name cannot be empty.'); return; }
+                                try {
+                                  await updateServant(s.id, {
+                                    name: editingServantName.trim(),
+                                    phone: editingServantPhone.trim(),
+                                    passcode: editingServantPasscode.trim(),
+                                    defaultRole: editingServantRole,
+                                    role: editingServantRole
+                                  });
+                                  setEditingServantId(null);
+                                } catch (e) {
+                                  alert('Failed to save servant details: ' + e.message);
+                                }
+                              }} style={{ background: 'linear-gradient(135deg,#10b981,#34d399)', border: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: '700', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>Save</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={s.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '14px', padding: '14px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setExpandedServant(expandedServant === s.id ? null : s.id)}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg,#1441a1,#60a5fa)', display: 'flex', alignItems: 'center', justify: 'center', fontWeight: '800', color: '#fff', fontSize: '1rem', flexShrink: 0 }}>{s.name?.[0]?.toUpperCase() || '?'}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.9rem' }}>{s.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{s.servicesAttended?.length || 0} services &nbsp;&#183;&nbsp; {s.defaultRole || 'volunteer'}</div>
+                          </div>
+                          
+                          {/* Attendance Checkbox */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const isAttending = editAttending.includes(s.id);
+                              let updatedAttending;
+                              let updatedRoles;
+                              if (isAttending) {
+                                updatedAttending = editAttending.filter(id => id !== s.id);
+                                updatedRoles = { ...editRoles };
+                                delete updatedRoles[s.id];
+                              } else {
+                                updatedAttending = [...editAttending, s.id];
+                                updatedRoles = { ...editRoles, [s.id]: s.defaultRole || 'volunteer' };
+                              }
+                              setEditAttending(updatedAttending);
+                              setEditRoles(updatedRoles);
+                              await handleAutoSaveRosterData(updatedAttending, updatedRoles);
+                            }}
+                            style={{
+                              background: isAttending ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)',
+                              border: '1px solid ' + (isAttending ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'),
+                              color: isAttending ? '#4ade80' : 'rgba(255,255,255,0.6)',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              marginRight: '6px'
+                            }}
+                          >
+                            {isAttending ? '✅ Attending' : '➕ Add to Service'}
+                          </button>
+
+                          <a href={getWhatsAppLink(s, 'your assigned role')} target='_blank' rel='noopener noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: '1.4rem', textDecoration: 'none', flexShrink: 0 }} title='Message on WhatsApp'>&#128172;</a>
+                        </div>
+                        {expandedServant === s.id && (
+                          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                            {s.phone && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Phone: <span style={{ color: '#fff' }}>{s.phone}</span></div>}
+                            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Passcode: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{s.passcode || '—'}</span></div>
+                            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginBottom: '12px' }}>Last seen: <span style={{ color: '#fff' }}>{s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : 'Never'}</span></div>
+                            
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                              <button onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingServantId(s.id);
+                                setEditingServantName(s.name || '');
+                                setEditingServantPhone(s.phone || '');
+                                setEditingServantPasscode(s.passcode || '1234');
+                                setEditingServantRole(s.defaultRole || s.role || 'volunteer');
+                              }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.7rem', fontWeight: '700', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer' }}>✏️ Edit</button>
+                              <button onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Are you sure you want to delete ${s.name} from the directory?`)) {
+                                  try {
+                                    await deleteServant(s.id);
+                                  } catch (err) {
+                                    alert('Failed to delete: ' + err.message);
+                                  }
+                                }
+                              }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '0.7rem', fontWeight: '700', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer' }}>🗑️ Delete</button>
+                            </div>
+
+                            {(s.servicesAttended || []).length > 0 && (
+                              <div>
+                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Attendance History ({s.servicesAttended.length})</div>
+                                {(s.servicesAttended || []).slice(-5).reverse().map((e, i) => (
+                                  <div key={i} style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginBottom: '2px' }}>&#183; {e.code} &mdash; {new Date(e.date).toLocaleDateString()}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                {globalServants.length === 0 && <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.3)' }}>No servants yet. They appear here when they log in.</div>}
               </div>
             </div>
           )}
-          <div style={{flex:1,overflowY:'auto',padding:'8px 16px',paddingBottom:`calc(16px + env(safe-area-inset-bottom))`}}>
-            {globalServants.filter(s=>!servantDirectorySearch||s.name?.toLowerCase().includes(servantDirectorySearch.toLowerCase())).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(s=>{
-              const isEditing = editingServantId === s.id;
-              if (isEditing) {
-                return (
-                  <div key={s.id} style={{background:'rgba(255,255,255,0.06)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.12)'}}>
-                    <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-                      <div>
-                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Name</label>
-                        <input value={editingServantName} onChange={e=>setEditingServantName(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
-                      </div>
-                      <div>
-                        <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Phone</label>
-                        <input value={editingServantPhone} onChange={e=>setEditingServantPhone(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
-                      </div>
-                      <div style={{display:'flex',gap:'10px'}}>
-                        <div style={{flex:1}}>
-                          <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Passcode</label>
-                          <input value={editingServantPasscode} onChange={e=>setEditingServantPasscode(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}} />
-                        </div>
-                        <div style={{flex:1}}>
-                          <label style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'2px'}}>Default Role</label>
-                          <select value={editingServantRole} onChange={e=>setEditingServantRole(e.target.value)} style={{width:'100%',background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',padding:'6px 10px',color:'#fff',fontSize:'0.85rem',boxSizing:'border-box'}}>
-                            <option value="volunteer">General Helper</option>
-                            <option value="referee">Game Referee</option>
-                            <option value="leader">Team Leader</option>
-                            <option value="service_leader">Service Leader</option>
-                            <option value="admin">Coordinator / Admin</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{display:'flex',justifyContent:'flex-end',gap:'8px',marginTop:'4px'}}>
-                        <button onClick={()=>setEditingServantId(null)} style={{background:'rgba(255,255,255,0.05)',border:'none',color:'#fff',fontSize:'0.75rem',fontWeight:'600',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>Cancel</button>
-                        <button onClick={async ()=>{
-                          if (!editingServantName.trim()) { alert('Name cannot be empty.'); return; }
-                          try {
-                            await updateServant(s.id, {
-                              name: editingServantName.trim(),
-                              phone: editingServantPhone.trim(),
-                              passcode: editingServantPasscode.trim(),
-                              defaultRole: editingServantRole,
-                              role: editingServantRole
-                            });
-                            setEditingServantId(null);
-                          } catch (e) {
-                            alert('Failed to save servant details: ' + e.message);
-                          }
-                        }} style={{background:'linear-gradient(135deg,#10b981,#34d399)',border:'none',color:'#fff',fontSize:'0.75rem',fontWeight:'700',padding:'6px 12px',borderRadius:'8px',cursor:'pointer'}}>Save</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              
-              return (
-                <div key={s.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'14px',padding:'14px',marginBottom:'8px',border:'1px solid rgba(255,255,255,0.06)'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}} onClick={()=>setExpandedServant(expandedServant===s.id?null:s.id)}>
-                    <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#1441a1,#60a5fa)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'800',color:'#fff',fontSize:'1rem',flexShrink:0}}>{s.name?.[0]?.toUpperCase()||'?'}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:'700',color:'#fff',fontSize:'0.9rem'}}>{s.name}</div>
-                      <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.35)'}}>{s.servicesAttended?.length||0} services &nbsp;&#183;&nbsp; {s.defaultRole||'volunteer'}</div>
-                    </div>
-                    <a href={getWhatsAppLink(s,'your assigned role')} target='_blank' rel='noopener noreferrer' onClick={e=>e.stopPropagation()} style={{fontSize:'1.4rem',textDecoration:'none',flexShrink:0}} title='Message on WhatsApp'>&#128172;</a>
-                  </div>
-                  {expandedServant===s.id && (
-                    <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                      {s.phone && <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'4px'}}>Phone: <span style={{color:'#fff'}}>{s.phone}</span></div>}
-                      <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'4px'}}>Passcode: <span style={{color:'#fff',fontFamily:'monospace'}}>{s.passcode||'—'}</span></div>
-                      <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.4)',marginBottom:'12px'}}>Last seen: <span style={{color:'#fff'}}>{s.lastSeen?new Date(s.lastSeen).toLocaleDateString():'Never'}</span></div>
-                      
-                      <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
-                        <button onClick={(e)=>{
-                          e.stopPropagation();
-                          setEditingServantId(s.id);
-                          setEditingServantName(s.name || '');
-                          setEditingServantPhone(s.phone || '');
-                          setEditingServantPasscode(s.passcode || '1234');
-                          setEditingServantRole(s.defaultRole || s.role || 'volunteer');
-                        }} style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',fontSize:'0.7rem',fontWeight:'700',padding:'5px 10px',borderRadius:'6px',cursor:'pointer'}}>✏️ Edit</button>
-                        <button onClick={async (e)=>{
-                          e.stopPropagation();
-                          if (window.confirm(`Are you sure you want to delete ${s.name} from the directory?`)) {
-                            try {
-                              await deleteServant(s.id);
-                            } catch (err) {
-                              alert('Failed to delete: ' + err.message);
-                            }
-                          }
-                        }} style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',fontSize:'0.7rem',fontWeight:'700',padding:'5px 10px',borderRadius:'6px',cursor:'pointer'}}>🗑️ Delete</button>
-                      </div>
-
-                      {(s.servicesAttended||[]).length > 0 && (
-                        <div>
-                          <div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.4)',fontWeight:'700',marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Attendance History ({s.servicesAttended.length})</div>
-                          {(s.servicesAttended||[]).slice(-5).reverse().map((e,i)=>(
-                            <div key={i} style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginBottom:'2px'}}>&#183; {e.code} &mdash; {new Date(e.date).toLocaleDateString()}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {globalServants.length===0 && <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.3)'}}>No servants yet. They appear here when they log in.</div>}
-          </div>
         </div>
       )}
 
