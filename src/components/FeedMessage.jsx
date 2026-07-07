@@ -315,6 +315,7 @@ function FeedMessage({ message, currentUser, onReact }) {
           {/* Image */}
           {imageUrl && (
             <img
+              loading="lazy" // ⚡ Bolt Optimization: Defer loading of off-screen feed images to save initial network bandwidth and improve page load time.
               src={imageUrl}
               alt="attachment"
               onClick={() => setLightboxOpen(true)}
