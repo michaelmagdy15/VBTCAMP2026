@@ -1475,14 +1475,26 @@ export default function DumbDashboard({
 
       {/* Tab: Radio */}
       {activeTab === 'radio' && (
-        <div className="glass-panel" style={{ padding: '4px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>Connecting Radio...</div>}>
-            <WalkieTalkie
-              eventCode={activeEventCode}
-              currentUser={currentUser}
-            />
-          </Suspense>
-        </div>
+        (currentUser?.role === 'admin' || currentUser?.role === 'coordinator' || currentUser?.role === 'sports_head' || currentUser?.role === 'logistics_head') ? (
+          <div className="glass-panel" style={{ padding: '4px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)' }}>
+            <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>Connecting Radio...</div>}>
+              <WalkieTalkie
+                eventCode={activeEventCode}
+                currentUser={currentUser}
+              />
+            </Suspense>
+          </div>
+        ) : (
+          <div className="glass-panel" style={{ padding: '36px 24px', borderRadius: '16px', background: 'rgba(13,20,38,0.4)', border: '1px solid var(--border-light)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <Radio size={48} style={{ color: 'var(--text-muted)', marginBottom: '16px' }} />
+            <h3 style={{ fontFamily: 'var(--font-title)', color: '#ffffff', margin: '0 0 8px', fontSize: '17px' }}>
+              Radio Channel Locked
+            </h3>
+            <p style={{ fontSize: '13px', lineHeight: '1.4', margin: 0 }}>
+              The Walkie-Talkie voice channel is reserved for Service Coordinators and Logistics Heads to ensure clear coordination.
+            </p>
+          </div>
+        )
       )}
 
       {/* View: Game Rules Booklet */}

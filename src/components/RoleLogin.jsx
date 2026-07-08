@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Phone, User, LogOut, Loader2 } from 'lucide-react';
-import { db } from '../firebase';
+import { db, addAnnouncement } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // ─── Theme Tokens (glassmorphism) ─────────────────────────────
@@ -242,6 +242,14 @@ export default function RoleLogin({
           uiMode: 'dumb' // strictly minimal Live Mode by default
         };
         await setDoc(docRef, userObj);
+        
+        try {
+          // Notify admins/coordinators immediately about the new walk-in registration
+          const eventCode = eventConfig?.eventCode || 'global';
+          await addAnnouncement(eventCode, `🆕 Walk-In Registered: ${cleanFirstName} (${cleanPhone}) has logged in. Please assign a role.`, 'System', 'urgent');
+        } catch (pushErr) {
+          console.warn('Failed to send walk-in notification:', pushErr);
+        }
       }
 
       // Log the user in
