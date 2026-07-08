@@ -33,7 +33,8 @@ This memory file encapsulates the context, configurations, completed tasks, and 
 - Shows a live countdown to the service start time, active shift progress (e.g., Shift 1/6), and live countdown to the service end once started.
 
 ### 🔑 Authentication & Servant Configuration
-- Added **Michel Ghobrial** as the Service Day Leader with passcode `vbtadmin` (role: `service_day_leader`, teamCode: `SERVICE`).
+- **Michel Ghobrial** as the Service Day Leader with passcode `vbtadmin` (role: `service_day_leader`, teamCode: `SERVICE`).
+- **Michael Mitry** with phone number `01000680580` is the primary **System Admin** (role: `admin`, uiMode: `detailed`).
 - Configured Firestore connectivity for named database `db-vbt` under registry key `july6`.
 
 ---
