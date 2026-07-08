@@ -16,25 +16,28 @@ import {
   Compass,
   ArrowLeft,
   BookOpen,
-  LifeBuoy
+  LifeBuoy,
+  Sparkles
 } from 'lucide-react';
 
 import BlessingBox from './BlessingBox';
 import RulesBooklet from './RulesBooklet';
 import EmergencySOS from './EmergencySOS';
+import { triggerHaptic } from '../utils/haptics';
+import { KeepAwake } from '@capacitor-community/keep-awake';
 
 const WalkieTalkie = lazy(() => import('./WalkieTalkie'));
 const TimelineFeedTab = lazy(() => import('./TimelineFeedTab'));
 const ScoreboardTab = lazy(() => import('./ScoreboardTab'));
 
 const S = {
-  container: (hasBottomNav) => ({
+  container: (hasBottomNav, showOutdoorHC) => ({
     minHeight: '100vh',
     width: '100%',
     maxWidth: '480px',
     margin: '0 auto',
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
+    background: showOutdoorHC ? '#ffffff' : 'var(--bg-primary)',
+    color: showOutdoorHC ? '#000000' : 'var(--text-primary)',
     fontFamily: "var(--font-body)",
     padding: hasBottomNav ? '16px 16px 80px 16px' : '16px 16px 24px 16px',
     boxSizing: 'border-box',
@@ -43,6 +46,7 @@ const S = {
     gap: '16px',
     position: 'relative',
     overflowX: 'hidden',
+    ...(showOutdoorHC ? { border: '4px solid #000000' } : {})
   }),
   toggleUiBtn: {
     background: 'rgba(41, 182, 246, 0.15)',
@@ -630,6 +634,10 @@ export default function DumbDashboard({
   activePingAlert = { show: false, text: '' },
   onToggleUiMode,
 
+  // New props
+  timeRemainingSecs,
+  isOutdoorMode,
+
   // Feed Tab Props
   announcementText: propAnnouncementText,
   uploadImage,
@@ -665,6 +673,52 @@ export default function DumbDashboard({
 }) {
   const isLeader = currentUser?.role === 'leader';
   const isReferee = currentUser?.role === 'referee';
+  const showOutdoorHC = isOutdoorMode && (isLeader || isReferee);
+
+  const getCardStyle = (extraStyles = {}) => {
+    return {
+      ...S.card,
+      ...extraStyles,
+      ...(showOutdoorHC ? {
+        background: '#ffffff',
+        color: '#000000',
+        border: '4px solid #000000',
+        borderColor: '#000000',
+        borderLeft: '4px solid #000000',
+        boxShadow: 'none',
+        animation: 'none',
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none'
+      } : {})
+    };
+  };
+
+  const isBreak = useMemo(() => {
+    if (!scheduleSlots.current) return false;
+    const name = (scheduleSlots.current.game || scheduleSlots.current.activity || '').toLowerCase();
+    return name.includes('break') || name.includes('lunch') || name.includes('dinner') || name.includes('snack') || name.includes('free time') || name.includes('transition') || name.includes('rest');
+  }, [scheduleSlots.current]);
+
+  useEffect(() => {
+    const lockWakeState = async () => {
+      try {
+        await KeepAwake.keepAwake();
+      } catch (err) {
+        console.warn('KeepAwake error:', err);
+      }
+    };
+    lockWakeState();
+    return () => {
+      const releaseWakeState = async () => {
+        try {
+          await KeepAwake.allowSleep();
+        } catch (err) {
+          console.warn('AllowSleep error:', err);
+        }
+      };
+      releaseWakeState();
+    };
+  }, []);
 
   // ─── Flip Rules and Location States ───
   const [flipRulesGame, setFlipRulesGame] = useState(null);
@@ -770,6 +824,31 @@ export default function DumbDashboard({
   const [customPoints, setCustomPoints] = useState(5);
   const [customReason, setCustomReason] = useState('');
   const [deductSuccessMsg, setDeductSuccessMsg] = useState('');
+
+  const [timeLeft, setTimeLeft] = useState(timeRemainingSecs);
+
+  useEffect(() => {
+    setTimeLeft(timeRemainingSecs);
+  }, [timeRemainingSecs]);
+
+  useEffect(() => {
+    if (timeLeft === undefined || timeLeft === null || timeLeft <= 0) return;
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev && prev > 0) return prev - 1;
+        clearInterval(interval);
+        return 0;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeLeft]);
+
+  const formatCountdown = (seconds) => {
+    if (seconds === undefined || seconds === null || seconds < 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Announcement Text (Leader only)
   const [announcementText, setAnnouncementText] = useState('');
@@ -923,6 +1002,7 @@ export default function DumbDashboard({
 
     if (onSubmitDeduction) {
       onSubmitDeduction(currentUser.teamCode, points, reason);
+      triggerHaptic('warning');
       setDeductSuccessMsg(`Deducted ${points} pts successfully!`);
       setTimeout(() => {
         setDeductSuccessMsg('');
@@ -937,6 +1017,7 @@ export default function DumbDashboard({
 
     if (onPostAnnouncement) {
       onPostAnnouncement(announcementText.trim());
+      triggerHaptic('success');
       setAnnouncementText('');
       setAnnouncementSuccess(true);
       setTimeout(() => setAnnouncementSuccess(false), 2000);
@@ -961,6 +1042,7 @@ export default function DumbDashboard({
 
     if (onSubmitScore) {
       onSubmitScore(matchupId, scores);
+      triggerHaptic('success');
       setRefSubmitSuccess(true);
       setTimeout(() => setRefSubmitSuccess(false), 2000);
     }
@@ -970,7 +1052,10 @@ export default function DumbDashboard({
   const teamB = selectedMatchup?.teamB || 'Team B';
 
   return (
-    <div style={S.container(currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator'))}>
+    <div 
+      style={S.container(currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator'), showOutdoorHC)}
+      className={showOutdoorHC ? 'outdoor-hc-active' : ''}
+    >
       <style>{`
         @keyframes pulseAlert {
           0%, 100% { transform: scale(1); opacity: 1; }
@@ -979,6 +1064,77 @@ export default function DumbDashboard({
         @keyframes subtleGlow {
           0%, 100% { box-shadow: 0 4px 20px rgba(0, 176, 255, 0.05); }
           50% { box-shadow: 0 4px 30px rgba(0, 176, 255, 0.15); }
+        }
+        .outdoor-hc-active {
+          --bg-primary: #ffffff !important;
+          --bg-surface: #ffffff !important;
+          --bg-elevated: #ffffff !important;
+          --bg-card: #ffffff !important;
+          --border-light: #000000 !important;
+          --text-primary: #000000 !important;
+          --text-secondary: #000000 !important;
+          --text-muted: #000000 !important;
+          --text-label: #000000 !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          border: 4px solid #000000 !important;
+        }
+        .outdoor-hc-active .outdoor-card {
+          background: #ffffff !important;
+          color: #000000 !important;
+          border: 4px solid #000000 !important;
+          box-shadow: none !important;
+          animation: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+        }
+        .outdoor-hc-active .outdoor-subbox {
+          background: #ffffff !important;
+          color: #000000 !important;
+          border: 3px solid #000000 !important;
+        }
+        .outdoor-hc-active .outdoor-badge {
+          background: #000000 !important;
+          color: #ffffff !important;
+          border: 2px solid #000000 !important;
+        }
+        .outdoor-hc-active .outdoor-card-button-rules,
+        .outdoor-hc-active .outdoor-card-button-sos {
+          background: #ffffff !important;
+          border: 3px solid #000000 !important;
+          color: #000000 !important;
+        }
+        .outdoor-hc-active .outdoor-deduct-btn,
+        .outdoor-hc-active .outdoor-broadcast-btn,
+        .outdoor-hc-active .outdoor-submit-score-btn {
+          background: #000000 !important;
+          color: #ffffff !important;
+          border: 3px solid #000000 !important;
+          box-shadow: none !important;
+        }
+        .outdoor-hc-active .outdoor-textarea,
+        .outdoor-hc-active .outdoor-select,
+        .outdoor-hc-active .outdoor-number-input,
+        .outdoor-hc-active .outdoor-text-input {
+          background: #ffffff !important;
+          border: 2px solid #000000 !important;
+          color: #000000 !important;
+        }
+        .outdoor-hc-active .outdoor-score-btn-win,
+        .outdoor-hc-active .outdoor-score-btn-lose {
+          background: #ffffff !important;
+          color: #000000 !important;
+          border: 3px solid #000000 !important;
+        }
+        .outdoor-hc-active * {
+          color: #000000 !important;
+          text-shadow: none !important;
+        }
+        .outdoor-hc-active .outdoor-badge *,
+        .outdoor-hc-active .outdoor-deduct-btn *,
+        .outdoor-hc-active .outdoor-broadcast-btn *,
+        .outdoor-hc-active .outdoor-submit-score-btn * {
+          color: #ffffff !important;
         }
       `}</style>
 
@@ -1042,7 +1198,7 @@ export default function DumbDashboard({
       {activeTab === 'actions' && (
         <>
           {/* Schedule Block */}
-          <section style={S.card}>
+          <section style={getCardStyle()} className="outdoor-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <Clock size={18} style={{ color: 'var(--vbt-sky)' }} />
               <h3 style={S.sectionTitle}>Timeline & Activity</h3>
@@ -1050,10 +1206,29 @@ export default function DumbDashboard({
 
             {scheduleSlots.current ? (
               <div>
-                <div style={S.currentActivityBox}>
-                  <span style={S.activityTimeBadge}>
-                    {scheduleSlots.current.time || 'NOW'}
-                  </span>
+                <div style={S.currentActivityBox} className="outdoor-subbox">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={S.activityTimeBadge} className="outdoor-badge">
+                      {scheduleSlots.current.time || 'NOW'}
+                    </span>
+                    {timeLeft !== undefined && timeLeft !== null && timeLeft > 0 && (
+                      <span style={{
+                        fontSize: '13px',
+                        fontWeight: '800',
+                        color: showOutdoorHC ? '#000000' : '#f87171',
+                        background: showOutdoorHC ? '#ffffff' : 'rgba(239, 68, 68, 0.1)',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        border: showOutdoorHC ? '2px solid #000000' : 'none'
+                      }} className="outdoor-badge">
+                        <Clock size={12} />
+                        <span>{formatCountdown(timeLeft)}</span>
+                      </span>
+                    )}
+                  </div>
                   <h2 style={S.currentActivityName}>{scheduleSlots.current.game || scheduleSlots.current.activity}</h2>
                   {scheduleSlots.current.location && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', color: 'var(--text-secondary)' }}>
@@ -1064,7 +1239,7 @@ export default function DumbDashboard({
                 </div>
 
                 {scheduleSlots.next && (
-                  <div style={S.nextActivityBox}>
+                  <div style={S.nextActivityBox} className="outdoor-subbox">
                     <span style={S.nextLabel}>UP NEXT:</span>
                     <span style={S.nextText}>
                       {scheduleSlots.next.game || scheduleSlots.next.activity} ({scheduleSlots.next.time})
@@ -1090,6 +1265,7 @@ export default function DumbDashboard({
                 border: '1px solid rgba(41, 182, 246, 0.3)',
                 color: '#29b6f6'
               }}
+              className="outdoor-card-button-rules"
             >
               <BookOpen size={20} />
               <span style={{ fontWeight: '750', fontSize: '12px' }}>Rules Booklet</span>
@@ -1102,6 +1278,7 @@ export default function DumbDashboard({
                 border: '1px solid rgba(239, 68, 68, 0.3)',
                 color: '#ef4444'
               }}
+              className="outdoor-card-button-sos"
             >
               <LifeBuoy size={20} />
               <span style={{ fontWeight: '750', fontSize: '12px' }}>Emergency SOS</span>
@@ -1112,7 +1289,7 @@ export default function DumbDashboard({
           {isLeader && (
             <>
               {/* Team Score & Deduct Button */}
-              <section style={{ ...S.card, borderLeft: `5px solid ${getSideColor(currentUser?.side)}` }}>
+              <section style={getCardStyle({ borderLeft: `5px solid ${getSideColor(currentUser?.side)}` })} className="outdoor-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
                     <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1131,21 +1308,20 @@ export default function DumbDashboard({
                   </div>
                 </div>
 
-                <button style={S.deductButton} onClick={() => setShowDeductModal(true)}>
+                <button style={S.deductButton} className="outdoor-deduct-btn" onClick={() => setShowDeductModal(true)}>
                   <span>⚠️ Deduct Points</span>
                 </button>
               </section>
 
               {/* CURRENT & NEXT LOCATION PANEL */}
-              <section style={{
-                ...S.card,
+              <section style={getCardStyle({
                 background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)',
                 border: '2px solid #ffffff',
                 padding: '24px 16px',
                 borderRadius: '20px',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
                 textAlign: 'center'
-              }}>
+              })} className="outdoor-card">
                 <h2 style={{
                   fontSize: '32px',
                   fontWeight: '900',
@@ -1166,7 +1342,7 @@ export default function DumbDashboard({
                     border: '1.5px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '16px',
                     padding: '18px 12px'
-                  }}>
+                  }} className="outdoor-subbox">
                     <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       📍 CURRENT STATION
                     </span>
@@ -1199,7 +1375,7 @@ export default function DumbDashboard({
                     border: '1.5px solid rgba(255, 255, 255, 0.05)',
                     borderRadius: '16px',
                     padding: '18px 12px'
-                  }}>
+                  }} className="outdoor-subbox">
                     <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       ➡️ NEXT STATION
                     </span>
@@ -1229,7 +1405,7 @@ export default function DumbDashboard({
               </section>
 
               {/* Broadcast Announcement */}
-              <section style={S.card}>
+              <section style={getCardStyle()} className="outdoor-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   <Bell size={18} style={{ color: 'var(--vbt-sky)' }} />
                   <h3 style={S.sectionTitle}>Broadcast to Camp</h3>
@@ -1240,9 +1416,10 @@ export default function DumbDashboard({
                     onChange={(e) => setAnnouncementText(e.target.value)}
                     placeholder="Type a quick notice to all camps..."
                     style={S.textarea}
+                    className="outdoor-textarea"
                     rows={3}
                   />
-                  <button type="submit" disabled={!announcementText.trim()} style={S.broadcastBtn(announcementText.trim())}>
+                  <button type="submit" disabled={!announcementText.trim()} style={S.broadcastBtn(announcementText.trim())} className="outdoor-broadcast-btn">
                     <Send size={16} />
                     <span>Send Broadcast</span>
                   </button>
@@ -1259,7 +1436,7 @@ export default function DumbDashboard({
 
           {/* Referee View */}
           {isReferee && (
-            <section style={S.card}>
+            <section style={getCardStyle()} className="outdoor-card">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Game / Station Selector */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1269,6 +1446,7 @@ export default function DumbDashboard({
                       onClick={() => handleFlipRules(selectedGame)}
                       style={{ ...S.singleGameDisplay, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
                       title="Tap to read game rules"
+                      className="outdoor-subbox"
                     >
                       <span>{selectedGame || 'No game assigned'}</span>
                       {selectedGame && <BookOpen size={14} style={{ color: 'var(--vbt-sky)' }} />}
@@ -1279,6 +1457,7 @@ export default function DumbDashboard({
                         value={selectedGame}
                         onChange={(e) => setSelectedGame(e.target.value)}
                         style={S.select}
+                        className="outdoor-select"
                       >
                         {assignedGames.map(g => (
                           <option key={g} value={g}>{g}</option>
@@ -1302,6 +1481,7 @@ export default function DumbDashboard({
                             if (match) setSelectedMatchup(match);
                           }}
                           style={S.select}
+                          className="outdoor-select"
                         >
                           {gameMatchups.map(m => {
                             const val = `${m.block}_${m.round}_${m.game}`;
@@ -1317,7 +1497,7 @@ export default function DumbDashboard({
                     </div>
 
                     {selectedMatchup && (
-                      <div style={S.scoringContainer}>
+                      <div style={S.scoringContainer} className="outdoor-subbox">
                         <div
                           onClick={() => handleFlipRules(selectedMatchup.game)}
                           style={{ ...S.matchupHeader, cursor: 'pointer' }}
@@ -1334,7 +1514,7 @@ export default function DumbDashboard({
                         {/* Giant Scoring Pads */}
                         <div style={S.scoringPadsGrid}>
                           {/* Team A */}
-                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}`, padding: '16px 12px' }}>
+                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}`, padding: '16px 12px' }} className="outdoor-subbox">
                             <span style={{ ...S.scoreTeamName, fontSize: '15px' }}>{teamA}</span>
                             <div style={{ ...S.scoreNumber, fontSize: '48px', margin: '8px 0' }}>{scoreA}</div>
                             
@@ -1356,6 +1536,7 @@ export default function DumbDashboard({
                                   gap: '6px',
                                   transition: 'all 0.2s ease',
                                 }}
+                                className="outdoor-score-btn-win"
                                 onClick={() => {
                                   setScoreA(15);
                                   setScoreB(5);
@@ -1380,6 +1561,7 @@ export default function DumbDashboard({
                                   gap: '6px',
                                   transition: 'all 0.2s ease',
                                 }}
+                                className="outdoor-score-btn-lose"
                                 onClick={() => {
                                   setScoreA(5);
                                   setScoreB(15);
@@ -1391,7 +1573,7 @@ export default function DumbDashboard({
                           </div>
 
                           {/* Team B */}
-                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}`, padding: '16px 12px' }}>
+                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}`, padding: '16px 12px' }} className="outdoor-subbox">
                             <span style={{ ...S.scoreTeamName, fontSize: '15px' }}>{teamB}</span>
                             <div style={{ ...S.scoreNumber, fontSize: '48px', margin: '8px 0' }}>{scoreB}</div>
                             
@@ -1413,6 +1595,7 @@ export default function DumbDashboard({
                                   gap: '6px',
                                   transition: 'all 0.2s ease',
                                 }}
+                                className="outdoor-score-btn-win"
                                 onClick={() => {
                                   setScoreB(15);
                                   setScoreA(5);
@@ -1437,6 +1620,7 @@ export default function DumbDashboard({
                                   gap: '6px',
                                   transition: 'all 0.2s ease',
                                 }}
+                                className="outdoor-score-btn-lose"
                                 onClick={() => {
                                   setScoreB(5);
                                   setScoreA(15);
@@ -1449,7 +1633,7 @@ export default function DumbDashboard({
                         </div>
 
                         {/* Submit Score Button */}
-                        <button style={S.submitScoreBtn} onClick={handleRefereeScoreSubmit}>
+                        <button style={S.submitScoreBtn} className="outdoor-submit-score-btn" onClick={handleRefereeScoreSubmit}>
                           <CheckCircle2 size={18} />
                           <span>Save & Submit Score</span>
                         </button>
@@ -1473,14 +1657,27 @@ export default function DumbDashboard({
           )}
 
           {/* Praise & Blessings Box */}
-          <BlessingBox
-            currentUser={currentUser}
-            activeEventCode={activeEventCode}
-            campData={campData}
-          />
+          {isBreak ? (
+            <div style={getCardStyle()} className="outdoor-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Sparkles size={20} style={{ color: showOutdoorHC ? '#000000' : '#fbbf24' }} />
+                <h3 style={S.sectionTitle}>Praise & Blessings Box</h3>
+              </div>
+              <div style={S.emptyState}>
+                <p>Blessings are paused during breaks.</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Enjoy your rest! Check back once activities resume.</p>
+              </div>
+            </div>
+          ) : (
+            <BlessingBox
+              currentUser={currentUser}
+              activeEventCode={activeEventCode}
+              campData={campData}
+            />
+          )}
 
           {/* Scrollable Announcements Feed */}
-          <section style={{ ...S.card, flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <section style={getCardStyle({ flex: 1, display: 'flex', flexDirection: 'column' })} className="outdoor-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <Bell size={18} style={{ color: 'var(--vbt-sky)' }} />
               <h3 style={S.sectionTitle}>Announcement Feed</h3>
@@ -1739,19 +1936,18 @@ export default function DumbDashboard({
           padding: '20px',
           boxSizing: 'border-box'
         }}>
-          <div style={{
-            ...S.card,
+          <div style={getCardStyle({
             width: '100%',
             maxWidth: '400px',
             maxHeight: '85vh',
             overflowY: 'auto',
-            border: '1px solid rgba(41, 182, 246, 0.4)',
+            border: '1.5px solid rgba(41, 182, 246, 0.4)',
             padding: '24px',
             background: 'var(--bg-surface)',
             display: 'flex',
             flexDirection: 'column',
             gap: '16px'
-          }}>
+          })} className="outdoor-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <BookOpen size={20} style={{ color: 'var(--vbt-sky)' }} /> Game Rules

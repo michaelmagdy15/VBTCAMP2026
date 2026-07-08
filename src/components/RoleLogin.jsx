@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Phone, User, LogOut, Loader2 } from 'lucide-react';
-import { db, addAnnouncement } from '../firebase';
+import { db, addAnnouncement, auth } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // ─── Theme Tokens (glassmorphism) ─────────────────────────────
@@ -250,6 +250,11 @@ export default function RoleLogin({
         } catch (pushErr) {
           console.warn('Failed to send walk-in notification:', pushErr);
         }
+      }
+
+      // Write the UID mapping document so firestore rules can validate roles
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'vbt_uid_map', auth.currentUser.uid), { phoneNumber: cleanPhone });
       }
 
       // Log the user in

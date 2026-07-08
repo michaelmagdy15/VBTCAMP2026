@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { triggerHaptic } from './haptics';
 import { playChime } from '../chimes';
+import { serverTimeOffsetMs } from '../firebase';
 
 /**
  * useServiceTimer
@@ -20,7 +21,7 @@ export function useServiceTimer(schedule, isOffline) {
     if (!schedule || schedule.length === 0) return;
 
     const interval = setInterval(() => {
-      const now = Date.now();
+      const now = Date.now() + serverTimeOffsetMs;
       
       // Determine if we need to enter static fallback mode (offline 30 mins before first round)
       const firstRoundStartTime = schedule[0]?.start_time || 0;

@@ -1,6 +1,6 @@
 import { useServiceTimer } from './utils/useServiceTimer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
+import { signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -81,7 +81,8 @@ import {
   updateScheduleData,
   updateScheduleMatchupTimes,
   auth,
-  db
+  db,
+  syncServerTimeOffset
 } from './firebase';
 import { setupPushNotifications } from './push_service';
 import initialStaticCampData from './data/camp_data.json';
@@ -909,6 +910,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    syncServerTimeOffset();
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // If a user profile is active in local storage, bind the UID map
+        const evCode = localStorage.getItem('vbt_current_event');
+        if (evCode) {
+          const saved = localStorage.getItem(`vbt_user_${evCode}`);
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              const phone = parsed.phoneNumber || parsed.id || parsed.phone;
+              if (phone) {
+                await setDoc(doc(db, 'vbt_uid_map', user.uid), { phoneNumber: phone.trim() });
+                console.log(`[Auth] Auto-registered UID map: ${user.uid} -> ${phone}`);
+              }
+            } catch (e) {
+              console.error("[Auth] Failed to bind UID mapping:", e);
+            }
+          }
+        }
+      }
+    });
+
     if (!auth.currentUser) {
       signInAnonymously(auth).catch(err => {
         console.error("Anonymous authentication failed:", err);
@@ -923,6 +948,8 @@ export default function App() {
       setCurrentEventCode('');
       setCurrentUser(null);
     }
+
+    return () => unsubscribe();
   }, []);
 
   // ─── DYNAMIC SIDE NAME HELPERS ────────────────────────────────────────────
@@ -4485,6 +4512,24 @@ export default function App() {
           shakesScore: scoreA,
           friesScore: scoreB
         });
+
+        // Write to matches subcollection for decoupled auditing and security rules
+        try {
+          const matchDocRef = doc(db, 'vbt_events', currentEventCode, 'matches', key);
+          await setDoc(matchDocRef, {
+            matchupId: key,
+            block,
+            round,
+            game,
+            winner: newWinner,
+            teamAScore: scoreA,
+            teamBScore: scoreB,
+            submittedBy: currentUser.name,
+            timestamp: serverTimestamp()
+          }, { merge: true });
+        } catch (e) {
+          console.error("[MatchOutcome] Failed to write match document:", e);
+        }
       }
     }
 
@@ -4536,6 +4581,24 @@ export default function App() {
     const newVal = Math.min(25, Math.max(0, currentVal + ptsNum));
 
     const newDeductions = { ...(campState.teamDeductions || {}), [teamCode]: newVal };
+    
+    // Write to Firestore subcollection first
+    try {
+      const deductionsCol = collection(db, 'vbt_events', currentEventCode, 'deductions');
+      await addDoc(deductionsCol, {
+        teamCode,
+        pointsDeducted: ptsNum,
+        reason,
+        submittedBy: currentUser.name,
+        timestamp: serverTimestamp()
+      });
+      triggerHaptic('success');
+    } catch (e) {
+      console.error("[Deduction] Failed to write deduction to Firestore:", e);
+      alert("Failed to log deduction. Please check connection.");
+      return;
+    }
+
     await handleUpdateCampState({ teamDeductions: newDeductions });
 
     if (currentUser) {
@@ -6864,6 +6927,7 @@ export default function App() {
         urgentAlert={urgentAlert}
         activePingAlert={activePingAlert}
         onToggleUiMode={handleToggleUiMode}
+        timeRemainingSecs={timeRemainingSecs}
 
         // Feed Tab Props
         announcementText={announcementText}

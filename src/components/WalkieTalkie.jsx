@@ -11,7 +11,7 @@ import {
 } from '../voip';
 import { playChime, unlockAudioContext, getSharedAudioContext } from '../chimes';
 import { agoraClient, AGORA_APP_ID } from '../agoraConfig';
-import { NOTIFY_SERVICE_URL } from '../firebase';
+import { NOTIFY_SERVICE_URL, auth } from '../firebase';
 import { acquireChannelLock, releaseChannelLock, subscribeToChannelLock } from '../liveAudio';
 import { AgoraRTCProvider, useJoin, useLocalMicrophoneTrack, useRemoteUsers, useRemoteAudioTracks } from "agora-rtc-react";
 
@@ -339,19 +339,26 @@ function WalkieTalkieInner({ eventCode, currentUser, onSpeakingChange }) {
   const [token, setToken] = useState(null);
   const [connected, setConnected] = useState(false);
 
-  // Generate Token when channel changes
+  // Generate Token when channel changes or periodically (silent refresh)
   useEffect(() => {
     let active = true;
+    let refreshTimeoutId = null;
+
     if (eventCode && activeChannel && connected) {
       const fetchToken = async () => {
         try {
+          const user = auth.currentUser;
+          let idToken = '';
+          if (user) {
+            idToken = await user.getIdToken(true);
+          }
           const response = await fetch(`${NOTIFY_SERVICE_URL}/agora-token`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': 'vbt_secret_camp_2026_key'
+              'Authorization': `Bearer ${idToken}`
             },
-            body: JSON.stringify({ channelName: `${eventCode}_${activeChannel}` })
+            body: JSON.stringify({ channelName: `walkie_talkie_${eventCode}_${activeChannel}` })
           });
           if (!response.ok) {
             throw new Error(`Token fetch responded with ${response.status}`);
@@ -359,22 +366,31 @@ function WalkieTalkieInner({ eventCode, currentUser, onSpeakingChange }) {
           const data = await response.json();
           if (active) {
             setToken(data.token);
+            // Silent refresh in 30 minutes
+            refreshTimeoutId = setTimeout(fetchToken, 1800000);
           }
         } catch (err) {
           console.error("Token generation failed:", err);
+          if (active) {
+            // Retry in 10 seconds if failed
+            refreshTimeoutId = setTimeout(fetchToken, 10000);
+          }
         }
       };
       fetchToken();
     }
     return () => {
       active = false;
+      if (refreshTimeoutId) {
+        clearTimeout(refreshTimeoutId);
+      }
     };
   }, [eventCode, activeChannel, connected]);
 
   // Agora Integration
   useJoin({
     appid: AGORA_APP_ID,
-    channel: `${eventCode}_${activeChannel}`,
+    channel: `walkie_talkie_${eventCode}_${activeChannel}`,
     token: token,
     uid: null // Let Agora assign UID, token built with uid 0 allows this
   }, !!eventCode && !!activeChannel && !!token && connected);

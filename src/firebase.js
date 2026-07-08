@@ -1575,4 +1575,28 @@ export async function updateFinances(eventCode, financeData) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// SERVER TIME SYNCHRONIZATION
+// ─────────────────────────────────────────────────────────────────
+
+export let serverTimeOffsetMs = 0;
+
+export async function syncServerTimeOffset() {
+  try {
+    const start = Date.now();
+    const response = await fetch(`${NOTIFY_SERVICE_URL}/subscribe`, { method: 'OPTIONS' });
+    const serverDateHeader = response.headers.get('date');
+    if (serverDateHeader) {
+      const serverTime = new Date(serverDateHeader).getTime();
+      const end = Date.now();
+      const rtt = end - start;
+      serverTimeOffsetMs = serverTime - (start + rtt / 2);
+      console.log(`[TimeSync] Server time offset calculated: ${serverTimeOffsetMs}ms (RTT: ${rtt}ms)`);
+    }
+  } catch (e) {
+    console.error("[TimeSync] Failed to sync server time:", e);
+  }
+}
+
+
 
