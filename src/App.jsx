@@ -901,6 +901,14 @@ export default function App() {
   const [editingGameHowToPlay, setEditingGameHowToPlay] = useState('');
   const [editingGameLesson, setEditingGameLesson] = useState('');
 
+  const [manualCodeOpen, setManualCodeOpen] = useState(true);
+  useEffect(() => {
+    if (eventRegistry && eventRegistry.length > 0) {
+      const hasActive = eventRegistry.some(e => e.active !== false && !e.expired && e.code !== 'june26');
+      setManualCodeOpen(!hasActive);
+    }
+  }, [eventRegistry]);
+
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -5345,18 +5353,17 @@ export default function App() {
                 {/* Enter manually */}
                 {(() => {
                   const hasActive = eventRegistry.some(e => e.active !== false && !e.expired && e.code !== 'june26');
-                  const [open, setOpen] = useState(!hasActive);
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {hasActive && (
-                        <button onClick={() => setOpen(!open)}
+                        <button onClick={() => setManualCodeOpen(!manualCodeOpen)}
                           style={{ width: '100%', padding: '13px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)',
                             background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          🔑 Enter a code manually {open ? '▲' : '▼'}
+                          🔑 Enter a code manually {manualCodeOpen ? '▲' : '▼'}
                         </button>
                       )}
-                      {open && (
+                      {manualCodeOpen && (
                         <div style={{
                           marginTop: hasActive ? '10px' : '0',
                           background: 'linear-gradient(135deg, rgba(20,65,161,0.2) 0%, rgba(41,182,246,0.07) 100%)',

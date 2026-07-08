@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     react(), 
     nodePolyfills(),
-    basicSsl(),
+    process.env.NO_HTTPS ? [] : basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
