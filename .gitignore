@@ -32,3 +32,4 @@ credentials.json
 
 # Graphify
 graphify-out/
+.gstack/
