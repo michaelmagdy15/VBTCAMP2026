@@ -358,6 +358,41 @@ export default function RoleLogin({
           )}
         </button>
       </form>
+      
+      {onLogout && (
+        <button
+          type="button"
+          onClick={onLogout}
+          style={{
+            width: '100%',
+            padding: '12px 0',
+            borderRadius: 12,
+            border: `1px solid rgba(255, 255, 255, 0.1)`,
+            background: 'rgba(255, 255, 255, 0.03)',
+            color: T.textSecondary,
+            fontSize: 14,
+            fontWeight: 700,
+            fontFamily: T.fontTitle,
+            cursor: 'pointer',
+            marginTop: 12,
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+            e.currentTarget.style.color = T.textSecondary;
+          }}
+        >
+          ← Change Event / Switch Camp
+        </button>
+      )}
 
       {/* Basic keyframe spinner logic */}
       <style>{`
