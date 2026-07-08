@@ -80,12 +80,12 @@ const thStyle = {
   textTransform: 'uppercase',
   color: T.textSecondary,
   fontFamily: T.fontBody,
-  borderBottom: '1px solid #eee',
+  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
 };
 
 const tdStyle = {
   padding: '12px 14px',
-  borderBottom: '1px solid #eee',
+  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   verticalAlign: 'middle',
 };
 
@@ -162,68 +162,97 @@ export default function LogisticsTab({ eventCode, currentUser }) {
         <p style={{ color: T.textMuted, fontSize: '14px', marginBottom: '16px' }}>Manage station inventory allocations and end-of-day reconciliation.</p>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '780px' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Material Name</th>
                 <th style={{ ...thStyle, width: '140px' }}>Station Allocations</th>
                 <th style={{ ...thStyle, width: '100px', textAlign: 'center' }}>Returnable</th>
                 <th style={{ ...thStyle, width: '160px' }}>End of Day Reconciled</th>
+                <th style={{ ...thStyle, width: '150px', textAlign: 'center' }}>Status</th>
                 <th style={{ ...thStyle, width: '60px' }} />
               </tr>
             </thead>
             <tbody>
-              {inventory.map((m) => (
-                <tr key={m.material_id}>
-                  <td style={tdStyle}>
-                    <input
-                      style={inputStyle}
-                      value={m.name || ''}
-                      onChange={(e) => handleFieldChange(m.material_id, 'name', e.target.value)}
-                    />
-                  </td>
-                  <td style={tdStyle}>
-                    <input
-                      style={{ ...inputStyle, textAlign: 'center' }}
-                      type="number"
-                      min="0"
-                      value={m.station_allocation_count ?? 0}
-                      onChange={(e) => handleFieldChange(m.material_id, 'station_allocation_count', Number(e.target.value))}
-                    />
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={m.is_returnable ?? true}
-                      onChange={(e) => handleFieldChange(m.material_id, 'is_returnable', e.target.checked)}
-                      style={{ transform: 'scale(1.5)', cursor: 'pointer' }}
-                    />
-                  </td>
-                  <td style={tdStyle}>
-                    <input
-                      style={{ 
-                        ...inputStyle, 
-                        textAlign: 'center', 
-                        color: (m.is_returnable && (m.end_day_reconciliation_count ?? 0) < (m.station_allocation_count ?? 0)) ? '#ef4444' : '#22c55e',
-                        opacity: m.is_returnable ? 1 : 0.4
-                      }}
-                      type="number"
-                      min="0"
-                      value={m.end_day_reconciliation_count ?? 0}
-                      onChange={(e) => handleFieldChange(m.material_id, 'end_day_reconciliation_count', Number(e.target.value))}
-                      disabled={!m.is_returnable}
-                    />
-                  </td>
-                  <td style={tdStyle}>
-                    <button style={btnDanger} onClick={() => handleDelete(m.material_id)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {inventory.map((m) => {
+                const hasMissing = m.is_returnable && (m.end_day_reconciliation_count ?? 0) < (m.station_allocation_count ?? 0);
+                const isOk = m.is_returnable && (m.end_day_reconciliation_count ?? 0) >= (m.station_allocation_count ?? 0);
+                const rowBg = hasMissing 
+                  ? 'rgba(239, 68, 68, 0.15)' 
+                  : isOk 
+                    ? 'rgba(34, 197, 94, 0.08)' 
+                    : 'rgba(255, 255, 255, 0.02)';
+                
+                return (
+                  <tr key={m.material_id} style={{ background: rowBg, transition: 'background 0.2s' }}>
+                    <td style={tdStyle}>
+                      <input
+                        style={{ ...inputStyle, fontWeight: hasMissing ? '900' : 'normal' }}
+                        value={m.name || ''}
+                        onChange={(e) => handleFieldChange(m.material_id, 'name', e.target.value)}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        style={{ ...inputStyle, textAlign: 'center', fontWeight: hasMissing ? '900' : 'normal' }}
+                        type="number"
+                        min="0"
+                        value={m.station_allocation_count ?? 0}
+                        onChange={(e) => handleFieldChange(m.material_id, 'station_allocation_count', Number(e.target.value))}
+                      />
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={m.is_returnable ?? true}
+                        onChange={(e) => handleFieldChange(m.material_id, 'is_returnable', e.target.checked)}
+                        style={{ transform: 'scale(1.5)', cursor: 'pointer' }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        style={{ 
+                          ...inputStyle, 
+                          textAlign: 'center', 
+                          fontWeight: hasMissing ? '900' : 'normal',
+                          color: hasMissing ? '#ef4444' : isOk ? '#22c55e' : '#ffffff',
+                          opacity: m.is_returnable ? 1 : 0.4
+                        }}
+                        type="number"
+                        min="0"
+                        value={m.end_day_reconciliation_count ?? 0}
+                        onChange={(e) => handleFieldChange(m.material_id, 'end_day_reconciliation_count', Number(e.target.value))}
+                        disabled={!m.is_returnable}
+                      />
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      {m.is_returnable ? (
+                        hasMissing ? (
+                          <span style={{ color: '#ef4444', fontWeight: '900', fontSize: '0.8rem', letterSpacing: '0.02em' }}>
+                            🚨 MISSING: {(m.station_allocation_count ?? 0) - (m.end_day_reconciliation_count ?? 0)}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#22c55e', fontWeight: '900', fontSize: '0.8rem' }}>
+                            ✅ RECONCILED
+                          </span>
+                        )
+                      ) : (
+                        <span style={{ color: T.textMuted, fontSize: '0.75rem', fontWeight: '600' }}>
+                          Consumable
+                        </span>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <button style={btnDanger} onClick={() => handleDelete(m.material_id)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {inventory.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: T.textMuted, padding: '32px' }}>
+                  <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: T.textMuted, padding: '32px' }}>
                     No materials added yet.
                   </td>
                 </tr>

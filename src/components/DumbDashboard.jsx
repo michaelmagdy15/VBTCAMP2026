@@ -28,7 +28,7 @@ const TimelineFeedTab = lazy(() => import('./TimelineFeedTab'));
 const ScoreboardTab = lazy(() => import('./ScoreboardTab'));
 
 const S = {
-  container: {
+  container: (hasBottomNav) => ({
     minHeight: '100vh',
     width: '100%',
     maxWidth: '480px',
@@ -36,14 +36,14 @@ const S = {
     background: 'var(--bg-primary)',
     color: 'var(--text-primary)',
     fontFamily: "var(--font-body)",
-    padding: '16px 16px 80px 16px',
+    padding: hasBottomNav ? '16px 16px 80px 16px' : '16px 16px 24px 16px',
     boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
     position: 'relative',
     overflowX: 'hidden',
-  },
+  }),
   toggleUiBtn: {
     background: 'rgba(41, 182, 246, 0.15)',
     border: '1px solid rgba(41, 182, 246, 0.3)',
@@ -970,7 +970,7 @@ export default function DumbDashboard({
   const teamB = selectedMatchup?.teamB || 'Team B';
 
   return (
-    <div style={S.container}>
+    <div style={S.container(currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator'))}>
       <style>{`
         @keyframes pulseAlert {
           0%, 100% { transform: scale(1); opacity: 1; }
@@ -1139,54 +1139,55 @@ export default function DumbDashboard({
               {/* CURRENT & NEXT LOCATION PANEL */}
               <section style={{
                 ...S.card,
-                background: 'linear-gradient(135deg, rgba(13, 20, 38, 0.9) 0%, rgba(20, 65, 161, 0.25) 100%)',
-                border: '1px solid rgba(41, 182, 246, 0.25)',
-                padding: '16px',
-                borderRadius: '16px'
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)',
+                border: '2px solid #ffffff',
+                padding: '24px 16px',
+                borderRadius: '20px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                textAlign: 'center'
               }}>
-                <h3 style={{
-                  fontSize: '11px',
-                  fontWeight: '800',
-                  color: '#29b6f6',
+                <h2 style={{
+                  fontSize: '32px',
+                  fontWeight: '900',
+                  color: getSideColor(currentUser?.side),
+                  fontFamily: 'var(--font-title)',
+                  margin: '0 0 16px 0',
+                  letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  textShadow: `0 0 15px ${getSideColor(currentUser?.side)}33`
                 }}>
-                  <Compass size={14} className="animate-pulse" /> Live Station Rotation
-                </h3>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+                  {(currentUser.teamCode || 'TEAM').replace(/^team_/i, '').replace(/_/g, ' ')}
+                </h2>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* Current Location */}
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    borderRadius: '12px',
-                    padding: '12px'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '16px',
+                    padding: '18px 12px'
                   }}>
-                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      CURRENT LOCATION
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      📍 CURRENT STATION
                     </span>
                     {currentBlockMatchup ? (
-                      <div style={{ marginTop: '4px' }}>
+                      <div style={{ marginTop: '8px' }}>
                         <div
                           onClick={() => handleFlipRules(currentBlockMatchup.game)}
-                          style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', lineHeight: 1.2 }}
                           title="Tap to read game rules"
                         >
-                          📍 {currentBlockMatchup.location} <BookOpen size={13} style={{ color: 'var(--vbt-sky)' }} />
+                          {currentBlockMatchup.location} <BookOpen size={16} style={{ color: 'var(--vbt-sky)' }} />
                         </div>
                         <div
                           onClick={() => handleFlipRules(currentBlockMatchup.game)}
-                          style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', cursor: 'pointer' }}
+                          style={{ fontSize: '14px', color: '#a78bfa', marginTop: '6px', fontWeight: '700', cursor: 'pointer' }}
                         >
                           Game: {currentBlockMatchup.game}
                         </div>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>
+                      <div style={{ fontSize: '16px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px', fontWeight: '700' }}>
                         No active game scheduled
                       </div>
                     )}
@@ -1194,32 +1195,32 @@ export default function DumbDashboard({
 
                   {/* Next Location */}
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    borderRadius: '12px',
-                    padding: '12px'
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '16px',
+                    padding: '18px 12px'
                   }}>
-                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      NEXT LOCATION
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      ➡️ NEXT STATION
                     </span>
                     {nextBlockMatchup ? (
-                      <div style={{ marginTop: '4px' }}>
+                      <div style={{ marginTop: '8px' }}>
                         <div
                           onClick={() => handleFlipRules(nextBlockMatchup.game)}
-                          style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', lineHeight: 1.2 }}
                           title="Tap to read game rules"
                         >
-                          📍 {nextBlockMatchup.location} <BookOpen size={13} style={{ color: 'var(--vbt-sky)' }} />
+                          {nextBlockMatchup.location} <BookOpen size={15} style={{ color: 'var(--vbt-sky)' }} />
                         </div>
                         <div
                           onClick={() => handleFlipRules(nextBlockMatchup.game)}
-                          style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', cursor: 'pointer' }}
+                          style={{ fontSize: '13px', color: '#a78bfa', marginTop: '6px', fontWeight: '700', cursor: 'pointer' }}
                         >
                           Game: {nextBlockMatchup.game}
                         </div>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>
+                      <div style={{ fontSize: '16px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px', fontWeight: '700' }}>
                         End of Day / No further games
                       </div>
                     )}
@@ -1333,26 +1334,116 @@ export default function DumbDashboard({
                         {/* Giant Scoring Pads */}
                         <div style={S.scoringPadsGrid}>
                           {/* Team A */}
-                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}` }}>
-                            <span style={S.scoreTeamName}>{teamA}</span>
-                            <div style={S.scoreNumber}>{scoreA}</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%' }}>
-                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => Math.max(0, prev - 1))}>-1</button>
-                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => Math.max(0, prev - 5))}>-5</button>
-                              <button style={{ ...S.padBtnPlus(getSideColor(teamA)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => prev + 1)}>+1</button>
-                              <button style={{ ...S.padBtnPlus(getSideColor(teamA)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => prev + 5)}>+5</button>
+                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}`, padding: '16px 12px' }}>
+                            <span style={{ ...S.scoreTeamName, fontSize: '15px' }}>{teamA}</span>
+                            <div style={{ ...S.scoreNumber, fontSize: '48px', margin: '8px 0' }}>{scoreA}</div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                              <button
+                                style={{
+                                  width: '100%',
+                                  height: '56px',
+                                  borderRadius: '12px',
+                                  background: scoreA === 15 ? '#10b981' : 'rgba(16, 185, 129, 0.08)',
+                                  border: `2px solid ${scoreA === 15 ? '#10b981' : 'rgba(16, 185, 129, 0.3)'}`,
+                                  color: scoreA === 15 ? '#ffffff' : '#10b981',
+                                  fontSize: '14px',
+                                  fontWeight: '900',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onClick={() => {
+                                  setScoreA(15);
+                                  setScoreB(5);
+                                }}
+                              >
+                                🏆 WIN
+                              </button>
+                              <button
+                                style={{
+                                  width: '100%',
+                                  height: '50px',
+                                  borderRadius: '12px',
+                                  background: scoreA === 5 ? '#ef4444' : 'rgba(239, 68, 68, 0.06)',
+                                  border: `2px solid ${scoreA === 5 ? '#ef4444' : 'rgba(239, 68, 68, 0.2)'}`,
+                                  color: scoreA === 5 ? '#ffffff' : '#f87171',
+                                  fontSize: '14px',
+                                  fontWeight: '900',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onClick={() => {
+                                  setScoreA(5);
+                                  setScoreB(15);
+                                }}
+                              >
+                                ❌ LOSE
+                              </button>
                             </div>
                           </div>
 
                           {/* Team B */}
-                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}` }}>
-                            <span style={S.scoreTeamName}>{teamB}</span>
-                            <div style={S.scoreNumber}>{scoreB}</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%' }}>
-                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => Math.max(0, prev - 1))}>-1</button>
-                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => Math.max(0, prev - 5))}>-5</button>
-                              <button style={{ ...S.padBtnPlus(getSideColor(teamB)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => prev + 1)}>+1</button>
-                              <button style={{ ...S.padBtnPlus(getSideColor(teamB)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => prev + 5)}>+5</button>
+                          <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}`, padding: '16px 12px' }}>
+                            <span style={{ ...S.scoreTeamName, fontSize: '15px' }}>{teamB}</span>
+                            <div style={{ ...S.scoreNumber, fontSize: '48px', margin: '8px 0' }}>{scoreB}</div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                              <button
+                                style={{
+                                  width: '100%',
+                                  height: '56px',
+                                  borderRadius: '12px',
+                                  background: scoreB === 15 ? '#10b981' : 'rgba(16, 185, 129, 0.08)',
+                                  border: `2px solid ${scoreB === 15 ? '#10b981' : 'rgba(16, 185, 129, 0.3)'}`,
+                                  color: scoreB === 15 ? '#ffffff' : '#10b981',
+                                  fontSize: '14px',
+                                  fontWeight: '900',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onClick={() => {
+                                  setScoreB(15);
+                                  setScoreA(5);
+                                }}
+                              >
+                                🏆 WIN
+                              </button>
+                              <button
+                                style={{
+                                  width: '100%',
+                                  height: '50px',
+                                  borderRadius: '12px',
+                                  background: scoreB === 5 ? '#ef4444' : 'rgba(239, 68, 68, 0.06)',
+                                  border: `2px solid ${scoreB === 5 ? '#ef4444' : 'rgba(239, 68, 68, 0.2)'}`,
+                                  color: scoreB === 5 ? '#ffffff' : '#f87171',
+                                  fontSize: '14px',
+                                  fontWeight: '900',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onClick={() => {
+                                  setScoreB(5);
+                                  setScoreA(15);
+                                }}
+                              >
+                                ❌ LOSE
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1526,40 +1617,42 @@ export default function DumbDashboard({
       </div>
 
       {/* Bottom Navigation Bar */}
-      <nav style={S.bottomNav}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('actions')}
-          style={S.navTab(activeTab === 'actions' || activeTab === 'rules' || activeTab === 'sos')}
-        >
-          <Compass size={18} />
-          <span style={S.navLabel}>Actions</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('feed')}
-          style={S.navTab(activeTab === 'feed')}
-        >
-          <Bell size={18} />
-          <span style={S.navLabel}>Feed</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('scores')}
-          style={S.navTab(activeTab === 'scores')}
-        >
-          <Trophy size={18} />
-          <span style={S.navLabel}>Scores</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('radio')}
-          style={S.navTab(activeTab === 'radio')}
-        >
-          <Radio size={18} />
-          <span style={S.navLabel}>Radio</span>
-        </button>
-      </nav>
+      {currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator') && (
+        <nav style={S.bottomNav}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('actions')}
+            style={S.navTab(activeTab === 'actions' || activeTab === 'rules' || activeTab === 'sos')}
+          >
+            <Compass size={18} />
+            <span style={S.navLabel}>Actions</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('feed')}
+            style={S.navTab(activeTab === 'feed')}
+          >
+            <Bell size={18} />
+            <span style={S.navLabel}>Feed</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('scores')}
+            style={S.navTab(activeTab === 'scores')}
+          >
+            <Trophy size={18} />
+            <span style={S.navLabel}>Scores</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('radio')}
+            style={S.navTab(activeTab === 'radio')}
+          >
+            <Radio size={18} />
+            <span style={S.navLabel}>Radio</span>
+          </button>
+        </nav>
+      )}
 
       {/* ─── Point Deduction Popup Modal ─────────────────────── */}
       {showDeductModal && (

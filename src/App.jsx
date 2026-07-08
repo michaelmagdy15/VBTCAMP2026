@@ -7158,6 +7158,7 @@ export default function App() {
             handleAdjustTimeShift={handleAdjustTimeShift}
             handleResetTimeShift={handleResetTimeShift}
             handleRotateBroadcast={handleRotateBroadcast}
+            handleUpdateCampState={handleUpdateCampState}
             handleStartMatchupTimer={handleStartMatchupTimer}
             handleStopMatchupTimer={handleStopMatchupTimer}
             handleResetMatchupTimer={handleResetMatchupTimer}

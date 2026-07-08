@@ -386,6 +386,7 @@ export default function ScheduleTab({
   handleAdjustTimeShift,
   handleResetTimeShift,
   handleRotateBroadcast,
+  handleUpdateCampState,
   handleStartMatchupTimer,
   handleStopMatchupTimer,
   handleResetMatchupTimer,
@@ -410,6 +411,162 @@ export default function ScheduleTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+      {/* ── MASTER REMOTE CONTROL FOR ADMINS ── */}
+      {currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator') && (
+        <div 
+          className="glass-panel animate-fade" 
+          style={{ 
+            padding: '20px', 
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
+            border: '2px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '24px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              🎮 VBT Master Remote Control
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '4px 10px', borderRadius: '8px' }}>
+              <span className={campState.isTimerPaused ? "" : "live-dot"} style={{ background: campState.isTimerPaused ? "#fbbf24" : "#22c55e", width: '8px', height: '8px' }} />
+              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: '800', color: '#ffffff' }}>
+                {campState.isTimerPaused ? 'PAUSED' : 'RUNNING'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {/* START BUTTON */}
+            <button
+              onClick={async () => {
+                if (campState.isTimerPaused) {
+                  await handleToggleTimer();
+                }
+              }}
+              style={{
+                height: '70px',
+                borderRadius: '16px',
+                background: !campState.isTimerPaused ? '#22c55e' : 'rgba(34, 197, 94, 0.15)',
+                border: `3px solid ${!campState.isTimerPaused ? '#4ade80' : 'rgba(34, 197, 94, 0.3)'}`,
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: '900',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: !campState.isTimerPaused ? '0 0 20px rgba(34, 197, 94, 0.4)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🟢 START
+            </button>
+
+            {/* PAUSE BUTTON */}
+            <button
+              onClick={async () => {
+                if (!campState.isTimerPaused) {
+                  await handleToggleTimer();
+                }
+              }}
+              style={{
+                height: '70px',
+                borderRadius: '16px',
+                background: campState.isTimerPaused ? '#fbbf24' : 'rgba(251, 191, 36, 0.15)',
+                border: `3px solid ${campState.isTimerPaused ? '#fcd34d' : 'rgba(251, 191, 36, 0.3)'}`,
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: '900',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: campState.isTimerPaused ? '0 0 20px rgba(251, 191, 36, 0.4)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🟡 PAUSE
+            </button>
+
+            {/* ROTATE BUTTON */}
+            <button
+              onClick={handleRotateBroadcast}
+              style={{
+                height: '70px',
+                gridColumn: 'span 2',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                border: '3px solid #60a5fa',
+                color: '#ffffff',
+                fontSize: '16px',
+                fontWeight: '900',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 15px rgba(37, 99, 235, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🔵 ROTATE CLOCKWISE
+            </button>
+
+            {/* END BUTTON */}
+            <button
+              onClick={async () => {
+                if (window.confirm("Are you sure you want to end today's schedule and reset timers?")) {
+                  // Reset shift and pause
+                  await handleUpdateCampState({
+                    timeShiftMinutes: 0,
+                    isTimerPaused: true,
+                    timerPausedAt: new Date().toISOString()
+                  });
+                  alert("Timer paused and offset reset to 0 minutes.");
+                }
+              }}
+              style={{
+                height: '56px',
+                gridColumn: 'span 2',
+                borderRadius: '16px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '2px solid rgba(239, 68, 68, 0.4)',
+                color: '#ef4444',
+                fontSize: '14px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🔴 END DAY / RESET
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '12px' }}>
+            <div>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '800' }}>Active Round Delay</span>
+              <div style={{ fontSize: '1.2rem', fontWeight: '900', color: getEffectiveTimeShift() > 0 ? '#f87171' : '#4ade80' }}>
+                {getEffectiveTimeShift() > 0 ? `+${getEffectiveTimeShift()} min` : 'On Schedule'}
+              </div>
+            </div>
+            {/* Quick manual adjust buttons */}
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={() => handleAdjustTimeShift(-5)} disabled={(campState.timeShiftMinutes || 0) <= 0} style={{ padding: '6px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer' }}>-5m</button>
+              <button onClick={() => handleAdjustTimeShift(5)} style={{ padding: '6px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer' }}>+5m</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Live Countdown Banner for Service Events ── */}
       {eventConfig.eventType === 'service' && (
