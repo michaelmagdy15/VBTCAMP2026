@@ -657,12 +657,109 @@ export default function DumbDashboard({
   getEffectiveTimeShift,
   getShiftedTimeStr,
   isTimeSlotActive,
+  getEventCurrentDay,
+  parseTimeToMs,
 
   // SOS Trigger
   triggerRemotePushNotification
 }) {
   const isLeader = currentUser?.role === 'leader';
   const isReferee = currentUser?.role === 'referee';
+
+  // ─── Flip Rules and Location States ───
+  const [flipRulesGame, setFlipRulesGame] = useState(null);
+
+  const handleFlipRules = (gameName) => {
+    if (!gameName) return;
+    let found = null;
+    if (eventConfig?.stations) {
+      found = Object.values(eventConfig.stations).find(s => 
+        (s.name || '').toLowerCase().includes(gameName.toLowerCase()) || 
+        gameName.toLowerCase().includes((s.name || '').toLowerCase())
+      );
+    }
+    if (!found && eventConfig?.bigGameName && (gameName.toLowerCase().includes(eventConfig.bigGameName.toLowerCase()) || eventConfig.bigGameName.toLowerCase().includes(gameName.toLowerCase()))) {
+      found = { name: eventConfig.bigGameName, howToPlay: eventConfig.bigGameHowToPlay, lesson: eventConfig.bigGameLesson };
+    }
+    if (!found && eventConfig?.reflectionName && (gameName.toLowerCase().includes(eventConfig.reflectionName.toLowerCase()) || eventConfig.reflectionName.toLowerCase().includes(gameName.toLowerCase()))) {
+      found = { name: eventConfig.reflectionName, howToPlay: eventConfig.reflectionHowToPlay, lesson: eventConfig.reflectionLesson };
+    }
+    if (!found) {
+      found = { name: gameName, howToPlay: "No specific rules provided for this activity.", lesson: "No specific lesson details." };
+    }
+    setFlipRulesGame(found);
+  };
+
+  // Find active/current block index
+  const activeBlockNum = useMemo(() => {
+    if (!campData?.matchups) return null;
+    const currentDay = getEventCurrentDay ? getEventCurrentDay() : 1;
+    const todaysMatchups = campData.matchups.filter(m => {
+      const mDay = m.day || (eventConfig?.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return mDay === currentDay;
+    });
+    const activeMatchup = todaysMatchups.find(m => isTimeSlotActive ? isTimeSlotActive(m.time, `Block ${m.block}`, m.day) : false);
+    return activeMatchup ? activeMatchup.block : null;
+  }, [campData, eventConfig, isTimeSlotActive, getEventCurrentDay]);
+
+  const currentBlockIndex = useMemo(() => {
+    if (activeBlockNum !== null) return activeBlockNum;
+    const currentDay = getEventCurrentDay ? getEventCurrentDay() : 1;
+    const todaysMatchups = campData?.matchups?.filter(m => {
+      const mDay = m.day || (eventConfig?.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return mDay === currentDay;
+    }) || [];
+    
+    const shift = getEffectiveTimeShift ? getEffectiveTimeShift() : 0;
+    const blocksWithTime = [];
+    const seenBlocks = new Set();
+    todaysMatchups.forEach(m => {
+      if (!seenBlocks.has(m.block)) {
+        seenBlocks.add(m.block);
+        const startMs = parseTimeToMs ? parseTimeToMs(m.time) + shift * 60 * 1000 : 0;
+        blocksWithTime.push({ block: m.block, startMs });
+      }
+    });
+    
+    blocksWithTime.sort((a, b) => a.startMs - b.startMs);
+    const nowMs = Date.now();
+    const upcoming = blocksWithTime.find(b => b.startMs > nowMs);
+    return upcoming ? upcoming.block : 1;
+  }, [activeBlockNum, campData, eventConfig, getEventCurrentDay, getEffectiveTimeShift, parseTimeToMs]);
+
+  const currentBlockMatchup = useMemo(() => {
+    if (!campData?.matchups || !currentUser?.teamCode) return null;
+    const myCodeNorm = currentUser.teamCode.toLowerCase().replace(/[\s_-]+/g, '');
+    const dayMatchups = campData.matchups.filter(m => {
+      const currentDay = getEventCurrentDay ? getEventCurrentDay() : 1;
+      const mDay = m.day || (eventConfig?.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return mDay === currentDay && m.block === currentBlockIndex;
+    });
+    
+    const specific = dayMatchups.find(m => {
+      const tANorm = (m.teamA || '').toLowerCase().replace(/[\s_-]+/g, '');
+      const tBNorm = (m.teamB || '').toLowerCase().replace(/[\s_-]+/g, '');
+      return tANorm === myCodeNorm || tBNorm === myCodeNorm;
+    });
+    return specific || dayMatchups[0] || null;
+  }, [campData, currentUser, currentBlockIndex, eventConfig, getEventCurrentDay]);
+
+  const nextBlockMatchup = useMemo(() => {
+    if (!campData?.matchups || !currentUser?.teamCode) return null;
+    const myCodeNorm = currentUser.teamCode.toLowerCase().replace(/[\s_-]+/g, '');
+    const dayMatchups = campData.matchups.filter(m => {
+      const currentDay = getEventCurrentDay ? getEventCurrentDay() : 1;
+      const mDay = m.day || (eventConfig?.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return mDay === currentDay && m.block === (currentBlockIndex + 1);
+    });
+    
+    const specific = dayMatchups.find(m => {
+      const tANorm = (m.teamA || '').toLowerCase().replace(/[\s_-]+/g, '');
+      const tBNorm = (m.teamB || '').toLowerCase().replace(/[\s_-]+/g, '');
+      return tANorm === myCodeNorm || tBNorm === myCodeNorm;
+    });
+    return specific || dayMatchups[0] || null;
+  }, [campData, currentUser, currentBlockIndex, eventConfig, getEventCurrentDay]);
 
   // ─── State ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('actions'); // 'actions' | 'feed' | 'scores' | 'radio' | 'rules' | 'sos'
@@ -1039,6 +1136,97 @@ export default function DumbDashboard({
                 </button>
               </section>
 
+              {/* CURRENT & NEXT LOCATION PANEL */}
+              <section style={{
+                ...S.card,
+                background: 'linear-gradient(135deg, rgba(13, 20, 38, 0.9) 0%, rgba(20, 65, 161, 0.25) 100%)',
+                border: '1px solid rgba(41, 182, 246, 0.25)',
+                padding: '16px',
+                borderRadius: '16px'
+              }}>
+                <h3 style={{
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  color: '#29b6f6',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Compass size={14} className="animate-pulse" /> Live Station Rotation
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+                  {/* Current Location */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    padding: '12px'
+                  }}>
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      CURRENT LOCATION
+                    </span>
+                    {currentBlockMatchup ? (
+                      <div style={{ marginTop: '4px' }}>
+                        <div
+                          onClick={() => handleFlipRules(currentBlockMatchup.game)}
+                          style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          title="Tap to read game rules"
+                        >
+                          📍 {currentBlockMatchup.location} <BookOpen size={13} style={{ color: 'var(--vbt-sky)' }} />
+                        </div>
+                        <div
+                          onClick={() => handleFlipRules(currentBlockMatchup.game)}
+                          style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', cursor: 'pointer' }}
+                        >
+                          Game: {currentBlockMatchup.game}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>
+                        No active game scheduled
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Next Location */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    padding: '12px'
+                  }}>
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      NEXT LOCATION
+                    </span>
+                    {nextBlockMatchup ? (
+                      <div style={{ marginTop: '4px' }}>
+                        <div
+                          onClick={() => handleFlipRules(nextBlockMatchup.game)}
+                          style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          title="Tap to read game rules"
+                        >
+                          📍 {nextBlockMatchup.location} <BookOpen size={13} style={{ color: 'var(--vbt-sky)' }} />
+                        </div>
+                        <div
+                          onClick={() => handleFlipRules(nextBlockMatchup.game)}
+                          style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', cursor: 'pointer' }}
+                        >
+                          Game: {nextBlockMatchup.game}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>
+                        End of Day / No further games
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
               {/* Broadcast Announcement */}
               <section style={S.card}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -1076,8 +1264,13 @@ export default function DumbDashboard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={S.inputLabel}>REF STATION / GAME</label>
                   {assignedGames.length <= 1 ? (
-                    <div style={S.singleGameDisplay}>
+                    <div
+                      onClick={() => handleFlipRules(selectedGame)}
+                      style={{ ...S.singleGameDisplay, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                      title="Tap to read game rules"
+                    >
                       <span>{selectedGame || 'No game assigned'}</span>
+                      {selectedGame && <BookOpen size={14} style={{ color: 'var(--vbt-sky)' }} />}
                     </div>
                   ) : (
                     <div style={{ position: 'relative' }}>
@@ -1124,9 +1317,13 @@ export default function DumbDashboard({
 
                     {selectedMatchup && (
                       <div style={S.scoringContainer}>
-                        <div style={S.matchupHeader}>
-                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase' }}>
-                            Block {selectedMatchup.block} • Round {selectedMatchup.round}
+                        <div
+                          onClick={() => handleFlipRules(selectedMatchup.game)}
+                          style={{ ...S.matchupHeader, cursor: 'pointer' }}
+                          title="Tap to read game rules"
+                        >
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            Block {selectedMatchup.block} • Round {selectedMatchup.round} <BookOpen size={11} />
                           </span>
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             📍 {selectedMatchup.location}
@@ -1139,13 +1336,11 @@ export default function DumbDashboard({
                           <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamA)}` }}>
                             <span style={S.scoreTeamName}>{teamA}</span>
                             <div style={S.scoreNumber}>{scoreA}</div>
-                            <div style={S.padButtonContainer}>
-                              <button style={S.padBtnMinus} onClick={() => setScoreA(prev => Math.max(0, prev - 1))}>
-                                <Minus size={20} />
-                              </button>
-                              <button style={S.padBtnPlus(getSideColor(teamA))} onClick={() => setScoreA(prev => prev + 1)}>
-                                <Plus size={20} />
-                              </button>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%' }}>
+                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => Math.max(0, prev - 1))}>-1</button>
+                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => Math.max(0, prev - 5))}>-5</button>
+                              <button style={{ ...S.padBtnPlus(getSideColor(teamA)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => prev + 1)}>+1</button>
+                              <button style={{ ...S.padBtnPlus(getSideColor(teamA)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreA(prev => prev + 5)}>+5</button>
                             </div>
                           </div>
 
@@ -1153,13 +1348,11 @@ export default function DumbDashboard({
                           <div style={{ ...S.scorePad, borderTop: `4px solid ${getSideColor(teamB)}` }}>
                             <span style={S.scoreTeamName}>{teamB}</span>
                             <div style={S.scoreNumber}>{scoreB}</div>
-                            <div style={S.padButtonContainer}>
-                              <button style={S.padBtnMinus} onClick={() => setScoreB(prev => Math.max(0, prev - 1))}>
-                                <Minus size={20} />
-                              </button>
-                              <button style={S.padBtnPlus(getSideColor(teamB))} onClick={() => setScoreB(prev => prev + 1)}>
-                                <Plus size={20} />
-                              </button>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%' }}>
+                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => Math.max(0, prev - 1))}>-1</button>
+                              <button style={{ ...S.padBtnMinus, height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => Math.max(0, prev - 5))}>-5</button>
+                              <button style={{ ...S.padBtnPlus(getSideColor(teamB)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => prev + 1)}>+1</button>
+                              <button style={{ ...S.padBtnPlus(getSideColor(teamB)), height: '32px', fontSize: '11px', fontWeight: '800' }} onClick={() => setScoreB(prev => prev + 5)}>+5</button>
                             </div>
                           </div>
                         </div>
@@ -1422,6 +1615,84 @@ export default function DumbDashboard({
                   <span>{deductSuccessMsg}</span>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── Flip Rules overlay Modal ──────────────────────── */}
+      {flipRulesGame && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(5, 8, 20, 0.9)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            ...S.card,
+            width: '100%',
+            maxWidth: '400px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            border: '1px solid rgba(41, 182, 246, 0.4)',
+            padding: '24px',
+            background: 'var(--bg-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <BookOpen size={20} style={{ color: 'var(--vbt-sky)' }} /> Game Rules
+              </h3>
+              <button
+                onClick={() => setFlipRulesGame(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  color: '#ffffff',
+                  width: '32px',
+                  height: '32px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#29b6f6', margin: '0 0 6px 0' }}>
+                {flipRulesGame.name}
+              </h4>
+              
+              <div style={{ marginTop: '14px' }}>
+                <h5 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 4px 0' }}>
+                  HOW TO PLAY
+                </h5>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-line', lineHeight: '1.5' }}>
+                  {flipRulesGame.howToPlay || flipRulesGame.rules || "No instructions."}
+                </p>
+              </div>
+
+              <div style={{ marginTop: '16px' }}>
+                <h5 style={{ fontSize: '11px', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', margin: '0 0 4px 0' }}>
+                  LESSON LEARNED
+                </h5>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-line', lineHeight: '1.5' }}>
+                  {flipRulesGame.lesson || "No lesson details."}
+                </p>
+              </div>
             </div>
           </div>
         </div>

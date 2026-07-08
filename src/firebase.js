@@ -643,73 +643,96 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
 
   const activeSubTeams = []; // e.g. ["Red 1", "Red 2", "White 1", "White 2", ...]
   const teamLeaders = {}; // teamName -> leaderName
-
-  const roleMapping = configData.servantAssignments || {};
-  Object.entries(roleMapping).forEach(([servantId, roleCode]) => {
-    if (!activeServantsList.includes(servantId)) return;
-
-    if (roleCode.startsWith('team_')) {
-      const servant = globalServants.find(s => s.id === servantId);
-      if (servant) {
-        const parts = roleCode.split('_'); // ["team", "white", "1"]
-        const colorKey = parts[1]; // "white"
-        const colorName = getCustomColorName(colorKey);
-        const idx = parts[2]; // "1"
-        const teamName = colorName + ' ' + idx; // "White 1"
-        activeSubTeams.push(teamName);
-        teamLeaders[teamName] = servant.name;
-      }
-    }
-  });
-
-  if (activeSubTeams.length === 0) {
-    throw new Error("Please assign at least one servant as a Team Leader (Red 1, White 1, etc.) before generating schedule.");
-  }
-
-  // Sort sub-teams predictably
-  activeSubTeams.sort((a, b) => {
-    const aColor = a.split(' ').slice(0, -1).join(' ');
-    const bColor = b.split(' ').slice(0, -1).join(' ');
-    
-    const getBaseColorOrder = (name) => {
-      if (name === getCustomColorName('red')) return 0;
-      if (name === getCustomColorName('white')) return 1;
-      if (name === getCustomColorName('black')) return 2;
-      if (name === getCustomColorName('blue')) return 3;
-      return 99;
-    };
-    
-    const aOrder = getBaseColorOrder(aColor);
-    const bOrder = getBaseColorOrder(bColor);
-    
-    const aIdx = parseInt(a.split(' ').pop(), 10) || 1;
-    const bIdx = parseInt(b.split(' ').pop(), 10) || 1;
-    
-    if (aOrder !== bOrder) return aOrder - bOrder;
-    return aIdx - bIdx;
-  });
-
-  const T = activeSubTeams.length;
-  const baseKids = Math.floor(configData.kidCount / T);
-  const remainder = configData.kidCount % T;
-
-  // Create teams map
   const teams = {};
-  activeSubTeams.forEach((teamName, idx) => {
-    const colorName = teamName.split(' ').slice(0, -1).join(' ');
-    let side = 'Red';
-    if (colorName === getCustomColorName('white')) side = 'White';
-    else if (colorName === getCustomColorName('black')) side = 'Black';
-    else if (colorName === getCustomColorName('blue')) side = 'Blue';
 
-    teams[teamName] = {
-      code: teamName,
-      name: teamName,
-      leaders: teamLeaders[teamName] || "Unassigned",
-      side: side,
-      kidCount: baseKids + (idx < remainder ? 1 : 0)
-    };
-  });
+  // If teams are already pre-divided (e.g. from Day Service Roster Import)
+  if (configData.teams && Object.keys(configData.teams).length > 0) {
+    Object.entries(configData.teams).forEach(([code, t]) => {
+      activeSubTeams.push(t.name);
+      teamLeaders[t.name] = t.leaders || "Unassigned";
+      teams[t.name] = {
+        code: t.code || code,
+        name: t.name,
+        leaders: t.leaders || "Unassigned",
+        side: t.side || "Red",
+        kidCount: t.kids ? t.kids.length : (t.kidCount || 0),
+        kids: t.kids || []
+      };
+    });
+  } else {
+    // Legacy/Fallback servant-based team creation
+    const roleMapping = configData.servantAssignments || {};
+    Object.entries(roleMapping).forEach(([servantId, roleCode]) => {
+      if (!activeServantsList.includes(servantId)) return;
+
+      if (roleCode.startsWith('team_')) {
+        const servant = globalServants.find(s => s.id === servantId);
+        if (servant) {
+          const parts = roleCode.split('_'); // ["team", "white", "1"]
+          const colorKey = parts[1]; // "white"
+          const colorName = getCustomColorName(colorKey);
+          const idx = parts[2]; // "1"
+          const teamName = colorName + ' ' + idx; // "White 1"
+          activeSubTeams.push(teamName);
+          teamLeaders[teamName] = servant.name;
+        }
+      }
+    });
+
+    if (activeSubTeams.length === 0) {
+      // Create at least 4 default teams if none assigned to prevent crash
+      const defaultColors = ['Red', 'White', 'Black', 'Blue'];
+      defaultColors.forEach((color) => {
+        const teamName = `${color} 1`;
+        activeSubTeams.push(teamName);
+        teamLeaders[teamName] = "Unassigned";
+      });
+    }
+
+    // Sort sub-teams predictably
+    activeSubTeams.sort((a, b) => {
+      const aColor = a.split(' ').slice(0, -1).join(' ');
+      const bColor = b.split(' ').slice(0, -1).join(' ');
+      
+      const getBaseColorOrder = (name) => {
+        if (name === getCustomColorName('red')) return 0;
+        if (name === getCustomColorName('white')) return 1;
+        if (name === getCustomColorName('black')) return 2;
+        if (name === getCustomColorName('blue')) return 3;
+        return 99;
+      };
+      
+      const aOrder = getBaseColorOrder(aColor);
+      const bOrder = getBaseColorOrder(bColor);
+      
+      const aIdx = parseInt(a.split(' ').pop(), 10) || 1;
+      const bIdx = parseInt(b.split(' ').pop(), 10) || 1;
+      
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return aIdx - bIdx;
+    });
+
+    const T = activeSubTeams.length;
+    const baseKids = Math.floor((configData.kidCount || 100) / T);
+    const remainder = (configData.kidCount || 100) % T;
+
+    activeSubTeams.forEach((teamName, idx) => {
+      const colorName = teamName.split(' ').slice(0, -1).join(' ');
+      let side = 'Red';
+      if (colorName === getCustomColorName('white')) side = 'White';
+      else if (colorName === getCustomColorName('black')) side = 'Black';
+      else if (colorName === getCustomColorName('blue')) side = 'Blue';
+
+      teams[teamName] = {
+        code: 'team_' + colorName.toLowerCase() + '_' + teamName.split(' ').pop(),
+        name: teamName,
+        leaders: teamLeaders[teamName] || "Unassigned",
+        side: side,
+        kidCount: baseKids + (idx < remainder ? 1 : 0),
+        kids: []
+      };
+    });
+  }
 
   const getStationInfo = (stKey, defaultName) => {
     const st = configData.stations?.[stKey];
@@ -765,55 +788,141 @@ export async function generateAndSaveServiceSchedule(targetEventCode, configData
     return strHours + ':' + strMinutes + ' ' + ampm;
   };
 
-  const numBlocks = Math.max(6, T);
-  const times = [];
-  for (let block = 0; block < numBlocks; block++) {
-    times.push(getShiftedTime(block * (roundDur + breakDur)));
-  }
-
-  // Group active sub-teams by their team number (e.g. "1" from "Red 1") to pair Red & Blue
-  const teamNumbers = {}; // number -> { red: string, blue: string }
-  activeSubTeams.forEach(teamName => {
-    const parts = teamName.split(' ');
-    const num = parts[parts.length - 1]; // "1", "2", etc.
-    const nameWithoutNum = parts.slice(0, -1).join(' ').toLowerCase();
-    
-    if (!teamNumbers[num]) teamNumbers[num] = {};
-    if (nameWithoutNum.includes('red') || nameWithoutNum.includes(getCustomColorName('red').toLowerCase())) {
-      teamNumbers[num].red = teamName;
-    } else if (nameWithoutNum.includes('blue') || nameWithoutNum.includes(getCustomColorName('blue').toLowerCase())) {
-      teamNumbers[num].blue = teamName;
-    } else {
-      // Fallback
-      if (!teamNumbers[num].red) teamNumbers[num].red = teamName;
-      else teamNumbers[num].blue = teamName;
-    }
-  });
-
-  const sortedNums = Object.keys(teamNumbers).sort((a,b) => Number(a) - Number(b));
-  const P = sortedNums.length || 6;
-
   const matchups = [];
   let idx = 0;
-  for (let block = 1; block <= numBlocks; block++) {
-    for (let station = 1; station <= 6; station++) {
-      let pairIdx = (station - 1 - (block - 1)) % P;
-      if (pairIdx < 0) pairIdx += P;
 
-      const num = sortedNums[pairIdx];
-      const pair = teamNumbers[num] || {};
+  // Split teams into two groups for Versus pairings
+  const group1 = activeSubTeams.filter(t => {
+    const side = teams[t]?.side;
+    return side === 'Red' || side === 'Black';
+  });
+  const group2 = activeSubTeams.filter(t => {
+    const side = teams[t]?.side;
+    return side === 'White' || side === 'Blue';
+  });
+  
+  // Fallbacks if groups are uneven or empty
+  let g1 = [...group1];
+  let g2 = [...group2];
+  if (g1.length === 0 || g2.length === 0) {
+    const half = Math.ceil(activeSubTeams.length / 2);
+    g1 = activeSubTeams.slice(0, half);
+    g2 = activeSubTeams.slice(half);
+  }
 
-      matchups.push({
-        id: 'b' + block + '_s' + station + '_' + Date.now() + '_' + (idx++),
-        day: 1,
-        block: block,
-        round: 1,
-        time: times[block - 1],
-        location: locationsList[station - 1] || ('Station ' + station),
-        game: gamesList[station - 1],
-        teamA: pair.red || '',
-        teamB: pair.blue || ''
+  const daysToGenerate = Number(configData.daysCount) || 1;
+
+  if (configData.eventType === 'camp' && configData.blocks && configData.blocks.length > 0) {
+    // CAMP MODE (Multi-day chronological blocks builder)
+    for (let day = 1; day <= daysToGenerate; day++) {
+      configData.blocks.forEach((block, bIdx) => {
+        const blockName = block.name || `Block ${bIdx + 1}`;
+        const blockTime = block.startTime || getShiftedTime(bIdx * (roundDur + breakDur));
+        const rotationLogic = block.rotationLogic || 'Rotation Double (Versus)';
+
+        if (block.type === 'Games') {
+          if (rotationLogic === 'Rotation Double (Versus)') {
+            // Rotation Double (Versus): 2 teams face off. One moves CW, other moves CCW.
+            for (let station = 1; station <= 6; station++) {
+              const idx1 = (station - 1 + bIdx) % g1.length;
+              const idx2 = (station - 1 - bIdx + g2.length * 10) % g2.length;
+
+              matchups.push({
+                id: `d${day}_b${bIdx + 1}_s${station}_${Date.now()}_${idx++}`,
+                day,
+                block: bIdx + 1,
+                round: 1,
+                time: blockTime,
+                location: locationsList[station - 1] || `Station ${station}`,
+                game: gamesList[station - 1],
+                teamA: g1[idx1] || '',
+                teamB: g2[idx2] || '',
+                blockType: 'Games',
+                rotationLogic
+              });
+            }
+          } else {
+            // Rotation Single: 1 team plays at a station, then rotates clockwise.
+            for (let station = 1; station <= 6; station++) {
+              const idxSingle = (station - 1 + bIdx) % activeSubTeams.length;
+              matchups.push({
+                id: `d${day}_b${bIdx + 1}_s${station}_${Date.now()}_${idx++}`,
+                day,
+                block: bIdx + 1,
+                round: 1,
+                time: blockTime,
+                location: locationsList[station - 1] || `Station ${station}`,
+                game: gamesList[station - 1],
+                teamA: activeSubTeams[idxSingle] || '',
+                teamB: '',
+                blockType: 'Games',
+                rotationLogic
+              });
+            }
+          }
+        } else if (block.type === 'Big Game') {
+          // Big Game: All teams play together
+          matchups.push({
+            id: `d${day}_b${bIdx + 1}_bg_${Date.now()}_${idx++}`,
+            day,
+            block: bIdx + 1,
+            round: 1,
+            time: blockTime,
+            location: stationData.big_game?.location || 'Football Field',
+            game: stationData.big_game?.name || 'Loyalty (Big Game)',
+            teamA: 'All Teams',
+            teamB: 'Referees',
+            blockType: 'Big Game',
+            rotationLogic: 'Big Game'
+          });
+        } else {
+          // Talk, Reflection, Giveaway: Placeholder block for schedule display
+          matchups.push({
+            id: `d${day}_b${bIdx + 1}_ph_${Date.now()}_${idx++}`,
+            day,
+            block: bIdx + 1,
+            round: 1,
+            time: blockTime,
+            location: block.type === 'Reflection' ? (stationData.reflection?.location || 'Reflection Area') : 'Main Area',
+            game: blockName + ` (${block.type})`,
+            teamA: 'All Teams',
+            teamB: '',
+            blockType: block.type,
+            rotationLogic: 'Big Game'
+          });
+        }
       });
+    }
+  } else {
+    // DAY SERVICE MODE (Standard rotational matchups)
+    const numBlocks = Math.max(6, activeSubTeams.length);
+    const times = [];
+    for (let block = 0; block < numBlocks; block++) {
+      times.push(getShiftedTime(block * (roundDur + breakDur)));
+    }
+
+    for (let day = 1; day <= daysToGenerate; day++) {
+      for (let block = 1; block <= numBlocks; block++) {
+        for (let station = 1; station <= 6; station++) {
+          // Versus default pairing: Red/Black CW vs White/Blue CCW
+          const idx1 = (station - 1 + (block - 1)) % g1.length;
+          const idx2 = (station - 1 - (block - 1) + g2.length * 10) % g2.length;
+
+          matchups.push({
+            id: `d${day}_b${block}_s${station}_${Date.now()}_${idx++}`,
+            day,
+            block: block,
+            round: 1,
+            time: times[block - 1],
+            location: locationsList[station - 1] || `Station ${station}`,
+            game: gamesList[station - 1],
+            teamA: g1[idx1] || '',
+            teamB: g2[idx2] || '',
+            blockType: 'Games',
+            rotationLogic: 'Rotation Double (Versus)'
+          });
+        }
+      }
     }
   }
 
@@ -1279,8 +1388,9 @@ export async function cancelScheduledNotification(notifId) {
  * Creates the servant in vbt_servants if they don't exist,
  * updates lastSeen, and appends the event to their servicesAttended array.
  */
-export async function upsertServantOnLogin(servantId, servantName, eventCode) {
-  if (!servantId) return;
+export async function upsertServantOnLogin(phoneNumber, firstName, eventCode, additionalData = {}) {
+  if (!phoneNumber) return null;
+  const servantId = phoneNumber.trim();
   try {
     const docRef = doc(db, 'vbt_servants', servantId);
     const snap = await getDoc(docRef);
@@ -1294,27 +1404,175 @@ export async function upsertServantOnLogin(servantId, servantName, eventCode) {
         attended.push({ code: eventCode, date: now });
         if (attended.length > 50) attended.splice(0, attended.length - 50);
       }
-      await setDoc(docRef, {
+      const updatedData = {
         ...existing,
-        name: servantName || existing.name,
+        firstName: firstName || existing.firstName || existing.name || '',
+        name: firstName || existing.name || '', // older UI compatibility
         lastSeen: now,
         servicesAttended: attended,
-      }, { merge: true });
+        ...additionalData
+      };
+      await setDoc(docRef, updatedData, { merge: true });
+      return { id: servantId, ...updatedData };
     } else {
-      // New servant — auto-create them in the directory
-      await setDoc(docRef, {
+      // New servant / lead — auto-register as unregistered/fresh lead
+      const newServant = {
         id: servantId,
-        name: servantName || servantId,
-        passcode: '1234',
-        defaultRole: 'volunteer',
+        firstName: firstName || '',
+        lastName: additionalData.lastName || '',
+        name: firstName || '', // fallback for older components
+        phoneNumber: servantId,
+        role: 'unregistered', // Auto register as "Fresh Lead" or "Unregistered"
         lastSeen: now,
         servicesAttended: eventCode ? [{ code: eventCode, date: now }] : [],
         createdAt: now,
-      });
+        assignedGames: [],
+        assignedTeams: [],
+        ...additionalData
+      };
+      await setDoc(docRef, newServant);
+      return newServant;
     }
   } catch (err) {
     console.error('[Firebase] upsertServantOnLogin error:', err);
-    // Non-blocking — don't throw
+    return null;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// GLOBAL INVENTORY DATABASE (vbt_inventory)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Real-time subscription to the global materials inventory stock.
+ */
+export function subscribeToInventory(callback) {
+  const colRef = collection(db, 'vbt_inventory');
+  return onSnapshot(colRef, (snapshot) => {
+    const items = [];
+    snapshot.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    callback(items);
+  }, (err) => {
+    console.error('[Firebase] subscribeToInventory error:', err);
+    callback([]);
+  });
+}
+
+/**
+ * Create or update an item in the global inventory.
+ */
+export async function upsertInventoryItem(materialId, itemData) {
+  if (!materialId) return;
+  const docRef = doc(db, 'vbt_inventory', materialId);
+  try {
+    const now = new Date().toISOString();
+    await setDoc(docRef, {
+      id: materialId,
+      ...itemData,
+      updatedAt: now
+    }, { merge: true });
+  } catch (err) {
+    console.error('[Firebase] upsertInventoryItem error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Delete a material from the global inventory.
+ */
+export async function deleteInventoryItem(materialId) {
+  try {
+    await deleteDoc(doc(db, 'vbt_inventory', materialId));
+  } catch (err) {
+    console.error('[Firebase] deleteInventoryItem error:', err);
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// GLOBAL LOCATIONS DIRECTORY (vbt_locations)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Real-time subscription to the global physical locations list.
+ */
+export function subscribeToLocations(callback) {
+  const colRef = collection(db, 'vbt_locations');
+  return onSnapshot(colRef, (snapshot) => {
+    const locations = [];
+    snapshot.forEach((d) => locations.push({ id: d.id, ...d.data() }));
+    // Sort locations by circuitOrder to ensure rotation mapping order
+    locations.sort((a, b) => (a.circuitOrder || 0) - (b.circuitOrder || 0));
+    callback(locations);
+  }, (err) => {
+    console.error('[Firebase] subscribeToLocations error:', err);
+    callback([]);
+  });
+}
+
+/**
+ * Create or update a location in the directory.
+ */
+export async function upsertLocation(locationId, locationData) {
+  if (!locationId) return;
+  const docRef = doc(db, 'vbt_locations', locationId);
+  try {
+    await setDoc(docRef, {
+      id: locationId,
+      ...locationData
+    }, { merge: true });
+  } catch (err) {
+    console.error('[Firebase] upsertLocation error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Delete a location from the global directory.
+ */
+export async function deleteLocation(locationId) {
+  try {
+    await deleteDoc(doc(db, 'vbt_locations', locationId));
+  } catch (err) {
+    console.error('[Firebase] deleteLocation error:', err);
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PER-EVENT FINANCES (vbt_events/{eventCode}/finances/main)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Real-time subscription to finances data for a specific event.
+ */
+export function subscribeToFinances(eventCode, callback) {
+  if (!eventCode) return () => {};
+  const docRef = doc(db, 'vbt_events', eventCode, 'finances', 'main');
+  return onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data());
+    } else {
+      callback({ budget: 0, expenses: [] });
+    }
+  }, (err) => {
+    console.error('[Firebase] subscribeToFinances error:', err);
+    callback({ budget: 0, expenses: [] });
+  });
+}
+
+/**
+ * Update the budget or expenses list for a specific event.
+ */
+export async function updateFinances(eventCode, financeData) {
+  if (!eventCode) return;
+  const docRef = doc(db, 'vbt_events', eventCode, 'finances', 'main');
+  try {
+    await setDoc(docRef, financeData, { merge: true });
+  } catch (err) {
+    console.error('[Firebase] updateFinances error:', err);
+    throw err;
+  }
+}
+
 

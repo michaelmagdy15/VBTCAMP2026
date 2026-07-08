@@ -35,7 +35,8 @@ import {
   Radio,
   Package,
   Navigation,
-  MoreHorizontal
+  MoreHorizontal,
+  Menu
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -767,6 +768,17 @@ export default function App() {
   const [newEventType, setNewEventType] = useState('service');
   const [newKidCount, setNewKidCount] = useState(100);
   const [newDaysCount, setNewDaysCount] = useState(1);
+
+  // Phase 3 States
+  const [kidsImportList, setKidsImportList] = useState('');
+  const [numDivideTeams, setNumDivideTeams] = useState(4);
+  const [dividedTeamsPreview, setDividedTeamsPreview] = useState(null);
+  const [campBlocks, setCampBlocks] = useState([
+    { id: 1, name: 'Block 1', startTime: '09:00', endTime: '10:00', duration: 60, type: 'Games', rotationLogic: 'Rotation Double (Versus)' },
+    { id: 2, name: 'Block 2', startTime: '10:00', endTime: '10:45', duration: 45, type: 'Talk', rotationLogic: 'Big Game' },
+    { id: 3, name: 'Block 3', startTime: '10:45', endTime: '11:15', duration: 30, type: 'Reflection', rotationLogic: 'Big Game' },
+    { id: 4, name: 'Block 4', startTime: '11:15', endTime: '12:00', duration: 45, type: 'Games', rotationLogic: 'Rotation Single' }
+  ]);
   const [newServiceBrief, setNewServiceBrief] = useState('Friend Request — Jesus is knocking... Will you open the door? (Revelation 3:20)\n\nAn outreach service featuring water games, rotational teamwork challenges, and reflection.');
   const [newStations, setNewStations] = useState({
     station_1: {
@@ -792,6 +804,18 @@ export default function App() {
       location: 'Pool',
       howToPlay: 'Objective: To teach the importance of communication and listening to one another.\n\nSetup: Set up a course with several obstacles between Point A and Point B.\nGoal: Safely transfer the item (water) through the course and reach Point B as a team!\n\nHow it Works - Rounds:\n- Round 1: Hearing (Verbal) - Player is blindfolded. Can only follow verbal instructions from teammates. Focus: Listening and giving clear verbal directions.\n- Round 2: Touch (Non-verbal) - Player is blindfolded. Cannot hear. Can only be guided through touch by a teammate. Focus: Non-verbal communication and trusting touch.\n\nTips for Success:\n- Speak clearly and simply.\n- Listen carefully and patiently.\n- Encourage and support one another.\n- Trust your teammates and work together.',
       lesson: 'Listening and understanding. Communication is essential in every relationship, especially in our friendship with God. Just as the players needed to listen carefully and trust the guidance they received, we need to take time to listen to God\'s voice and communicate with Him through prayer. Good communication helps us stay connected, understand one another, and move in the right direction.\n\nMain Message: A STRONG FRIENDSHIP REQUIRES CLEAR COMMUNICATION AND LISTENING.'
+    },
+    station_5: {
+      name: 'Whiffle Ball',
+      location: 'Court B',
+      howToPlay: 'A team-based Whiffle Ball challenge targeting coordination and quick response.',
+      lesson: 'Teamwork and timing: succeeding requires alignment and supporting each other.'
+    },
+    station_6: {
+      name: 'Blind Shape',
+      location: 'Garden',
+      howToPlay: 'Team members must form a geometric shape with a rope while blindfolded.',
+      lesson: 'Trust and coordinate, utilizing non-visual cues to achieve shared goals.'
     },
     big_game: {
       name: 'Loyalty (Big Game)',
@@ -1535,6 +1559,7 @@ export default function App() {
   // UI state
   const [currentTab, setCurrentTab] = useState('scoreboard');
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [infoSubTab, setInfoSubTab] = useState('map');
   const [settingsSubTab, setSettingsSubTab] = useState('config');
   const [auditLogFilter, setAuditLogFilter] = useState('All');
@@ -2641,71 +2666,62 @@ export default function App() {
 
 
 
-  // Login Handler — uses dynamic per-event passcodes from eventConfig
-  const handleLogin = (userAttempt) => {
-    const { id, role, name, passcode, assignedTeams, assignedGames } = userAttempt;
-    const normalizedPasscode = (passcode || '').trim().toUpperCase();
+  // Login Handler — routes user strictly to their role's UI
+  const handleLogin = (authenticatedUser) => {
+    const { id, role, firstName, name, assignedTeams, assignedGames } = authenticatedUser;
 
-    let resolvedRole = 'viewer';
+    let resolvedRole = 'volunteer';
     let teamCode = '';
     let side = 'System';
     let grade = 'All';
 
-    if (role === ROLES.VOLUNTEER) {
-      resolvedRole = 'volunteer';
-    } else {
-      if (role === ROLES.TEAM_LEADER) {
-        resolvedRole = 'leader';
-        teamCode = assignedTeams?.[0] || 'Unknown';
-        
-        // Find team inside campData.teams
-        const normUser = (teamCode || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
-        const matchedTeamKey = Object.keys(campData?.teams || {}).find(k => {
-          const normK = k.toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
-          return normK === normUser;
-        });
-        const dbTeam = matchedTeamKey ? campData.teams[matchedTeamKey] : null;
-        if (dbTeam) {
-          side = dbTeam.side || 'System';
-          grade = dbTeam.grade || 'All';
-        }
-      } else if (role === ROLES.GAME_LEADER) {
-        const gamePass = (eventConfig.passcodeGameLeader || 'VBT2026').toUpperCase();
-        if (normalizedPasscode !== gamePass && normalizedPasscode !== 'VBT2026') {
-          setLoginError('Incorrect Game Leader passcode.');
-          return;
-        }
-        resolvedRole = 'referee';
-        teamCode = 'REF';
-      } else if (role === ROLES.SERVICE_LEADER) {
-        const servicePass = (eventConfig.passcodeServiceLeader || 'VBT2026').toUpperCase();
-        if (normalizedPasscode !== servicePass && normalizedPasscode !== 'VBT2026') {
-          setLoginError('Incorrect Service Leader passcode.');
-          return;
-        }
-        resolvedRole = 'service_day_leader';
-        teamCode = 'SERVICE';
-      } else if (role === ROLES.COORDINATOR) {
-        const coordPass = (eventConfig.passcodeCoordinator || 'VBTADMIN').toUpperCase();
-        if (normalizedPasscode !== coordPass) {
-          setLoginError('Incorrect Coordinator passcode.');
-          return;
-        }
-        resolvedRole = 'admin';
-        teamCode = 'ADMIN';
+    // Normalize roles
+    if (role === 'admin' || role === 'coordinator' || role === 'sports_head') {
+      resolvedRole = 'admin';
+      teamCode = 'ADMIN';
+    } else if (role === 'logistics_head') {
+      resolvedRole = 'logistics_head';
+      teamCode = 'LOGISTICS';
+    } else if (role === 'game_leader' || role === 'referee') {
+      resolvedRole = 'referee';
+      teamCode = 'REF';
+    } else if (role === 'team_leader' || role === 'leader') {
+      resolvedRole = 'leader';
+      teamCode = assignedTeams?.[0] || 'Unknown';
+      
+      // Find team inside campData.teams
+      const normUser = (teamCode || '').toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+      const matchedTeamKey = Object.keys(campData?.teams || {}).find(k => {
+        const normK = k.toLowerCase().replace(/^team_/i, '').replace(/[\s_-]+/g, '');
+        return normK === normUser;
+      });
+      const dbTeam = matchedTeamKey ? campData.teams[matchedTeamKey] : null;
+      if (dbTeam) {
+        side = dbTeam.side || 'System';
+        grade = dbTeam.grade || 'All';
       }
+    } else if (role === 'unregistered') {
+      resolvedRole = 'unregistered';
+      teamCode = 'UNREGISTERED';
+    } else {
+      resolvedRole = 'volunteer';
     }
 
+    // Volunteers, Game Leaders, Team Leaders, and Unregistered are locked to Live Service Mode (dumb UI)
+    const isLiveModeOnly = ['referee', 'leader', 'volunteer', 'unregistered'].includes(resolvedRole);
+    const resolvedUiMode = isLiveModeOnly ? 'dumb' : 'detailed';
+
     const user = {
-      id: id || name?.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      id: id || '',
       role: resolvedRole,
-      name: name || (resolvedRole === 'admin' ? 'Coordinator' : 'Guest'),
+      name: firstName || name || (resolvedRole === 'admin' ? 'Coordinator' : 'Guest'),
+      firstName: firstName || name || '',
       teamCode,
       side,
       grade,
-      assignedTeams,
-      assignedGames,
-      uiMode: loginUseSimpleLayout ? 'dumb' : 'detailed'
+      assignedTeams: assignedTeams || [],
+      assignedGames: assignedGames || [],
+      uiMode: resolvedUiMode
     };
     
     setCurrentUser(user);
@@ -2715,16 +2731,16 @@ export default function App() {
     setLoginError('');
     setLoginPassword('');
     
-    if (resolvedRole === 'admin' || resolvedRole === 'service_day_leader' || resolvedRole === 'referee') {
-      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
-    } else if (resolvedRole === 'leader') {
-      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'myteam');
-      // Auto-filter schedule to show only this leader's team
-      if (teamCode && teamCode !== 'Unknown') {
+    // Strict Routing
+    if (resolvedRole === 'admin') {
+      setCurrentTab('schedule');
+    } else if (resolvedRole === 'logistics_head') {
+      setCurrentTab('logistics');
+    } else {
+      setCurrentTab('service');
+      if (resolvedRole === 'leader' && teamCode && teamCode !== 'Unknown') {
         setScheduleTeamFilter(teamCode);
       }
-    } else {
-      setCurrentTab(eventConfig?.eventType === 'service' ? 'schedule' : 'scoreboard');
     }
     
     if (!isOfflineMode) {
@@ -3275,13 +3291,54 @@ export default function App() {
   // Auto-save games to global library
   const autoSaveGamesToLibrary = async (stationsObj, eCode, eName) => {
     if (!stationsObj) return;
-    const types = [['station_1','station'],['station_2','station'],['station_3','station'],['station_4','station'],['big_game','big_game'],['reflection','reflection']];
+    const types = [['station_1','station'],['station_2','station'],['station_3','station'],['station_4','station'],['station_5','station'],['station_6','station'],['big_game','big_game'],['reflection','reflection']];
     for (const [key, type] of types) {
       const s = stationsObj[key];
       if (!s?.name?.trim()) continue;
       const gId = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       if (gId) upsertGame(gId, { name: s.name, type, location: s.location || '', howToPlay: s.howToPlay || '', lesson: s.lesson || '', eventCode: eCode, eventName: eName }).catch(() => {});
     }
+  };
+
+  const handleDivideKids = () => {
+    // Parse kids list
+    const kidNames = kidsImportList
+      .split(/[\n,]/)
+      .map(name => name.trim())
+      .filter(name => name.length > 0);
+
+    if (kidNames.length === 0) {
+      alert("Please paste or type at least one kid's name.");
+      return;
+    }
+
+    const T = parseInt(numDivideTeams, 10) || 4;
+    const colors = ['Red', 'White', 'Black', 'Blue'];
+    const teams = {};
+
+    // Initialize teams
+    for (let i = 0; i < T; i++) {
+      const color = colors[i % 4];
+      const index = Math.floor(i / 4) + 1;
+      const teamName = `${color} ${index}`;
+      const teamCode = `team_${color.toLowerCase()}_${index}`;
+      teams[teamCode] = {
+        code: teamCode,
+        name: teamName,
+        side: color,
+        kids: [],
+      };
+    }
+
+    // Distribute kids round-robin to ensure equal sizes
+    kidNames.forEach((kid, idx) => {
+      const teamCodes = Object.keys(teams);
+      const targetTeamCode = teamCodes[idx % T];
+      teams[targetTeamCode].kids.push(kid);
+    });
+
+    setDividedTeamsPreview(teams);
+    setNewKidCount(kidNames.length);
   };
 
   // Create New Event Handler
@@ -3319,6 +3376,7 @@ export default function App() {
           passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER',
           activeServants: wizardAttending,
           servantAssignments: wizardRoles,
+          teams: dividedTeamsPreview || {},
           teamNames: {
             red: newTeamRed.trim() || 'Red',
             white: newTeamWhite.trim() || 'White',
@@ -3329,7 +3387,9 @@ export default function App() {
             station_1: { name: newStations.station_1.name, location: newStations.station_1.location, howToPlay: newStations.station_1.howToPlay, lesson: newStations.station_1.lesson },
             station_2: { name: newStations.station_2.name, location: newStations.station_2.location, howToPlay: newStations.station_2.howToPlay, lesson: newStations.station_2.lesson },
             station_3: { name: newStations.station_3.name, location: newStations.station_3.location, howToPlay: newStations.station_3.howToPlay, lesson: newStations.station_3.lesson },
-            station_4: { name: newStations.station_4.name, location: newStations.station_4.location, howToPlay: newStations.station_4.howToPlay, lesson: newStations.station_4.lesson }
+            station_4: { name: newStations.station_4.name, location: newStations.station_4.location, howToPlay: newStations.station_4.howToPlay, lesson: newStations.station_4.lesson },
+            station_5: { name: newStations.station_5.name, location: newStations.station_5.location, howToPlay: newStations.station_5.howToPlay, lesson: newStations.station_5.lesson },
+            station_6: { name: newStations.station_6.name, location: newStations.station_6.location, howToPlay: newStations.station_6.howToPlay, lesson: newStations.station_6.lesson }
           },
           bigGameName: newStations.big_game.name,
           bigGameLocation: newStations.big_game.location,
@@ -3348,21 +3408,46 @@ export default function App() {
         await generateAndSaveServiceSchedule(code, configData, wizardAttending, globalServants);
         autoSaveGamesToLibrary(configData.stations, code, configData.eventName).catch(() => {});
       } else {
-        // Camp Mode (Legacy)
-        await createEvent(code, {
+        // Camp Mode (Chronological Blocks Schedule)
+        const configData = {
           eventName: newEventName.trim(),
           description: 'Camp Outreach',
           eventDate: newEventDate || new Date().toISOString().split('T')[0],
           eventType: 'camp',
           daysCount: finalDaysCount,
-          side1Name: newEventSide1 || 'Team A',
-          side2Name: newEventSide2 || 'Team B',
+          kidCount: parseInt(newKidCount, 10) || 100,
           primaryColor: '#1441a1',
           logoUrl: '/Final VBT Re-Branding 2026-02 (3).png',
           passcodeCoordinator: newEventPassCoord.trim().toUpperCase(),
           passcodeGameLeader: newEventPassGame.trim().toUpperCase() || 'GAMEREF',
-          passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER'
-        });
+          passcodeTeamLeader: newEventPassTeam.trim().toUpperCase() || 'LEADER',
+          activeServants: wizardAttending,
+          servantAssignments: wizardRoles,
+          blocks: campBlocks,
+          stations: {
+            station_1: { name: newStations.station_1.name, location: newStations.station_1.location, howToPlay: newStations.station_1.howToPlay, lesson: newStations.station_1.lesson },
+            station_2: { name: newStations.station_2.name, location: newStations.station_2.location, howToPlay: newStations.station_2.howToPlay, lesson: newStations.station_2.lesson },
+            station_3: { name: newStations.station_3.name, location: newStations.station_3.location, howToPlay: newStations.station_3.howToPlay, lesson: newStations.station_3.lesson },
+            station_4: { name: newStations.station_4.name, location: newStations.station_4.location, howToPlay: newStations.station_4.howToPlay, lesson: newStations.station_4.lesson },
+            station_5: { name: newStations.station_5.name, location: newStations.station_5.location, howToPlay: newStations.station_5.howToPlay, lesson: newStations.station_5.lesson },
+            station_6: { name: newStations.station_6.name, location: newStations.station_6.location, howToPlay: newStations.station_6.howToPlay, lesson: newStations.station_6.lesson }
+          },
+          bigGameName: newStations.big_game.name,
+          bigGameLocation: newStations.big_game.location,
+          bigGameHowToPlay: newStations.big_game.howToPlay,
+          bigGameLesson: newStations.big_game.lesson,
+          reflectionName: newStations.reflection.name,
+          reflectionLocation: newStations.reflection.location,
+          reflectionHowToPlay: newStations.reflection.howToPlay,
+          reflectionLesson: newStations.reflection.lesson
+        };
+
+        // Write event configuration and live scores structure
+        await createEvent(code, configData);
+        
+        // Run scheduling engine
+        await generateAndSaveServiceSchedule(code, configData, wizardAttending, globalServants);
+        autoSaveGamesToLibrary(configData.stations, code, configData.eventName).catch(() => {});
       }
       
       // Auto-join the newly created event
@@ -4230,6 +4315,75 @@ export default function App() {
     }
   };
 
+  const handleRotateBroadcast = async () => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      alert("Permission denied. Only Admins/Coordinators can broadcast rotation.");
+      return;
+    }
+    if (!campData?.matchups || campData.matchups.length === 0) {
+      alert("No schedule found to rotate!");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to broadcast [ROTATE] to all device timelines? This shifts schedule offsets dynamically.")) return;
+
+    try {
+      const currentDay = getEventCurrentDay();
+      const todaysMatchups = campData.matchups.filter(m => {
+        const mDay = m.day || (eventConfig?.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+        return mDay === currentDay;
+      });
+      if (todaysMatchups.length === 0) {
+        alert("No matchups scheduled for today.");
+        return;
+      }
+
+      // Find currently active block
+      const activeMatchup = todaysMatchups.find(m => isTimeSlotActive(m.time, `Block ${m.block}`, m.day));
+      let targetBlockNum = 1;
+      if (activeMatchup) {
+        targetBlockNum = activeMatchup.block + 1;
+      } else {
+        const shift = getEffectiveTimeShift();
+        const blocksWithTime = [];
+        const seenBlocks = new Set();
+        todaysMatchups.forEach(m => {
+          if (!seenBlocks.has(m.block)) {
+            seenBlocks.add(m.block);
+            const startMs = parseTimeToMs(m.time) + shift * 60 * 1000;
+            blocksWithTime.push({ block: m.block, startMs });
+          }
+        });
+        blocksWithTime.sort((a, b) => a.startMs - b.startMs);
+        const nowMs = Date.now();
+        const upcoming = blocksWithTime.find(b => b.startMs > nowMs);
+        if (upcoming) {
+          targetBlockNum = upcoming.block;
+        }
+      }
+
+      const targetMatchup = todaysMatchups.find(m => m.block === targetBlockNum);
+      if (targetMatchup) {
+        const scheduledMs = parseTimeToMs(targetMatchup.time);
+        const nowMs = Date.now();
+        const diffMins = Math.round((nowMs - scheduledMs) / (60 * 1000));
+        const newShift = Math.max(0, diffMins);
+
+        await handleUpdateCampState({
+          timeShiftMinutes: newShift
+        });
+
+        if (!isOfflineMode) {
+          const msg = `📢 ROTATION BROADCAST: Rotate Clockwise to Block ${targetBlockNum}!`;
+          await addAnnouncement(currentEventCode, msg, currentUser.name, 'round_start');
+        }
+      } else {
+        alert("No more upcoming blocks to rotate to for today!");
+      }
+    } catch (err) {
+      alert("Failed to rotate: " + err.message);
+    }
+  };
+
   // Handle toggling matchup winner
   const handleToggleWinner = async (block, round, game, newWinner) => {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'referee')) {
@@ -5070,12 +5224,12 @@ export default function App() {
                           value={newEventType}
                           onChange={(e) => {
                             setNewEventType(e.target.value);
-                            setNewDaysCount(e.target.value === 'camp' ? 2 : 1);
+                            setNewDaysCount(e.target.value === 'camp' ? 3 : 1);
                           }}
                           style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
                         >
-                          <option value="service">Service Mode (Dynamic 4 Teams)</option>
-                          <option value="camp" disabled style={{ color: 'var(--text-muted)' }}>Camp Mode (Legacy 2 Teams) — EXPIRED</option>
+                          <option value="service">Day Service Mode (Single Event)</option>
+                          <option value="camp">Camp Mode (Multi-Day)</option>
                         </select>
                       </div>
                       <div>
@@ -5207,7 +5361,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {newEventType === 'service' ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -5225,60 +5378,271 @@ export default function App() {
                           cursor: 'pointer', marginTop: '10px'
                         }}
                       >
-                        Next: Setup Games ➔
+                        Next: Configure {newEventType === 'camp' ? 'Blocks & Schedule' : 'Games & Roster'} ➔
                       </button>
-                    ) : (
-                      <button
-                        type="submit"
-                        disabled={createEventLoading}
-                        className="btn-glow"
-                        style={{
-                          width: '100%', padding: '14px', borderRadius: '12px',
-                          background: 'var(--gradient-vbt)', border: 'none', color: '#ffffff',
-                          fontFamily: 'var(--font-title)', fontWeight: '800', fontSize: '0.95rem',
-                          cursor: createEventLoading ? 'not-allowed' : 'pointer', opacity: createEventLoading ? 0.7 : 1,
-                          marginTop: '10px', boxShadow: '0 4px 15px rgba(20,65,161,0.3)'
-                        }}
-                      >
-                        {createEventLoading ? 'Creating...' : '🚀 Create & Join Event'}
-                      </button>
-                    )}
                   </div>
                 )}
 
                 {/* Step 2: Games & Outreach Brief Setup */}
                 {creationStep === 2 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
-                        <input
-                          type="number"
-                          value={newKidCount}
-                          onChange={(e) => setNewKidCount(parseInt(e.target.value, 10) || '')}
-                          placeholder="e.g. 100"
-                          style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
-                        />
-                      </div>
-                    </div>
+                    
+                    {newEventType === 'service' ? (
+                      <>
+                        {/* Day Service Mode: Attendee Roster Import & Division */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Expected Kids Count</label>
+                            <input
+                              type="number"
+                              value={newKidCount}
+                              onChange={(e) => setNewKidCount(parseInt(e.target.value, 10) || '')}
+                              placeholder="e.g. 100"
+                              style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                            />
+                          </div>
+                        </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Outreach Theme Brief</label>
-                      <textarea
-                        value={newServiceBrief}
-                        onChange={(e) => setNewServiceBrief(e.target.value)}
-                        placeholder="Brief description of the service target and theme..."
-                        rows={3}
-                        style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'inherit', resize: 'vertical' }}
-                      />
-                    </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Outreach Theme Brief</label>
+                          <textarea
+                            value={newServiceBrief}
+                            onChange={(e) => setNewServiceBrief(e.target.value)}
+                            placeholder="Brief description of the service target and theme..."
+                            rows={3}
+                            style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem', outline: 'none', fontFamily: 'inherit', resize: 'vertical' }}
+                          />
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)', marginTop: '8px' }}>
+                          <h4 style={{ color: '#c4b5fd', fontSize: '0.9rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>👥 Attendee Roster Import & Division</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Number of Teams to Divide Into</label>
+                              <input
+                                type="number"
+                                min="2"
+                                max="24"
+                                value={numDivideTeams}
+                                onChange={(e) => setNumDivideTeams(Math.max(2, parseInt(e.target.value, 10) || 4))}
+                                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.85rem' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '700' }}>Paste Kids Names (One name per line or comma-separated)</label>
+                              <textarea
+                                value={kidsImportList}
+                                onChange={(e) => setKidsImportList(e.target.value)}
+                                placeholder="e.g. Andrew, Sherry, Mark, Martina..."
+                                rows={4}
+                                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.8rem', fontFamily: 'inherit', resize: 'vertical' }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleDivideKids}
+                              style={{
+                                padding: '10px',
+                                background: 'var(--gradient-vbt)',
+                                border: 'none',
+                                borderRadius: '8px',
+                                color: '#ffffff',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                              }}
+                            >
+                              ⚡ Auto-Divide Kids into {numDivideTeams} Teams
+                            </button>
+
+                            {dividedTeamsPreview && (
+                              <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <h5 style={{ fontSize: '0.8rem', color: '#4ade80', margin: '0 0 8px 0', fontWeight: '700' }}>Division Preview ({newKidCount} kids total)</h5>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                                  {Object.values(dividedTeamsPreview).map((team) => (
+                                    <div key={team.code} style={{ background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '6px' }}>
+                                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#ffffff' }}>{team.name} ({team.kids.length})</div>
+                                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {team.kids.join(', ') || 'No kids'}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Camp Mode: Chronological Blocks Builder */}
+                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h4 style={{ color: '#c4b5fd', fontSize: '0.9rem', fontWeight: '800', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Chronological Blocks Builder</h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCampBlocks(prev => [
+                                  ...prev,
+                                  { id: Date.now(), name: `Block ${prev.length + 1}`, startTime: '12:00', endTime: '12:30', duration: 30, type: 'Games', rotationLogic: 'Rotation Double (Versus)' }
+                                ]);
+                              }}
+                              style={{
+                                padding: '4px 10px',
+                                background: 'rgba(59,130,246,0.2)',
+                                color: '#60a5fa',
+                                border: '1px solid rgba(59,130,246,0.3)',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              + Add Block
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {campBlocks.map((block, idx) => (
+                              <div key={block.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff' }}>#{idx + 1}: {block.name}</span>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button
+                                      type="button"
+                                      disabled={idx === 0}
+                                      onClick={() => {
+                                        const next = [...campBlocks];
+                                        const temp = next[idx];
+                                        next[idx] = next[idx - 1];
+                                        next[idx - 1] = temp;
+                                        setCampBlocks(next);
+                                      }}
+                                      style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '0.75rem' }}
+                                    >
+                                      ▲
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={idx === campBlocks.length - 1}
+                                      onClick={() => {
+                                        const next = [...campBlocks];
+                                        const temp = next[idx];
+                                        next[idx] = next[idx + 1];
+                                        next[idx + 1] = temp;
+                                        setCampBlocks(next);
+                                      }}
+                                      style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '0.75rem' }}
+                                    >
+                                      ▼
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCampBlocks(prev => prev.filter(b => b.id !== block.id));
+                                      }}
+                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', marginLeft: '6px' }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '8px' }}>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '3px' }}>Block Label</label>
+                                    <input
+                                      type="text"
+                                      value={block.name}
+                                      onChange={(e) => {
+                                        setCampBlocks(prev => prev.map(b => b.id === block.id ? { ...b, name: e.target.value } : b));
+                                      }}
+                                      style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem' }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '3px' }}>Start Time</label>
+                                    <input
+                                      type="text"
+                                      value={block.startTime}
+                                      onChange={(e) => {
+                                        setCampBlocks(prev => prev.map(b => b.id === block.id ? { ...b, startTime: e.target.value } : b));
+                                      }}
+                                      style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem' }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '3px' }}>End Time</label>
+                                    <input
+                                      type="text"
+                                      value={block.endTime}
+                                      onChange={(e) => {
+                                        setCampBlocks(prev => prev.map(b => b.id === block.id ? { ...b, endTime: e.target.value } : b));
+                                      }}
+                                      style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem' }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '3px' }}>Duration (min)</label>
+                                    <input
+                                      type="number"
+                                      value={block.duration}
+                                      onChange={(e) => {
+                                        setCampBlocks(prev => prev.map(b => b.id === block.id ? { ...b, duration: parseInt(e.target.value, 10) || 30 } : b));
+                                      }}
+                                      style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem' }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '3px' }}>Block Type</label>
+                                    <select
+                                      value={block.type}
+                                      onChange={(e) => {
+                                        setCampBlocks(prev => prev.map(b => b.id === block.id ? { ...b, type: e.target.value } : b));
+                                      }}
+                                      style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer' }}
+                                    >
+                                      <option value="Games">Games</option>
+                                      <option value="Talk">Talk</option>
+                                      <option value="Reflection">Reflection</option>
+                                      <option value="Giveaway">Giveaway</option>
+                                      <option value="Big Game">Big Game</option>
+                                    </select>
+                                  </div>
+
+                                  {(block.type === 'Games' || block.type === 'Big Game') && (
+                                    <div>
+                                      <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '3px' }}>Rotation Logic</label>
+                                      <select
+                                        value={block.rotationLogic}
+                                        onChange={(e) => {
+                                          setCampBlocks(prev => prev.map(b => b.id === block.id ? { ...b, rotationLogic: e.target.value } : b));
+                                        }}
+                                        style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.75rem', cursor: 'pointer' }}
+                                      >
+                                        <option value="Rotation Single">Rotation Single (1 team/st)</option>
+                                        <option value="Rotation Double (Versus)">Rotation Double (Versus)</option>
+                                        <option value="Big Game">Big Game (All together)</option>
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {/* Rotational Stations Setup */}
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
-                      <h4 style={{ color: '#c4b5fd', fontSize: '0.9rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏁 Rotational Stations (4 Stations)</h4>
+                      <h4 style={{ color: '#c4b5fd', fontSize: '0.9rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏁 Rotational Stations (6 Stations)</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {['station_1', 'station_2', 'station_3', 'station_4'].map((stKey, idx) => {
-                          const st = newStations[stKey];
+                        {['station_1', 'station_2', 'station_3', 'station_4', 'station_5', 'station_6'].map((stKey, idx) => {
+                          const st = newStations[stKey] || { name: '', location: '', howToPlay: '', lesson: '' };
                           return (
                             <div key={stKey} style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
                               <h5 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: '700', marginBottom: '8px' }}>Station {idx + 1}</h5>
@@ -6119,6 +6483,8 @@ export default function App() {
         getEffectiveTimeShift={getEffectiveTimeShift}
         getShiftedTimeStr={getShiftedTimeStr}
         isTimeSlotActive={isTimeSlotActive}
+        getEventCurrentDay={getEventCurrentDay}
+        parseTimeToMs={parseTimeToMs}
       />
     );
   }
@@ -6127,10 +6493,20 @@ export default function App() {
   const getActiveTabs = () => {
     if (!currentUser) return [];
     const role = currentUser.role || 'volunteer';
-    const isAdmin = role === 'admin' || role === 'coordinator';
+    const isAdmin = role === 'admin' || role === 'coordinator' || role === 'sports_head';
+    const isLogistics = role === 'logistics_head';
     const isLeader = role === 'leader';
     const isReferee = role === 'referee';
     const unread = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
+
+    // Admin has NO bottom tabs (all housed in Hamburger Sidebar Menu)
+    if (isAdmin) return [];
+
+    // Logistics Head sees only Logistics tab and Feed
+    if (isLogistics) return [
+      { id: 'logistics', label: 'Logistics', icon: Package },
+      { id: 'timeline', label: 'Feed', icon: Bell, badge: unread }
+    ];
 
     if (eventConfig?.eventType === 'service') {
       if (isReferee) return [
@@ -6267,6 +6643,28 @@ export default function App() {
           alignItems: 'center'
         }}>
           <div className="header-branding" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator' || currentUser.role === 'sports_head') && (
+              <button
+                onClick={() => setShowAdminMenu(true)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '4px',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+              >
+                <Menu size={20} />
+              </button>
+            )}
             <img src={eventConfig.logoUrl || '/Final VBT Re-Branding 2026-02 (3).png'} alt="Logo" style={{ height: '32px', width: 'auto' }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -6516,6 +6914,7 @@ export default function App() {
             handleToggleTimer={handleToggleTimer}
             handleAdjustTimeShift={handleAdjustTimeShift}
             handleResetTimeShift={handleResetTimeShift}
+            handleRotateBroadcast={handleRotateBroadcast}
             handleStartMatchupTimer={handleStartMatchupTimer}
             handleStopMatchupTimer={handleStopMatchupTimer}
             handleResetMatchupTimer={handleResetMatchupTimer}
@@ -7169,6 +7568,11 @@ export default function App() {
             currentUser={currentUser}
             eventConfig={eventConfig}
             campData={campData}
+            campState={campState}
+            isTimeSlotActive={isTimeSlotActive}
+            getEventCurrentDay={getEventCurrentDay}
+            getEffectiveTimeShift={getEffectiveTimeShift}
+            parseTimeToMs={parseTimeToMs}
           />
         )}
 
@@ -7376,54 +7780,282 @@ export default function App() {
       })()}
 
       {/* Navigation bar */}
-      <nav className="mobile-nav-bar">
-        {getActiveTabs().map((t) => {
-          const Icon = t.icon;
-          const mainTabIds = getActiveTabs().filter(tab => tab.id !== 'more').map(tab => tab.id);
-          const isMoreActive = t.id === 'more' && !mainTabIds.includes(currentTab);
-          const isActive = currentTab === t.id || isMoreActive;
-          return (
-            <button 
-              key={t.id}
-              className={`mobile-nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => {
-                if (t.id === 'more') {
-                  setShowMoreDrawer(true);
-                } else {
-                  setCurrentTab(t.id);
-                  if (t.id === 'timeline') {
-                    const now = new Date().toISOString();
-                    setLastSeenFeedTimestamp(now);
-                    try { localStorage.setItem('vbt_last_seen_feed', now); } catch(_) {}
+      {getActiveTabs().length > 0 && (
+        <nav className="mobile-nav-bar">
+          {getActiveTabs().map((t) => {
+            const Icon = t.icon;
+            const mainTabIds = getActiveTabs().filter(tab => tab.id !== 'more').map(tab => tab.id);
+            const isMoreActive = t.id === 'more' && !mainTabIds.includes(currentTab);
+            const isActive = currentTab === t.id || isMoreActive;
+            return (
+              <button 
+                key={t.id}
+                className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  if (t.id === 'more') {
+                    setShowMoreDrawer(true);
+                  } else {
+                    setCurrentTab(t.id);
+                    if (t.id === 'timeline') {
+                      const now = new Date().toISOString();
+                      setLastSeenFeedTimestamp(now);
+                      try { localStorage.setItem('vbt_last_seen_feed', now); } catch(_) {}
+                    }
+                    if (showOnboardingTip) {
+                      setShowOnboardingTip(false);
+                      try { localStorage.setItem('vbt_onboarded', 'true'); } catch(_) {}
+                    }
                   }
-                  if (showOnboardingTip) {
-                    setShowOnboardingTip(false);
-                    try { localStorage.setItem('vbt_onboarded', 'true'); } catch(_) {}
-                  }
-                }
-              }}
-              aria-label={t.label}
-            >
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={22} style={{ marginBottom: '2px' }} />
-                {t.badge > 0 && (
-                  <span style={{
-                    position: 'absolute', top: '-4px', right: '-6px',
-                    minWidth: '16px', height: '16px', padding: '0 4px',
-                    background: '#ef4444', borderRadius: '8px',
-                    fontSize: '0.6rem', fontWeight: '800', color: '#ffffff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    lineHeight: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.4)'
-                  }}>
-                    {t.badge > 9 ? '9+' : t.badge}
-                  </span>
-                )}
+                }}
+                aria-label={t.label}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon size={22} style={{ marginBottom: '2px' }} />
+                  {t.badge > 0 && (
+                    <span style={{
+                      position: 'absolute', top: '-4px', right: '-6px',
+                      minWidth: '16px', height: '16px', padding: '0 4px',
+                      background: '#ef4444', borderRadius: '8px',
+                      fontSize: '0.6rem', fontWeight: '800', color: '#ffffff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      lineHeight: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.4)'
+                    }}>
+                      {t.badge > 9 ? '9+' : t.badge}
+                    </span>
+                  )}
+                </div>
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      <style>{`
+        @keyframes slideRight {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
+
+      {/* Admin Hamburger Sidebar Drawer */}
+      {showAdminMenu && currentUser && (
+        <div
+          className="admin-sidebar-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 1200,
+            display: 'flex',
+            justifyContent: 'flex-start',
+          }}
+          onClick={() => setShowAdminMenu(false)}
+        >
+          <div
+            className="admin-sidebar-content"
+            style={{
+              width: '80%',
+              maxWidth: '320px',
+              height: '100%',
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '24px 16px calc(24px + env(safe-area-inset-bottom, 0px)) 16px',
+              boxSizing: 'border-box',
+              animation: 'slideRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              boxShadow: '10px 0 40px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', margin: 0 }}>Sports Head Portal</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Logged in: {currentUser.name}</span>
               </div>
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+              <button 
+                onClick={() => setShowAdminMenu(false)}
+                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', color: '#94a3b8', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Navigation List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
+              {[
+                { id: 'service', label: 'Live Service & Setup', icon: BookOpen },
+                { id: 'schedule', label: 'Schedule Builder', icon: Calendar },
+                { id: 'scoreboard', label: 'Live Scoreboard', icon: Trophy },
+                { id: 'timeline', label: 'Timeline Feed', icon: Bell },
+                { id: 'logistics', label: 'Logistics Sync', icon: Package },
+                { id: 'walkie', label: 'Radio / Walkie', icon: Radio },
+                { id: 'settings', label: 'System Config', icon: Settings },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setCurrentTab(item.id);
+                      setShowAdminMenu(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #29b6f6 100%)' : 'rgba(255, 255, 255, 0.03)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      color: '#ffffff',
+                      fontFamily: 'var(--font-body)',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.2)' : 'none',
+                    }}
+                  >
+                    <Icon size={18} color={isActive ? '#ffffff' : 'var(--vbt-sky)'} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '12px 0' }} />
+
+              {/* Quick Modals */}
+              <button
+                onClick={() => {
+                  setServantModalTab('roster');
+                  setShowServantDirectoryModal(true);
+                  setShowAdminMenu(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <Users size={18} color="#4ade80" />
+                <span>Roster Manager</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowOfflineBackupModal(true);
+                  setShowAdminMenu(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <Shield size={18} color="#fbbf24" />
+                <span>Offline Backup</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  handleRotateBroadcast();
+                  setShowAdminMenu(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '800',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                }}
+              >
+                <Radio size={18} color="#ffffff" />
+                <span>📢 BROADCAST ROTATE</span>
+              </button>
+            </div>
+
+            {/* Logout Footer */}
+            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setShowAdminMenu(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(248, 113, 113, 0.3)',
+                  background: 'rgba(248, 113, 113, 0.1)',
+                  color: '#f87171',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'}
+              >
+                <LogOut size={16} />
+                <span>Sign Out / Log Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* More Drawer Slide-up Sheet */}
       {showMoreDrawer && (

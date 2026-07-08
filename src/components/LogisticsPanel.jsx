@@ -140,46 +140,26 @@ function TabButton({ active, icon: Icon, label, onClick }) {
 /* ════════════════════════════════════════════
    MATERIALS TAB
    ════════════════════════════════════════════ */
-function MaterialsTab({ eventCode, campData }) {
-  const [materials, setMaterials] = useState([]);
-  const [materialsLost, setMaterialsLost] = useState(0);
-  const [materialsCollected, setMaterialsCollected] = useState(0);
-
-  useEffect(() => {
-    if (!eventCode) return;
-    const unsub = subscribeToLogistics(eventCode, setMaterials);
-    return () => unsub();
-  }, [eventCode]);
-
+/* ════════════════════════════════════════════
+   MATERIALS TAB
+   ════════════════════════════════════════════ */
+function MaterialsTab({
+  eventCode,
+  campData,
+  materials,
+  eventGames,
+  handleFieldChange,
+  handleAdd,
+  handleDelete,
+  materialsLost,
+  setMaterialsLost,
+  materialsCollected,
+  setMaterialsCollected
+}) {
   const totalValue = useMemo(
     () => materials.reduce((sum, m) => sum + (m.quantityAvailable || 0) * (m.unitPrice || 0), 0),
     [materials]
   );
-
-  const handleFieldChange = async (id, field, value) => {
-    try {
-      await updateMaterial(eventCode, id, { [field]: value });
-    } catch (e) {
-      console.error('Update failed:', e);
-    }
-  };
-
-  const handleAdd = async () => {
-    try {
-      await addMaterial(eventCode, { name: 'New Item' });
-    } catch (e) {
-      console.error('Add failed:', e);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this material?')) return;
-    try {
-      await deleteMaterial(eventCode, id);
-    } catch (e) {
-      console.error('Delete failed:', e);
-    }
-  };
 
   // Derive per-game material breakdown from campData
   const games = campData?.games || campData?.stations || [];
@@ -197,10 +177,11 @@ function MaterialsTab({ eventCode, campData }) {
         </div>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '850px' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Item Name</th>
+                <th style={{ ...thStyle, width: '160px' }}>Associated Game</th>
                 <th style={{ ...thStyle, width: '100px' }}>Qty Needed</th>
                 <th style={{ ...thStyle, width: '110px' }}>Qty Available</th>
                 <th style={{ ...thStyle, width: '100px' }}>Unit Price</th>
@@ -218,6 +199,23 @@ function MaterialsTab({ eventCode, campData }) {
                       value={m.name || ''}
                       onChange={(e) => handleFieldChange(m.id, 'name', e.target.value)}
                     />
+                    {m.quantityAvailable < m.quantityNeeded && (
+                      <span style={{ fontSize: '11px', color: '#f87171', display: 'block', marginTop: '4px', fontWeight: 'bold' }}>
+                        ⚠️ Deficit: -{m.quantityNeeded - m.quantityAvailable}
+                      </span>
+                    )}
+                  </td>
+                  <td style={tdStyle}>
+                    <select
+                      style={{ ...inputStyle, padding: '8px 10px', fontSize: '13px' }}
+                      value={m.associatedGame || 'General'}
+                      onChange={(e) => handleFieldChange(m.id, 'associatedGame', e.target.value)}
+                    >
+                      <option value="General">General / All</option>
+                      {eventGames.map((g) => (
+                        <option key={g.name} value={g.name}>{g.name}</option>
+                      ))}
+                    </select>
                   </td>
                   <td style={tdStyle}>
                     <input
@@ -283,7 +281,7 @@ function MaterialsTab({ eventCode, campData }) {
               ))}
               {materials.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: T.textMuted, padding: '32px' }}>
+                  <td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: T.textMuted, padding: '32px' }}>
                     No materials yet — add one below.
                   </td>
                 </tr>
@@ -381,7 +379,7 @@ const EXPENSE_CATEGORIES = [
 ];
 
 function BalanceSheetTab({ eventCode }) {
-  const [financials, setFinancials] = useState({ expenses: [], income: [] });
+  const [financials, setFinancials] = useState({ expenses: [], income: [], totalBudget: 10000 });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -390,6 +388,7 @@ function BalanceSheetTab({ eventCode }) {
       setFinancials({
         expenses: data.expenses || [],
         income: data.income || [],
+        totalBudget: data.totalBudget ?? 10000
       });
     });
     return () => unsub();
@@ -456,6 +455,7 @@ function BalanceSheetTab({ eventCode }) {
   );
   const totalIncome = financials.income.reduce((s, i) => s + (i.amount || 0), 0);
   const difference = totalIncome - totalExpenses;
+  const budgetRemaining = (financials.totalBudget ?? 10000) - totalExpenses;
 
   // Group expenses by category
   const grouped = EXPENSE_CATEGORIES.map((cat) => ({
@@ -467,6 +467,61 @@ function BalanceSheetTab({ eventCode }) {
 
   return (
     <div style={{ width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      
+      {/* ── Budget Summary Card ── */}
+      <div style={{ ...glassPanel, background: 'rgba(13,20,38,0.75)' }}>
+        <h3 style={{ fontFamily: T.fontTitle, color: T.textPrimary, margin: '0 0 16px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <DollarSign size={18} style={{ color: T.vbtSky }} /> Event Budget Management
+        </h3>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ fontFamily: T.fontBody, fontSize: '12px', color: T.textSecondary, display: 'block', marginBottom: '6px', fontWeight: '700' }}>
+              TOTAL EVENT BUDGET (EGP)
+            </label>
+            <input
+              style={{ ...inputStyle, fontSize: '18px', fontWeight: 800, color: T.vbtSky }}
+              type="number"
+              min="0"
+              value={financials.totalBudget ?? 10000}
+              onChange={(e) => {
+                const newBudget = parseFloat(e.target.value) || 0;
+                setFinancials(prev => {
+                  const next = { ...prev, totalBudget: newBudget };
+                  persist(next);
+                  return next;
+                });
+              }}
+            />
+          </div>
+
+          <div style={{ textAlign: 'center', minWidth: '120px' }}>
+            <div style={{ fontFamily: T.fontBody, fontSize: '11px', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+              Total Expenses
+            </div>
+            <div style={{ fontFamily: T.fontTitle, fontSize: '20px', fontWeight: 800, color: '#ef4444' }}>
+              EGP {totalExpenses.toLocaleString('en', { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center', minWidth: '150px' }}>
+            <div style={{ fontFamily: T.fontBody, fontSize: '11px', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+              Budget Remaining
+            </div>
+            <div
+              style={{
+                fontFamily: T.fontTitle,
+                fontSize: '24px',
+                fontWeight: 900,
+                color: budgetRemaining >= 0 ? '#22c55e' : '#ef4444',
+                textShadow: budgetRemaining >= 0 ? '0 0 15px rgba(34,197,94,0.3)' : '0 0 15px rgba(239,68,68,0.3)',
+              }}
+            >
+              EGP {budgetRemaining.toLocaleString('en', { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── EXPENSES ── */}
       <div style={glassPanel}>
         <h3 style={{ fontFamily: T.fontTitle, color: T.textPrimary, margin: '0 0 16px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -765,9 +820,55 @@ function AccessControlTab({ eventCode, currentUser }) {
 /* ════════════════════════════════════════════
    MAIN COMPONENT — LogisticsPanel
    ════════════════════════════════════════════ */
-export default function LogisticsPanel({ eventCode, currentUser, eventConfig, campData }) {
+export default function LogisticsPanel({
+  eventCode,
+  currentUser,
+  eventConfig,
+  campData,
+  campState,
+  isTimeSlotActive,
+  getEventCurrentDay,
+  getEffectiveTimeShift,
+  parseTimeToMs
+}) {
   const [activeTab, setActiveTab] = useState('materials');
   const [accessList, setAccessList] = useState(null);
+  
+  const [materials, setMaterials] = useState([]);
+  const [materialsLost, setMaterialsLost] = useState(0);
+  const [materialsCollected, setMaterialsCollected] = useState(0);
+
+  // Subscribe to materials list
+  useEffect(() => {
+    if (!eventCode) return;
+    const unsub = subscribeToLogistics(eventCode, setMaterials);
+    return () => unsub();
+  }, [eventCode]);
+
+  const handleFieldChange = async (id, field, value) => {
+    try {
+      await updateMaterial(eventCode, id, { [field]: value });
+    } catch (e) {
+      console.error('Update failed:', e);
+    }
+  };
+
+  const handleAdd = async () => {
+    try {
+      await addMaterial(eventCode, { name: 'New Item' });
+    } catch (e) {
+      console.error('Add failed:', e);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this material?')) return;
+    try {
+      await deleteMaterial(eventCode, id);
+    } catch (e) {
+      console.error('Delete failed:', e);
+    }
+  };
 
   // Subscribe to access list to gate the panel
   useEffect(() => {
@@ -777,6 +878,93 @@ export default function LogisticsPanel({ eventCode, currentUser, eventConfig, ca
     });
     return () => unsub();
   }, [eventCode]);
+
+  // Derive unique event games list
+  const eventGames = useMemo(() => {
+    const gamesSet = new Set();
+    if (eventConfig?.stations) {
+      Object.keys(eventConfig.stations).forEach((key) => {
+        const s = eventConfig.stations[key];
+        if (s?.name?.trim()) {
+          gamesSet.add(s.name.trim());
+        }
+      });
+    }
+    if (eventConfig?.bigGameName?.trim()) {
+      gamesSet.add(eventConfig.bigGameName.trim());
+    }
+    if (eventConfig?.reflectionName?.trim()) {
+      gamesSet.add(eventConfig.reflectionName.trim());
+    }
+    if (campData?.matchups) {
+      campData.matchups.forEach(m => {
+        if (m.game?.trim()) {
+          gamesSet.add(m.game.trim());
+        }
+      });
+    }
+    return Array.from(gamesSet).map(name => ({ name }));
+  }, [eventConfig, campData]);
+
+  // Derive next block's scheduled matchups, games, and deficits
+  const nextBlockMatchups = useMemo(() => {
+    if (!campData?.matchups || campData.matchups.length === 0) return [];
+    
+    const currentDay = getEventCurrentDay ? getEventCurrentDay() : 1;
+    
+    const todaysMatchups = campData.matchups.filter(m => {
+      const mDay = m.day || (eventConfig?.eventType === 'camp' ? ([1, 2, 3].includes(m.block) ? 1 : 2) : 1);
+      return mDay === currentDay;
+    });
+    if (todaysMatchups.length === 0) return [];
+
+    const activeMatchup = todaysMatchups.find(m => isTimeSlotActive ? isTimeSlotActive(m.time, `Block ${m.block}`, m.day) : false);
+
+    let nextBlockNum = null;
+    if (activeMatchup) {
+      nextBlockNum = activeMatchup.block + 1;
+    } else {
+      const shift = getEffectiveTimeShift ? getEffectiveTimeShift() : 0;
+      const blocksWithTime = [];
+      const seenBlocks = new Set();
+      todaysMatchups.forEach(m => {
+        if (!seenBlocks.has(m.block)) {
+          seenBlocks.add(m.block);
+          const startMs = parseTimeToMs ? parseTimeToMs(m.time) + shift * 60 * 1000 : 0;
+          blocksWithTime.push({ block: m.block, startMs });
+        }
+      });
+      
+      blocksWithTime.sort((a, b) => a.startMs - b.startMs);
+      const nowMs = Date.now();
+      const upcoming = blocksWithTime.find(b => b.startMs > nowMs);
+      if (upcoming) {
+        nextBlockNum = upcoming.block;
+      }
+    }
+
+    if (nextBlockNum === null) return [];
+    return todaysMatchups.filter(m => m.block === nextBlockNum);
+  }, [campData, campState, eventConfig, isTimeSlotActive, getEventCurrentDay, getEffectiveTimeShift, parseTimeToMs]);
+
+  const nextBlockGames = useMemo(() => {
+    const gamesSet = new Set();
+    nextBlockMatchups.forEach(m => {
+      if (m.game?.trim()) {
+        gamesSet.add(m.game.trim());
+      }
+    });
+    return Array.from(gamesSet);
+  }, [nextBlockMatchups]);
+
+  const nextBlockDeficits = useMemo(() => {
+    return materials.filter(m => {
+      if (!m.associatedGame || m.associatedGame === 'General') return false;
+      const matchesGame = nextBlockGames.some(gName => gName.toLowerCase() === m.associatedGame.toLowerCase());
+      const hasDeficit = (m.quantityAvailable || 0) < (m.quantityNeeded || 0);
+      return matchesGame && hasDeficit;
+    });
+  }, [materials, nextBlockGames]);
 
   // Determine authorisation
   const userName = currentUser?.name || '';
@@ -833,9 +1021,48 @@ export default function LogisticsPanel({ eventCode, currentUser, eventConfig, ca
         <TabButton active={activeTab === 'access'} icon={Shield} label="Access Control" onClick={() => setActiveTab('access')} />
       </div>
 
+      {/* Next Block Deficit Alert Banner */}
+      {nextBlockDeficits.length > 0 && (
+        <div
+          style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontWeight: '800', fontSize: '0.95rem', marginBottom: '6px' }}>
+            ⚠️ MATERIAL DEFICIT ALERT FOR UPCOMING BLOCK
+          </div>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(255,255,255,0.85)', marginBottom: '8px' }}>
+            The following materials needed for the next block games (<strong>{nextBlockGames.join(', ')}</strong>) have deficits:
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {nextBlockDeficits.map(m => (
+              <div key={m.id} style={{ fontSize: '0.85rem', color: '#f87171' }}>
+                • <strong>{m.name}</strong> (for game: <em>{m.associatedGame}</em>): Have {m.quantityAvailable} / Need {m.quantityNeeded} (Short by {m.quantityNeeded - m.quantityAvailable})
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Active tab content */}
       {activeTab === 'materials' && (
-        <MaterialsTab eventCode={eventCode} campData={campData} />
+        <MaterialsTab
+          eventCode={eventCode}
+          campData={campData}
+          materials={materials}
+          eventGames={eventGames}
+          handleFieldChange={handleFieldChange}
+          handleAdd={handleAdd}
+          handleDelete={handleDelete}
+          materialsLost={materialsLost}
+          setMaterialsLost={setMaterialsLost}
+          materialsCollected={materialsCollected}
+          setMaterialsCollected={setMaterialsCollected}
+        />
       )}
       {activeTab === 'balance' && (
         <BalanceSheetTab eventCode={eventCode} />

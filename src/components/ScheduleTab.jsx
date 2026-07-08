@@ -385,6 +385,7 @@ export default function ScheduleTab({
   handleToggleTimer,
   handleAdjustTimeShift,
   handleResetTimeShift,
+  handleRotateBroadcast,
   handleStartMatchupTimer,
   handleStopMatchupTimer,
   handleResetMatchupTimer,
@@ -1159,6 +1160,25 @@ export default function ScheduleTab({
                   }}
                 >
                   🔕 Round End
+                </button>
+                <button 
+                  onClick={handleRotateBroadcast}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                    fontWeight: '800',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
+                    border: 'none'
+                  }}
+                >
+                  📢 Broadcast Rotate
                 </button>
               </div>
               

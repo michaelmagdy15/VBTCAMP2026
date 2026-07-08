@@ -1,146 +1,133 @@
-import React, { useState, useMemo } from 'react';
-import {
-  Eye,
-  Crosshair,
-  Users,
-  Shield,
-  LogOut,
-  Lock,
-  Unlock,
-} from 'lucide-react';
-import { ROLES } from '../permissions';
+import React, { useState } from 'react';
+import { Shield, Phone, User, LogOut, Loader2 } from 'lucide-react';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const FALLBACK_SERVANT_ASSIGNMENTS = {
-  // Team Leaders
-  'andrew': 'team_red_1',
-  'andrew essam': 'team_red_1',
-  'sherry': 'team_blue_1',
-  'sherry wael': 'team_blue_1',
-  'amberto': 'team_red_2',
-  'youstina': 'team_blue_2',
-  'youssef': 'team_red_3',
-  'youssef wael': 'team_red_3',
-  'tony': 'team_blue_3',
-  'tony_tafaya_blue': 'team_blue_3',
-  'tony tafaya blue': 'team_blue_3',
-  'tony tafaya (blue)': 'team_blue_3',
-  'seif': 'team_red_4',
-  'seif samer': 'team_red_4',
-  'rougy': 'team_blue_4',
-  'rougy adel': 'team_blue_4',
-  'tony tafaya': 'team_red_5',
-  'tony_tafaya_red': 'team_red_5',
-  'tony tafaya red': 'team_red_5',
-  'tony tafaya (red)': 'team_red_5',
-  'sandra': 'team_blue_5',
-  'sandra wael': 'team_blue_5',
-  'kirollos': 'team_red_6',
-  'kirollos remon': 'team_red_6',
-  'martina': 'team_blue_6',
-  'martina rizk': 'team_blue_6',
-  
-  // Game Leaders / Referees
-  'michel remon': 'station_1',
-  'micho': 'station_1',
-  'emily boshra': 'station_1',
-  'emily': 'station_1',
-  'macarious': 'station_2',
-  'passant': 'station_2',
-  'dani': 'reflection',
-  'nathalie hazem': 'station_3',
-  'nathalie': 'station_3',
-  'kiro wagdy': 'station_3',
-  'kiro': 'station_3',
-  'karim hany': 'station_4',
-  'karim': 'station_4',
-  'john kamel': 'station_4',
-  'john': 'station_4',
-  'cinderella': 'station_4',
-  'patrick sameh': 'station_4',
-  'patrick': 'station_4',
-  'andrew nader': 'station_5',
-  'jessica nossier': 'station_5',
-  'jessica': 'station_5',
-  'joice': 'station_5',
-  'bassem khella': 'station_6',
-  'bassem': 'station_6',
-  'sara zaki': 'station_6',
-  'sara': 'station_6',
-  
-  // Other roles
-  'michael mitry': 'media',
-  'amy ramy': 'equipment',
-  'amy': 'equipment',
-  'daniel el masry': 'reflection'
+// ─── Theme Tokens (glassmorphism) ─────────────────────────────
+const T = {
+  vbtSky: '#29b6f6',
+  vbtBlue: '#3b82f6',
+  vbtPurple: '#a855f7',
+  textPrimary: '#ffffff',
+  textSecondary: '#94a3b8',
+  glassBg: 'rgba(15, 23, 42, 0.65)',
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  accentGradient: 'linear-gradient(135deg, #3b82f6 0%, #29b6f6 100%)',
+  fontTitle: "'Outfit', sans-serif",
+  fontBody: "'Plus Jakarta Sans', sans-serif",
 };
 
-// ─── Constants ───────────────────────────────────────────────
-
-const ROLE_META = [
-  {
-    key: ROLES.VOLUNTEER,
-    label: 'Volunteer / Viewer',
-    icon: Eye,
-    desc: 'Watch scores & schedule live — no login required',
-    color: '#00b0ff', // Shakes Cyan
-    needsPasscode: false,
-  },
-  {
-    key: ROLES.GAME_LEADER,
-    label: 'Game Leader / Referee',
-    icon: Crosshair,
-    desc: 'Enter scores & game results',
-    color: '#3b82f6', // VBT Blue
-    needsPasscode: true,
-  },
-  {
-    key: ROLES.TEAM_LEADER,
-    label: 'Team Leader / Servant',
-    icon: Users,
-    desc: 'Submit deductions & view schedules',
-    color: '#ff9100', // Fries Orange
-    needsPasscode: false,
-  },
-  {
-    key: ROLES.SERVICE_LEADER,
-    label: 'Service Leader',
-    icon: Shield,
-    desc: 'Manage service timeline & alerts',
-    color: '#a855f7', // Tie Purple
-    needsPasscode: true,
-  },
-];
-
-const COORDINATOR_META = {
-  key: ROLES.COORDINATOR,
-  label: 'Coordinator',
-  icon: Shield,
-  desc: 'Full control over config, scores & alerts',
-  color: '#f97316', // VBT Warm Orange / CTA
-  needsPasscode: true,
-};
-
-// ─── Inline Styles (dark glassmorphism) ──────────────────────
-
+// ─── Inline Styles ───────────────────────────────────────────
 const S = {
   wrapper: {
     width: '100%',
-    maxWidth: 520,
-    margin: '0 auto',
-    fontFamily: 'var(--font-body)',
+    maxWidth: 420,
+    margin: '40px auto',
+    padding: '32px 24px',
+    borderRadius: 24,
+    background: T.glassBg,
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    border: `1px solid ${T.glassBorder}`,
+    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+    fontFamily: T.fontBody,
+    boxSizing: 'border-box',
   },
-
-  /* ── Logged-in badge ── */
+  title: {
+    fontSize: 26,
+    fontWeight: 900,
+    color: '#fff',
+    fontFamily: T.fontTitle,
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: '-0.02em',
+    textShadow: '0 0 15px rgba(59, 130, 246, 0.25)',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: T.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 1.5,
+  },
+  formGroup: {
+    marginBottom: 18,
+    position: 'relative',
+  },
+  label: {
+    display: 'block',
+    fontSize: 12,
+    fontWeight: 700,
+    color: T.textSecondary,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  inputWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 14,
+    color: T.textSecondary,
+    pointerEvents: 'none',
+  },
+  input: {
+    width: '100%',
+    padding: '12px 14px 12px 42px',
+    borderRadius: 12,
+    border: `1.5px solid ${T.glassBorder}`,
+    background: 'rgba(10, 15, 30, 0.7)',
+    color: '#f8fafc',
+    fontSize: 15,
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s ease',
+    fontFamily: T.fontBody,
+  },
+  submitBtn: {
+    width: '100%',
+    padding: '14px 0',
+    borderRadius: 12,
+    border: 'none',
+    background: T.accentGradient,
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 800,
+    fontFamily: T.fontTitle,
+    cursor: 'pointer',
+    letterSpacing: '0.02em',
+    transition: 'all 0.2s ease',
+    marginTop: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  error: {
+    padding: '12px 14px',
+    borderRadius: 12,
+    background: 'rgba(239, 68, 68, 0.12)',
+    border: '1px solid rgba(239, 68, 68, 0.25)',
+    color: '#f87171',
+    fontSize: 13,
+    fontWeight: 600,
+    marginBottom: 20,
+    textAlign: 'center',
+    lineHeight: 1.4,
+  },
+  /* Logged-in View */
   badge: {
     display: 'flex',
     alignItems: 'center',
     gap: 16,
-    padding: '20px',
+    padding: '24px 20px',
     borderRadius: 20,
-    background: 'rgba(30, 41, 59, 0.7)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    border: '1px solid rgba(148, 163, 184, 0.15)',
+    background: 'rgba(30, 41, 59, 0.6)',
+    backdropFilter: 'blur(16px)',
+    border: `1px solid ${T.glassBorder}`,
   },
   badgeInfo: {
     flex: 1,
@@ -150,813 +137,227 @@ const S = {
   },
   badgeName: {
     fontSize: 18,
-    fontWeight: 700,
+    fontWeight: 800,
     color: '#f8fafc',
-    fontFamily: 'var(--font-title)',
+    fontFamily: T.fontTitle,
   },
-  badgeRole: (color) => ({
+  badgeRole: {
     display: 'inline-block',
     fontSize: 11,
     fontWeight: 800,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
     color: '#0f172a',
-    background: color,
+    background: T.vbtSky,
     borderRadius: 6,
     padding: '4px 10px',
     marginRight: 8,
-  }),
-  badgeSub: {
-    fontSize: 14,
-    color: '#94a3b8',
+    width: 'fit-content',
   },
   logoutBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '12px 20px',
+    padding: '10px 16px',
     borderRadius: 12,
     border: '1px solid rgba(248, 113, 113, 0.3)',
     background: 'rgba(248, 113, 113, 0.1)',
     color: '#f87171',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all .2s',
   },
-
-  /* ── Role selector grid ── */
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: 16,
-    marginBottom: 24,
-  },
-  card: (selected, color) => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: '20px 12px',
-    borderRadius: 20,
-    cursor: 'pointer',
-    textAlign: 'center',
-    background: selected
-      ? `linear-gradient(135deg, rgba(${hexToRgb(color)}, 0.15) 0%, rgba(${hexToRgb(color)}, 0.02) 100%)`
-      : 'rgba(28, 28, 30, 0.65)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    border: `2px solid ${selected ? color : 'rgba(255, 255, 255, 0.06)'}`,
-    boxShadow: selected
-      ? `0 12px 28px -4px rgba(${hexToRgb(color)}, 0.2), 0 0 15px rgba(${hexToRgb(color)}, 0.08)`
-      : '0 4px 16px rgba(0, 0, 0, 0.4)',
-    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    transform: selected ? 'scale(1.03)' : 'scale(1)',
-    touchAction: 'manipulation',
-  }),
-  cardLabel: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#ffffff',
-    fontFamily: 'var(--font-title)',
-    marginTop: 4,
-  },
-  cardDesc: {
-    fontSize: 11,
-    color: 'var(--text-secondary)',
-    lineHeight: 1.4,
-  },
-
-  /* ── Form fields ── */
-  title: {
-    fontSize: 22,
-    fontWeight: 800,
-    color: '#fff',
-    fontFamily: 'var(--font-title)',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 1.4,
-  },
-  formGroup: {
-    marginBottom: 12,
-  },
-  label: {
-    display: 'block',
-    fontSize: 13,
-    fontWeight: 700,
-    color: '#94a3b8',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-  },
-  input: {
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: 12,
-    border: '2px solid rgba(148, 163, 184, 0.15)',
-    background: 'rgba(15, 23, 42, 0.6)',
-    color: '#f8fafc',
-    fontSize: 16,
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color .2s',
-  },
-  select: {
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: 12,
-    border: '2px solid rgba(148, 163, 184, 0.15)',
-    background: 'rgba(15, 23, 42, 0.85)',
-    color: '#f8fafc',
-    fontSize: 16,
-    outline: 'none',
-    boxSizing: 'border-box',
-    appearance: 'none',
-    cursor: 'pointer',
-  },
-  passwordWrap: {
-    position: 'relative',
-  },
-  toggleEye: {
-    position: 'absolute',
-    right: 16,
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    color: '#64748b',
-    cursor: 'pointer',
-    padding: 8,
-    display: 'flex',
-  },
-  submitBtn: (color) => ({
-    width: '100%',
-    padding: '14px 0',
-    borderRadius: 12,
-    border: 'none',
-    background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 800,
-    fontFamily: 'var(--font-title)',
-    cursor: 'pointer',
-    letterSpacing: '0.02em',
-    transition: 'transform .1s, opacity .2s',
-    marginTop: 20,
-    marginBottom: 8,
-  }),
-  error: {
-    padding: '14px',
-    borderRadius: 12,
-    background: 'rgba(248, 113, 113, 0.15)',
-    border: '1px solid rgba(248, 113, 113, 0.30)',
-    color: '#f87171',
-    fontSize: 14,
-    fontWeight: 600,
-    marginBottom: 20,
-    animation: 'rl-shake 0.35s ease-in-out',
-  },
 };
-
-// ─── Utility ─────────────────────────────────────────────────
-
-function hexToRgb(hex) {
-  const h = hex.replace('#', '');
-  return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
-  ].join(', ');
-}
-
-/**
- * Extract servants that match a given prefix from globalServants array.
- * globalServants is expected to be an array of { name, role } objects.
- */
-function getEffectiveRole(servant, eventConfig) {
-  if (!servant) return '';
-  const sId = servant.id || servant.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  const eventAssignedRole = eventConfig?.servantAssignments?.[sId];
-  if (eventAssignedRole) {
-    return eventAssignedRole;
-  }
-  return servant.role || '';
-}
-
-function getTeamLabel(servant, eventConfig) {
-  const role = getEffectiveRole(servant, eventConfig);
-  if (!role) return '';
-  const match = role.match(/^team_(red|blue)_(\d+)$/i);
-  if (match) {
-    const color = match[1].charAt(0).toUpperCase() + match[1].slice(1);
-    const num = match[2];
-    return ` (${color} ${num})`;
-  }
-  return '';
-}
-
-function getGameLabel(servant, eventConfig) {
-  const roleCode = getEffectiveRole(servant, eventConfig);
-  if (roleCode && roleCode.startsWith('station_')) {
-    const station = eventConfig?.stations?.[roleCode];
-    if (station?.name) return ` (${station.name})`;
-  }
-  return '';
-}
-
-function filterServants(globalServants, rolePrefixes, eventConfig) {
-  if (!Array.isArray(globalServants)) return [];
-  const prefixes = Array.isArray(rolePrefixes) ? rolePrefixes : [rolePrefixes];
-  return globalServants.filter(
-    (s) => {
-      const role = getEffectiveRole(s, eventConfig);
-      return role && prefixes.some(prefix => role.toLowerCase().startsWith(prefix));
-    }
-  );
-}
-
-/**
- * Given a servant object, extract assigned team codes from their role
- * (e.g. role "team_red" → ["red"]).
- */
-function extractAssignedTeams(servant, eventConfig) {
-  const sId = servant?.id || servant?.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  let role = servant?.role || '';
-  if (eventConfig?.servantAssignments?.[sId]) {
-    role = eventConfig.servantAssignments[sId];
-  }
-  if ((!role || role === 'volunteer') && servant?.name) {
-    const normName = servant.name.toLowerCase().trim();
-    if (FALLBACK_SERVANT_ASSIGNMENTS[normName]) {
-      role = FALLBACK_SERVANT_ASSIGNMENTS[normName];
-    }
-  }
-  if (role && role.toLowerCase().startsWith('team_')) {
-    return [role];
-  }
-  return [];
-}
-
-/**
- * Given a servant and eventConfig, extract assigned game names.
- * Looks at eventConfig.servantAssignments or the servant's own metadata.
- */
-function extractAssignedGames(servant, eventConfig) {
-  const sId = servant?.id || servant?.name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  let roleCode = eventConfig?.servantAssignments?.[sId];
-  if (!roleCode && servant?.name) {
-    const normName = servant.name.toLowerCase().trim();
-    roleCode = FALLBACK_SERVANT_ASSIGNMENTS[normName];
-  }
-  if (roleCode && roleCode.startsWith('station_')) {
-    const station = eventConfig?.stations?.[roleCode];
-    if (station?.name) return [station.name];
-  }
-  // Fallback: if the servant object itself carries games
-  if (Array.isArray(servant?.assignedGames)) return servant.assignedGames;
-  if (Array.isArray(servant?.games)) return servant.games;
-  return [];
-}
-
-// ─── Component ───────────────────────────────────────────────
 
 export default function RoleLogin({
   eventConfig,
-  globalServants,
   onLogin,
   onLogout,
   currentUser,
   loginError,
   setLoginError,
 }) {
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [name, setName] = useState('');
-  const [passcode, setPasscode] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const handleCoordinatorClick = () => {
-    setSelectedRole(ROLES.COORDINATOR);
-    setName('');
-    setPasscode('');
-    setShowPass(false);
+  const [firstName, setFirstName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (setLoginError) setLoginError('');
+
+    const cleanFirstName = firstName.trim();
+    const cleanPhone = phoneNumber.replace(/[^a-zA-Z0-9+]/g, '').trim(); // Normalized phone (raw digits, letters, +)
+
+    if (!cleanFirstName) {
+      if (setLoginError) setLoginError('Please enter your first name.');
+      return;
+    }
+    if (!cleanPhone || cleanPhone.length < 5) {
+      if (setLoginError) setLoginError('Please enter a valid phone number.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Fetch servant by phone number (Primary Key / doc ID)
+      const docRef = doc(db, 'vbt_servants', cleanPhone);
+      const snap = await getDoc(docRef);
+      const now = new Date().toISOString();
+
+      let userObj = null;
+
+      if (snap.exists()) {
+        // Returning User
+        const existing = snap.data();
+        const attended = existing.servicesAttended || [];
+        const eventCode = eventConfig?.eventCode || 'global';
+        if (eventCode && !attended.find(e => e.code === eventCode && e.date?.startsWith(now.slice(0, 10)))) {
+          attended.push({ code: eventCode, date: now });
+        }
+
+        userObj = {
+          ...existing,
+          firstName: cleanFirstName || existing.firstName || existing.name || '',
+          name: cleanFirstName || existing.name || '',
+          lastSeen: now,
+          servicesAttended: attended,
+        };
+        await setDoc(docRef, userObj, { merge: true });
+      } else {
+        // Auto-Registration / "New Lead"
+        userObj = {
+          id: cleanPhone,
+          firstName: cleanFirstName,
+          lastName: '',
+          name: cleanFirstName,
+          phoneNumber: cleanPhone,
+          role: 'unregistered', // Registered as "Fresh Lead" or "Unregistered"
+          lastSeen: now,
+          servicesAttended: eventConfig?.eventCode ? [{ code: eventConfig.eventCode, date: now }] : [],
+          createdAt: now,
+          assignedGames: [],
+          assignedTeams: [],
+          uiMode: 'dumb' // strictly minimal Live Mode by default
+        };
+        await setDoc(docRef, userObj);
+      }
+
+      // Log the user in
+      onLogin(userObj);
+    } catch (err) {
+      console.error('[Login] Error:', err);
+      if (setLoginError) setLoginError('Failed to login. Please check connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Servants filtered by role prefix
-  const refereeServants = useMemo(
-    () => filterServants(globalServants, ['referee', 'station_', 'big_game_', 'reflection', 'media'], eventConfig),
-    [globalServants, eventConfig],
-  );
-  const leaderServants = useMemo(
-    () => filterServants(globalServants, ['team_', 'leader'], eventConfig),
-    [globalServants, eventConfig],
-  );
-  const serviceLeaderServants = useMemo(
-    () => filterServants(globalServants, ['service_leader', 'admin'], eventConfig),
-    [globalServants, eventConfig],
-  );
-
-  const coordinatorServants = useMemo(() => {
-    const coords = filterServants(globalServants, ['coordinator'], eventConfig);
-    const defaults = ['Michael Mitry', 'Andrew Rafik', 'Michael Nakhla', 'Yohanna', 'Anthony', 'Rita Ghaly'];
-    defaults.forEach(name => {
-      if (!coords.find(c => c.name.toLowerCase() === name.toLowerCase())) {
-        coords.push({ name, role: 'coordinator' });
-      }
-    });
-    return coords.sort((a,b) => a.name.localeCompare(b.name));
-  }, [globalServants, eventConfig]);
-
-  // ── Logged-in view ─────────────────────────────────────────
+  // ── Logged-in View ─────────────────────────────────────────
   if (currentUser) {
-    const meta = currentUser.role === ROLES.COORDINATOR 
-      ? COORDINATOR_META 
-      : ROLE_META.find((r) => r.key === currentUser.role) || ROLE_META[0];
-    const assignments = [];
-    if (currentUser.assignedTeams?.length) {
-      const cleanTeams = currentUser.assignedTeams.map(t => 
-        t.replace(/^team_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-      );
-      assignments.push(`Teams: ${cleanTeams.join(', ')}`);
-    }
-    if (currentUser.assignedGames?.length) {
-      assignments.push(`Games: ${currentUser.assignedGames.join(', ')}`);
-    }
+    const roleLabels = {
+      admin: 'Sports Head',
+      coordinator: 'Sports Head',
+      sports_head: 'Sports Head',
+      logistics_head: 'Logistics Head',
+      game_leader: 'Game Leader',
+      referee: 'Game Leader',
+      team_leader: 'Team Leader',
+      leader: 'Team Leader',
+      volunteer: 'Volunteer',
+      unregistered: 'Fresh Lead'
+    };
+
+    const displayRole = roleLabels[currentUser.role] || 'Volunteer';
 
     return (
       <div style={S.wrapper}>
         <div style={S.badge}>
-          <meta.icon size={22} color={meta.color} />
           <div style={S.badgeInfo}>
-            <span style={S.badgeName}>{currentUser.name || 'Guest'}</span>
-            <div>
-              <span style={S.badgeRole(meta.color)}>{meta.label}</span>
-              {assignments.length > 0 && (
-                <span style={S.badgeSub}>{assignments.join(' · ')}</span>
-              )}
+            <span style={S.badgeName}>Hello, {currentUser.firstName || currentUser.name || 'Guest'}</span>
+            <div style={{ marginTop: 4 }}>
+              <span style={S.badgeRole}>{displayRole}</span>
             </div>
           </div>
           <button
             style={S.logoutBtn}
             onClick={onLogout}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = 'rgba(248,113,113,0.22)')
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = 'rgba(248,113,113,0.10)')
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)')}
           >
             <LogOut size={15} />
-            Log out
+            Logout
           </button>
         </div>
       </div>
     );
   }
 
-  // ── Handlers ───────────────────────────────────────────────
-
-  const handleSelectRole = (roleKey) => {
-    setSelectedRole(roleKey);
-    setName('');
-    setPasscode('');
-    setShowPass(false);
-    if (setLoginError) setLoginError('');
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedRole) return;
-
-    // Volunteer — instant login, no passcode
-    if (selectedRole === ROLES.VOLUNTEER) {
-      onLogin({
-        name: 'Volunteer ' + Math.floor(Math.random() * 100),
-        role: ROLES.VOLUNTEER,
-        passcode: '',
-        assignedGames: [],
-        assignedTeams: [],
-      });
-      return;
-    }
-
-    // Validate name
-    if (!name.trim()) {
-      if (setLoginError) setLoginError('Please select or enter your name.');
-      return;
-    }
-
-    // Build user object
-    const matchedServant = (globalServants || []).find(s => s.id === name || (s.name && s.name.trim().toLowerCase() === name.trim().toLowerCase()));
-    const user = {
-      id: matchedServant ? matchedServant.id : name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      name: matchedServant ? matchedServant.name : name.trim(),
-      role: selectedRole,
-      passcode,
-      assignedGames: [],
-      assignedTeams: [],
-    };
-
-    // 2. Game Leader Login
-    if (selectedRole === ROLES.GAME_LEADER) {
-      const servant = refereeServants.find((s) => s.id === name || s.name === name.trim());
-      user.assignedGames = extractAssignedGames(servant, eventConfig);
-    }
-    // 3. Team Leader Login
-    if (selectedRole === ROLES.TEAM_LEADER) {
-      const servant = leaderServants.find((s) => s.id === name || s.name === name.trim());
-      user.assignedTeams = extractAssignedTeams(servant, eventConfig);
-    }
-    // 4. Service Leader Login
-    if (selectedRole === ROLES.SERVICE_LEADER) {
-      user.role = ROLES.SERVICE_LEADER;
-    }
-
-    onLogin(user);
-  };
-
-  // ── Active role meta ───────────────────────────────────────
-  const activeMeta = selectedRole === ROLES.COORDINATOR 
-    ? COORDINATOR_META 
-    : ROLE_META.find((r) => r.key === selectedRole);
-
-  // ── Render ─────────────────────────────────────────────────
+  // ── Render Login Form ──────────────────────────────────────
   return (
     <div style={S.wrapper}>
-      {/* Shake animation & hover/press micro-interactions (pure CSS) */}
+      <div style={S.title}>VBT SPORTS PORTAL</div>
+      <div style={S.subtitle}>
+        Sign in or register instantly using only your first name and phone number.
+        <br />
+        <span style={{ fontSize: '11px', color: '#ff9100' }}>Arabic / English bilingual support.</span>
+      </div>
+
+      {loginError && <div style={S.error}>{loginError}</div>}
+
+      <form onSubmit={handleSubmit}>
+        <div style={S.formGroup}>
+          <label style={S.label}>First Name / الاسم الأول</label>
+          <div style={S.inputWrapper}>
+            <User size={18} style={S.inputIcon} />
+            <input
+              style={S.input}
+              type="text"
+              placeholder="e.g. Michael / ميخائيل"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <div style={S.formGroup}>
+          <label style={S.label}>Phone Number / رقم الموبايل</label>
+          <div style={S.inputWrapper}>
+            <Phone size={18} style={S.inputIcon} />
+            <input
+              style={S.input}
+              type="tel"
+              placeholder="e.g. +201234567890"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <button type="submit" style={{ ...S.submitBtn, opacity: loading ? 0.7 : 1 }} disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+              Verifying Portal Access...
+            </>
+          ) : (
+            'Enter / دخول'
+          )}
+        </button>
+      </form>
+
+      {/* Basic keyframe spinner logic */}
       <style>{`
-        @keyframes rl-shake {
-          0%, 100% { transform: translateX(0); }
-          20% { transform: translateX(-6px); }
-          40% { transform: translateX(6px); }
-          60% { transform: translateX(-4px); }
-          80% { transform: translateX(4px); }
-        }
-        .role-card-hover {
-          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease !important;
-        }
-        .role-card-hover:hover {
-          transform: translateY(-4px) scale(1.02) !important;
-          border-color: rgba(255, 255, 255, 0.15) !important;
-          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
-        }
-        .role-card-hover:active {
-          transform: scale(0.95) !important;
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
-
-      {/* Page Title & Title description */}
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <h2 style={{
-          fontSize: '2rem',
-          fontWeight: '900',
-          fontFamily: 'var(--font-title)',
-          color: '#ffffff',
-          marginBottom: '8px',
-          textShadow: '0 0 15px rgba(59, 130, 246, 0.3)',
-          letterSpacing: '-0.02em'
-        }}>
-          Access Portal
-        </h2>
-        <p style={{
-          fontSize: '0.9rem',
-          color: 'var(--text-secondary)',
-          maxWidth: '360px',
-          margin: '0 auto 16px auto',
-          lineHeight: '1.4'
-        }}>
-          Identify your role to view real-time scores, manage event schedules, or coordinate the camp.
-        </p>
-        <button
-          type="button"
-          onClick={onLogout}
-          style={{
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '9999px',
-            color: 'var(--text-secondary)',
-            fontSize: '0.8rem',
-            padding: '6px 16px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-            e.currentTarget.style.color = '#ffffff';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-            e.currentTarget.style.color = 'var(--text-secondary)';
-          }}
-        >
-          ← Exit to Camp Page
-        </button>
-      </div>
-
-      {/* ── Role selector cards ── */}
-      <div style={S.grid}>
-        {ROLE_META.map((rm) => {
-          const Icon = rm.icon;
-          const selected = selectedRole === rm.key;
-          return (
-            <div
-              key={rm.key}
-              className="role-card-hover"
-              style={S.card(selected, rm.color)}
-              onClick={() => handleSelectRole(rm.key)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && handleSelectRole(rm.key)}
-            >
-              {/* Colored Circular Icon Container */}
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: selected ? `rgba(${hexToRgb(rm.color)}, 0.2)` : 'rgba(255, 255, 255, 0.03)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '10px',
-                transition: 'all 0.3s ease',
-                border: `1px solid ${selected ? `rgba(${hexToRgb(rm.color)}, 0.4)` : 'rgba(255, 255, 255, 0.05)'}`
-              }}>
-                <Icon size={22} color={selected ? rm.color : '#94a3b8'} />
-              </div>
-              <span style={S.cardLabel}>{rm.label}</span>
-              <span style={S.cardDesc}>{rm.desc}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Coordinator Access Button (Clean & Integrated) ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px', marginBottom: '24px' }}>
-        <button
-          type="button"
-          onClick={handleCoordinatorClick}
-          style={{
-            background: selectedRole === ROLES.COORDINATOR ? `linear-gradient(135deg, rgba(${hexToRgb(COORDINATOR_META.color)}, 0.15) 0%, rgba(${hexToRgb(COORDINATOR_META.color)}, 0.02) 100%)` : 'rgba(255, 255, 255, 0.03)',
-            border: `1px solid ${selectedRole === ROLES.COORDINATOR ? COORDINATOR_META.color : 'rgba(255, 255, 255, 0.06)'}`,
-            borderRadius: '16px',
-            color: selectedRole === ROLES.COORDINATOR ? '#ffffff' : 'rgba(148, 163, 184, 0.7)',
-            fontSize: '0.8rem',
-            fontWeight: '600',
-            padding: '12px 24px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            boxShadow: selectedRole === ROLES.COORDINATOR ? `0 8px 24px -4px rgba(${hexToRgb(COORDINATOR_META.color)}, 0.2)` : 'none'
-          }}
-          className="role-card-hover"
-        >
-          <Shield size={16} color={selectedRole === ROLES.COORDINATOR ? COORDINATOR_META.color : 'rgba(148, 163, 184, 0.7)'} />
-          <span>System Coordinator Login</span>
-        </button>
-      </div>
-
-
-      {/* ── Login form (only when a role needing auth is selected) ── */}
-      {selectedRole && (
-        <form onSubmit={handleSubmit}>
-          {/* Error banner */}
-          {loginError && <div style={S.error}>{loginError}</div>}
-
-          {/* Volunteer — just a button */}
-          {selectedRole === ROLES.VOLUNTEER && (
-            <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <div style={S.title}>Welcome to {eventConfig?.eventType === 'service' ? "Service" : "VBT Camp"}!</div>
-              <div style={S.subtitle}>You are signing in as a Volunteer. You will only have view access.</div>
-              <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Enter Dashboard
-              </button>
-            </div>
-          )}
-
-          {/* Game Leader name dropdown */}
-          {selectedRole === ROLES.GAME_LEADER && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={S.title}>Game Leader Login</div>
-              <div style={S.subtitle}>Enter passcode to manage scores for your games</div>
-              <div style={S.formGroup}>
-                <label style={S.label}>Your Name</label>
-                {refereeServants.length > 0 ? (
-                  <select
-                    style={S.select}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  >
-                    <option value="">Select your name…</option>
-                    {refereeServants.map((s) => (
-                      <option key={s.id || s.name} value={s.id || s.name}>
-                        {s.name}{getGameLabel(s, eventConfig)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    style={S.input}
-                    type="text"
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                )}
-              </div>
-
-              <div style={S.formGroup}>
-                <label style={S.label}>Passcode</label>
-                <div style={S.passwordWrap}>
-                  <input
-                    style={S.input}
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="Enter game leader passcode"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    style={S.toggleEye}
-                    onClick={() => setShowPass((v) => !v)}
-                    aria-label={showPass ? 'Hide passcode' : 'Show passcode'}
-                  >
-                    {showPass ? <Unlock size={16} /> : <Lock size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Log in as Game Leader
-              </button>
-            </div>
-          )}
-
-          {/* Team Leader name dropdown */}
-          {selectedRole === ROLES.TEAM_LEADER && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={S.title}>Team Leader Login</div>
-              <div style={S.subtitle}>Select your team and enter passcode to manage deductions</div>
-              <div style={S.formGroup}>
-                <label style={S.label}>Your Name</label>
-                {leaderServants.length > 0 ? (
-                  <select
-                    style={S.select}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  >
-                    <option value="">Select your name…</option>
-                    {leaderServants.map((s) => (
-                      <option key={s.id || s.name} value={s.id || s.name}>
-                        {s.name}{getTeamLabel(s, eventConfig)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    style={S.input}
-                    type="text"
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                )}
-              </div>
-
-              <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Log in as Team Leader
-              </button>
-            </div>
-          )}
-
-          {/* Service Leader name dropdown */}
-          {selectedRole === ROLES.SERVICE_LEADER && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={S.title}>Service Leader Login</div>
-              <div style={S.subtitle}>Select your name and enter passcode to manage timeline and pings</div>
-              <div style={S.formGroup}>
-                <label style={S.label}>Your Name</label>
-                {serviceLeaderServants.length > 0 ? (
-                  <select
-                    style={S.select}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  >
-                    <option value="">Select your name…</option>
-                    {serviceLeaderServants.map((s) => (
-                      <option key={s.id || s.name} value={s.id || s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    style={S.input}
-                    type="text"
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                )}
-              </div>
-
-              <div style={S.formGroup}>
-                <label style={S.label}>Passcode</label>
-                <div style={S.passwordWrap}>
-                  <input
-                    style={S.input}
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="Enter service leader passcode"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    style={S.toggleEye}
-                    onClick={() => setShowPass((v) => !v)}
-                    aria-label={showPass ? 'Hide passcode' : 'Show passcode'}
-                  >
-                    {showPass ? <Unlock size={16} /> : <Lock size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Log in as Service Leader
-              </button>
-            </div>
-          )}
-
-          {/* Coordinator Name Dropdown Login */}
-          {selectedRole === ROLES.COORDINATOR && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={S.title}>Coordinator Login</div>
-              <div style={S.subtitle}>Select your name and enter passcode for full control</div>
-              <div style={S.formGroup}>
-                <label style={S.label}>Your Name</label>
-                {coordinatorServants.length > 0 ? (
-                  <select
-                    style={S.select}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  >
-                    <option value="">Select your name…</option>
-                    {coordinatorServants.map((s) => (
-                      <option key={s.id || s.name} value={s.id || s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    style={S.input}
-                    type="text"
-                    placeholder="Enter coordinator name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                )}
-              </div>
-
-              <div style={S.formGroup}>
-                <label style={S.label}>Passcode</label>
-                <div style={S.passwordWrap}>
-                  <input
-                    style={S.input}
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="Enter coordinator passcode"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    style={S.toggleEye}
-                    onClick={() => setShowPass((v) => !v)}
-                    aria-label={showPass ? 'Hide passcode' : 'Show passcode'}
-                  >
-                    {showPass ? <Unlock size={16} /> : <Lock size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" style={S.submitBtn(activeMeta.color)}>
-                Log in as Coordinator
-              </button>
-            </div>
-          )}
-        </form>
-      )}
-
     </div>
   );
 }
