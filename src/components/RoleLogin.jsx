@@ -201,9 +201,20 @@ export default function RoleLogin({
     setLoading(true);
 
     try {
-      // 1. Fetch servant by phone number (Primary Key / doc ID)
+      // Write the UID mapping document first so firestore rules can validate roles
+      if (auth.currentUser) {
+        console.log("[Login] Writing vbt_uid_map for UID:", auth.currentUser.uid, "Phone:", cleanPhone);
+        await setDoc(doc(db, 'vbt_uid_map', auth.currentUser.uid), { phoneNumber: cleanPhone });
+        console.log("[Login] Successfully wrote vbt_uid_map");
+      } else {
+        console.warn("[Login] auth.currentUser is null! Cannot write UID map.");
+      }
+
+      // Fetch servant by phone number (Primary Key / doc ID)
       const docRef = doc(db, 'vbt_servants', cleanPhone);
+      console.log("[Login] Fetching vbt_servants for doc:", cleanPhone);
       const snap = await getDoc(docRef);
+      console.log("[Login] Successfully fetched vbt_servants. Exists:", snap.exists());
       const now = new Date().toISOString();
 
       let userObj = null;
@@ -224,7 +235,9 @@ export default function RoleLogin({
           lastSeen: now,
           servicesAttended: attended,
         };
+        console.log("[Login] Updating returning user in vbt_servants");
         await setDoc(docRef, userObj, { merge: true });
+        console.log("[Login] Successfully updated returning user");
       } else {
         // Auto-Registration / "New Lead"
         userObj = {
@@ -241,7 +254,9 @@ export default function RoleLogin({
           assignedTeams: [],
           uiMode: 'dumb' // strictly minimal Live Mode by default
         };
+        console.log("[Login] Registering new user in vbt_servants");
         await setDoc(docRef, userObj);
+        console.log("[Login] Successfully registered new user in vbt_servants");
         
         try {
           // Notify admins/coordinators immediately about the new walk-in registration
@@ -250,11 +265,6 @@ export default function RoleLogin({
         } catch (pushErr) {
           console.warn('Failed to send walk-in notification:', pushErr);
         }
-      }
-
-      // Write the UID mapping document so firestore rules can validate roles
-      if (auth.currentUser) {
-        await setDoc(doc(db, 'vbt_uid_map', auth.currentUser.uid), { phoneNumber: cleanPhone });
       }
 
       // Log the user in

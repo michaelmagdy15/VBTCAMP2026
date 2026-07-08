@@ -100,7 +100,7 @@ export async function getEventRegistry() {
       try {
         docSnap = await Promise.race([
           getDoc(docRef),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
         ]);
       } catch (e) {
         console.warn("Network fetch timed out or failed. Falling back to cache for registry.");

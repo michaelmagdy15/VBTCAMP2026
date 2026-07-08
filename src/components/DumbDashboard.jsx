@@ -693,12 +693,6 @@ export default function DumbDashboard({
     };
   };
 
-  const isBreak = useMemo(() => {
-    if (!scheduleSlots.current) return false;
-    const name = (scheduleSlots.current.game || scheduleSlots.current.activity || '').toLowerCase();
-    return name.includes('break') || name.includes('lunch') || name.includes('dinner') || name.includes('snack') || name.includes('free time') || name.includes('transition') || name.includes('rest');
-  }, [scheduleSlots.current]);
-
   useEffect(() => {
     const lockWakeState = async () => {
       try {
@@ -983,6 +977,12 @@ export default function DumbDashboard({
     }
     return { current: null, next: null };
   }, [activeScheduleItem]);
+
+  const isBreak = useMemo(() => {
+    if (!scheduleSlots.current) return false;
+    const name = (scheduleSlots.current.game || scheduleSlots.current.activity || '').toLowerCase();
+    return name.includes('break') || name.includes('lunch') || name.includes('dinner') || name.includes('snack') || name.includes('free time') || name.includes('transition') || name.includes('rest');
+  }, [scheduleSlots.current]);
 
   // ─── Actions ────────────────────────────────────────────────
 

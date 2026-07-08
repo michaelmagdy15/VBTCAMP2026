@@ -6,14 +6,29 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Helper to check if user has a phone mapping
+    function hasPhoneMap() {
+      return exists(/databases/$(database)/documents/vbt_uid_map/$(request.auth.uid));
+    }
+
     // Helper to resolve user phone number via the UID map
     function getUserPhone() {
       return get(/databases/$(database)/documents/vbt_uid_map/$(request.auth.uid)).data.phoneNumber;
     }
 
+    // Helper to check if a servant document exists for their mapped phone number
+    function hasServantData() {
+      return hasPhoneMap() && exists(/databases/$(database)/documents/vbt_servants/$(getUserPhone()));
+    }
+
     // Helper to get user document (servant document mapped by phone number)
     function getUserData() {
       return get(/databases/$(database)/documents/vbt_servants/$(getUserPhone())).data;
+    }
+
+    // Helper to check if the user is an admin
+    function isAdmin() {
+      return hasServantData() && getUserData().role == 'admin';
     }
 
     // Match root UID maps (only the owner can write their own mapping)
@@ -27,7 +42,7 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAuthenticated() && (
         // Admin can modify anything
-        getUserData().role == 'admin' ||
+        isAdmin() ||
         // New user self-registering with unregistered role
         (!exists(/databases/$(database)/documents/vbt_servants/$(phone)) && request.resource.data.role == 'unregistered') ||
         // Returning user updating their lastSeen or attending, but NOT changing their role
@@ -38,40 +53,86 @@ service cloud.firestore {
     // Match global inventory stock
     match /vbt_inventory/{itemId} {
       allow read: if true;
-      allow write: if isAuthenticated() && getUserData().role == 'admin';
+      allow write: if isAuthenticated() && isAdmin();
     }
 
     // Match global locations directory
     match /vbt_locations/{locationId} {
       allow read: if true;
-      allow write: if isAuthenticated() && getUserData().role == 'admin';
+      allow write: if isAuthenticated() && isAdmin();
     }
 
     // Match all collections nested under an event
     match /vbt_events/{eventCode} {
       allow read: if true;
-      allow write: if isAuthenticated() && (
-        getUserData().role == 'admin'
-      );
+      allow write: if isAuthenticated() && isAdmin();
+
+      // For all subcollections under the event
+      match /{allPaths=**} {
+        allow read: if true;
+        // By default, only admins can write to any nested path, unless overridden below
+        allow write: if isAuthenticated() && isAdmin();
+      }
 
       // Matches collection (scores)
       match /matches/{matchId} {
-        allow read: if true;
         allow write: if isAuthenticated() && (
-          getUserData().role == 'admin' ||
-          getUserData().role == 'referee'
+          isAdmin() ||
+          (hasServantData() && getUserData().role == 'referee')
         );
       }
 
       // Deductions collection
       match /deductions/{deductionId} {
-        allow read: if true;
         allow write: if isAuthenticated() && (
-          getUserData().role == 'admin' ||
-          getUserData().role == 'leader' ||
-          getUserData().role == 'service_leader'
+          isAdmin() ||
+          (hasServantData() && (getUserData().role == 'leader' || getUserData().role == 'service_leader'))
         );
       }
+
+      // Announcements subcollection
+      match /announcements/{announcementId} {
+        allow write: if isAuthenticated();
+      }
+
+      // Voice messages subcollection
+      match /voice_messages/{messageId} {
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Match games library
+    match /vbt_games/{gameId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // Match event registry
+    match /vbt_event_registry/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // Match push notifications tokens
+    match /vbt_push_tokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    // Match service templates
+    match /vbt_service_templates/{templateId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // Match service timers
+    match /vbt_timer/{timerId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // Match web push subscriptions
+    match /vbt_web_push_subscriptions/{subId} {
+      allow read, write: if true;
     }
   }
 }
