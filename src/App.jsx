@@ -1,7 +1,7 @@
 import { useServiceTimer } from './utils/useServiceTimer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Trophy, 
@@ -729,6 +729,11 @@ export default function App() {
   const [eventJoinError, setEventJoinError] = useState('');
   const [eventJoinLoading, setEventJoinLoading] = useState(false);
   const [eventRegistry, setEventRegistry] = useState([]);
+  const [showGlobalAdminLogin, setShowGlobalAdminLogin] = useState(false);
+  const [globalAdminPhone, setGlobalAdminPhone] = useState('');
+  const [globalAdminFirstName, setGlobalAdminFirstName] = useState('');
+  const [globalAdminLoginError, setGlobalAdminLoginError] = useState('');
+  const [globalAdminLoginLoading, setGlobalAdminLoginLoading] = useState(false);
 
   // New event creation state
   const [showCreateEvent, setShowCreateEvent] = useState(false);
@@ -2809,6 +2814,59 @@ export default function App() {
     } finally {
       setEventJoinLoading(false);
       setEventJoinInput('');
+    }
+  };
+  
+  // Global Admin Login Handler
+  const handleGlobalAdminLogin = async (e) => {
+    e.preventDefault();
+    setGlobalAdminLoginError('');
+    const cleanFirstName = globalAdminFirstName.trim();
+    const cleanPhone = globalAdminPhone.replace(/[^a-zA-Z0-9+]/g, '').trim();
+
+    if (!cleanFirstName) {
+      setGlobalAdminLoginError('Please enter your first name.');
+      return;
+    }
+    if (!cleanPhone || cleanPhone.length < 5) {
+      setGlobalAdminLoginError('Please enter a valid phone number.');
+      return;
+    }
+
+    setGlobalAdminLoginLoading(true);
+
+    try {
+      // Query servant directly
+      const docRef = doc(db, 'vbt_servants', cleanPhone);
+      const snap = await getDoc(docRef);
+
+      if (snap.exists()) {
+        const userObj = snap.data();
+        // Check if role is admin or coordinator
+        if (userObj.role === 'admin' || userObj.role === 'coordinator' || userObj.role === 'sports_head') {
+          const now = new Date().toISOString();
+          const updatedUserObj = {
+            ...userObj,
+            firstName: cleanFirstName || userObj.firstName || userObj.name || '',
+            name: cleanFirstName || userObj.name || '',
+            lastSeen: now
+          };
+          await setDoc(docRef, updatedUserObj, { merge: true });
+          setCurrentUser(updatedUserObj);
+          setShowGlobalAdminLogin(false);
+          setGlobalAdminFirstName('');
+          setGlobalAdminPhone('');
+        } else {
+          setGlobalAdminLoginError('Access Denied: Only registered VBT Heads/Coordinators can access the global control panel.');
+        }
+      } else {
+        setGlobalAdminLoginError('Account not found. Please contact the system administrator or login inside an event to auto-register.');
+      }
+    } catch (err) {
+      console.error('[Global Admin Login] Error:', err);
+      setGlobalAdminLoginError('Failed to login. Check your internet connection.');
+    } finally {
+      setGlobalAdminLoginLoading(false);
     }
   };
 
@@ -5088,33 +5146,104 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Coordinator actions - only visible to admins */}
-              {currentUser && currentUser.role === 'admin' && (
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Coordinator Actions</p>
-                <button onClick={seedJuly6Service}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
-                    background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
-                  🚀 SETUP JULY 6TH SERVICE (AI)
-                </button>
-                <button onClick={() => setShowCreateEvent(true)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
-                    background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  + Create New Service Day
-                </button>
-                <button onClick={() => { setShowServiceRequestModal(true); setRequestSuccess(false); setServiceRequestStep(1);
-                    setServiceRequestForm({ serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
+              {/* Public Actions (Request Service is open to everyone) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                <button 
+                  onClick={() => { 
+                    setShowServiceRequestModal(true); 
+                    setRequestSuccess(false); 
+                    setServiceRequestStep(1);
+                    setServiceRequestForm({ 
+                      serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
                       serviceTopic: '', targetGender: 'Mix', targetAgeGrade: '', participantsCount: '',
                       alreadySplitTeams: 'no', teamsCount: '', needSpecificServantsCount: 'no',
                       servantsCount: '', servantsAvailableHelping: 'yes',
-                      contactName: '', contactNumber: '', churchName: '' }); }}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px',
-                    border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.06)', color: '#c4b5fd',
-                    fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  &#9962; Request VBT Service
+                      contactName: '', contactNumber: '', churchName: '' 
+                    }); 
+                  }}
+                  style={{ 
+                    width: '100%', 
+                    padding: '13px', 
+                    borderRadius: '12px',
+                    border: '1px solid rgba(167,139,250,0.3)', 
+                    background: 'rgba(167,139,250,0.08)', 
+                    color: '#c4b5fd',
+                    fontWeight: '800', 
+                    fontSize: '0.9rem', 
+                    cursor: 'pointer',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px',
+                    boxShadow: '0 4px 15px rgba(167,139,250,0.1)'
+                  }}
+                >
+                  ⛪ Request VBT Service
                 </button>
               </div>
+
+              {/* VBT Coordinator/Head Access */}
+              {currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator') ? (
+                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#c4b5fd', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      ⚙️ Coordinator Controls
+                    </span>
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        color: '#f87171',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        fontSize: '0.68rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Exit Admin
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>
+                    Welcome back, **{currentUser.name || 'Admin'}**! You have global dashboard control.
+                  </p>
+                  <button onClick={seedJuly6Service}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
+                      background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
+                    🚀 SETUP JULY 6TH SERVICE (AI)
+                  </button>
+                  <button onClick={() => setShowCreateEvent(true)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
+                      background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    + Create New Service Day
+                  </button>
+                </div>
+              ) : (
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '16px' }}>
+                  <button
+                    onClick={() => setShowGlobalAdminLogin(true)}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
+                  >
+                    🔑 VBT Heads & Coordinators Login
+                  </button>
+                </div>
               )}
 
               {/* Bottom safe area spacer */}
@@ -6381,6 +6510,120 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        
+        {showGlobalAdminLogin && (
+          <div
+            className="more-drawer-overlay"
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(5, 7, 20, 0.85)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              zIndex: 1500,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+          >
+            <div
+              className="glass-panel animate-fade"
+              style={{
+                width: '100%',
+                maxWidth: '400px',
+                padding: '28px',
+                position: 'relative',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                borderRadius: '24px',
+                background: 'rgba(15, 23, 42, 0.95)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowGlobalAdminLogin(false);
+                  setGlobalAdminLoginError('');
+                }}
+                style={{
+                  position: 'absolute', top: '16px', right: '16px',
+                  background: 'rgba(255,255,255,0.05)', border: 'none',
+                  color: '#94a3b8', width: '32px', height: '32px',
+                  borderRadius: '50%', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+
+              <div>
+                <h3 style={{ fontSize: '1.25rem', color: '#ffffff', fontWeight: '800', margin: 0, fontFamily: 'var(--font-title)' }}>
+                  🔐 VBT Heads Portal Login
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+                  Enter your first name and phone number to unlock global actions.
+                </p>
+              </div>
+
+              {globalAdminLoginError && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '10px 14px' }}>
+                  <p style={{ color: '#f87171', fontSize: '0.8rem', margin: 0 }}>⚠️ {globalAdminLoginError}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleGlobalAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>FIRST NAME</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Michael"
+                    value={globalAdminFirstName}
+                    onChange={(e) => setGlobalAdminFirstName(e.target.value)}
+                    required
+                    disabled={globalAdminLoginLoading}
+                    style={{
+                      padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>PHONE NUMBER</label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 01000680580"
+                    value={globalAdminPhone}
+                    onChange={(e) => setGlobalAdminPhone(e.target.value)}
+                    required
+                    disabled={globalAdminLoginLoading}
+                    style={{
+                      padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-light)', color: '#ffffff', fontSize: '0.88rem', outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={globalAdminLoginLoading}
+                  className="btn-glow"
+                  style={{
+                    width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
+                    background: 'var(--gradient-vbt)', color: '#ffffff', fontWeight: '800',
+                    fontSize: '0.95rem', cursor: globalAdminLoginLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 20px rgba(20,65,161,0.4)', marginTop: '8px'
+                  }}
+                >
+                  {globalAdminLoginLoading ? 'Verifying...' : 'Unlock Portal'}
+                </button>
+              </form>
             </div>
           </div>
         )}
