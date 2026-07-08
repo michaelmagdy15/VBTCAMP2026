@@ -4968,246 +4968,185 @@ export default function App() {
           display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
           {!showCreateEvent ? (
-            <>
-              {/* Hero */}
-              <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
-                <h1 style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff',
-                  fontFamily: 'var(--font-title)', lineHeight: '1.1', marginBottom: '10px', letterSpacing: '-0.02em' }}>
-                  Games That{' '}
-                  <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Inspire</span>
-                </h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 auto', maxWidth: '320px' }}>
-                  Dynamic sports &amp; Bible reflections for kids &mdash; coordinated in real-time.
-                </p>
-              </section>
+            currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator') ? (
+              /* ── GLOBAL COORDINATOR PORTAL ── */
+              <>
+                {/* Hero */}
+                <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
+                  <h1 style={{ fontSize: '1.8rem', fontWeight: '900', color: '#ffffff',
+                    fontFamily: 'var(--font-title)', lineHeight: '1.2', marginBottom: '6px', letterSpacing: '-0.02em' }}>
+                    🛡️ VBT Head Portal
+                  </h1>
+                  <p style={{ color: '#c4b5fd', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                    Global Systems Console
+                  </p>
+                </section>
 
-              {/* ── QUICK JOIN (active events from registry) ── */}
-              {(() => {
-                const activeEvents = eventRegistry.filter(e => e.active !== false && !e.expired && e.code !== 'june26');
-                if (activeEvents.length === 0) return null;
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {activeEvents.map(ev => {
-                      const isToday = ev.date && (() => {
-                        try {
-                          const d = new Date(ev.date);
-                          const now = new Date();
-                          return d.toDateString() === now.toDateString();
-                        } catch { return false; }
-                      })();
-                      return (
-                        <div key={ev.code} style={{
-                          background: 'linear-gradient(135deg, rgba(20,65,161,0.45) 0%, rgba(41,182,246,0.18) 100%)',
-                          border: `1px solid ${isToday ? 'rgba(74,222,128,0.5)' : 'rgba(41,182,246,0.35)'}`,
-                          borderRadius: '20px', padding: '20px',
-                          boxShadow: isToday ? '0 0 24px rgba(74,222,128,0.15), 0 8px 32px rgba(20,65,161,0.25)' : '0 8px 32px rgba(20,65,161,0.2)',
-                          position: 'relative', overflow: 'hidden',
-                        }}>
-                          {/* Glow accent */}
-                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-                            background: isToday ? 'linear-gradient(90deg, #4ade80, #60a5fa)' : 'linear-gradient(90deg, #1441a1, #60a5fa)' }} />
+                {/* Coordinator Stats */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '14px 10px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1.5rem' }}>⛪</span>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#c4b5fd', marginTop: '4px', fontFamily: 'var(--font-title)' }}>
+                      {serviceRequests.filter(r => r.status === 'pending').length}
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', display: 'block', marginTop: '2px' }}>Pending Requests</span>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '14px 10px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📅</span>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--vbt-sky)', marginTop: '4px', fontFamily: 'var(--font-title)' }}>
+                      {eventRegistry.filter(e => e.active !== false && !e.expired).length}
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', display: 'block', marginTop: '2px' }}>Active Events</span>
+                  </div>
+                </div>
 
-                          {/* Live badge */}
-                          {isToday && (
-                            <div style={{ position: 'absolute', top: '14px', right: '16px',
-                              display: 'flex', alignItems: 'center', gap: '5px',
-                              background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)',
-                              borderRadius: '20px', padding: '3px 10px' }}>
-                              <span className="live-dot" style={{ width: '5px', height: '5px', background: '#4ade80' }} />
-                              <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Today</span>
-                            </div>
-                          )}
+                {/* ⛪ SECTION: INCOMING SERVICE REQUESTS */}
+                <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>⛪</span>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                      Incoming Outreach Requests
+                    </h3>
+                  </div>
 
-                          <div style={{ marginBottom: '14px', paddingRight: isToday ? '60px' : '0' }}>
-                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700',
-                              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>
-                              {ev.eventType === 'camp' ? '⛺ Camp' : '⚡ Service'} · {ev.code.toUpperCase()}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {serviceRequests.length > 0 ? (
+                      serviceRequests.map((req) => (
+                        <div 
+                          key={req.id} 
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1.5px solid rgba(167, 139, 250, 0.25)',
+                            borderRadius: '16px',
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '2px 8px', borderRadius: '20px', fontWeight: '700', textTransform: 'uppercase' }}>
+                                {req.status || 'PENDING APPROVAL'}
+                              </span>
+                              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', margin: '6px 0 2px 0' }}>
+                                {req.churchName || 'St. Mark Church'}
+                              </h4>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                                Requested Date: 📅 **{req.serviceDate || 'TBD'}**
+                              </p>
                             </div>
-                            <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-0.01em' }}>
-                              {ev.name || ev.code}
-                            </div>
-                            {ev.date && (
-                              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px' }}>
-                                📅 {new Date(ev.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-                              </div>
-                            )}
+                          </div>
+
+                          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div>Topic/Theme: **{req.serviceTopic || 'N/A'}**</div>
+                            <div>Target: **{req.targetAgeGrade || 'Mix'}** ({req.participantsCount || '—'} kids)</div>
+                            <div>Contact: **{req.contactName || '—'}** ({req.contactNumber || '—'})</div>
                           </div>
 
                           <button
-                            onClick={() => handleQuickJoin(ev.code)}
-                            disabled={eventJoinLoading !== false}
-                            style={{
-                              width: '100%', padding: '15px', borderRadius: '14px', border: 'none',
-                              background: isToday
-                                ? 'linear-gradient(135deg, #166534 0%, #4ade80 100%)'
-                                : 'linear-gradient(135deg, #1441a1 0%, #60a5fa 100%)',
-                              color: '#ffffff', fontWeight: '800', fontSize: '1.05rem',
-                              cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
-                              boxShadow: isToday ? '0 4px 20px rgba(74,222,128,0.35)' : '0 4px 20px rgba(20,65,161,0.4)',
-                              letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
-                              justifyContent: 'center', gap: '8px',
-                              transition: 'opacity 0.2s, transform 0.15s',
+                            onClick={() => {
+                              // Pre-fill creation state
+                              setNewEventCode(req.churchName.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 15) + '_' + (req.serviceDate || '').replace(/[^0-9]/g, ''));
+                              setNewEventName("VBT Service - " + req.churchName);
+                              setNewEventDate(req.serviceDate || '');
+                              setNewKidCount(req.participantsCount || 50);
+                              setNewServiceBrief(req.serviceTopic || '');
+                              setCreationStep(1);
+                              setShowCreateEvent(true);
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                            className="btn-glow"
+                            style={{
+                              width: '100%',
+                              padding: '11px',
+                              borderRadius: '10px',
+                              border: 'none',
+                              background: 'var(--gradient-vbt)',
+                              color: '#ffffff',
+                              fontWeight: '800',
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
                           >
-                            {eventJoinLoading === ev.code ? (
-                              <span>Joining…</span>
-                            ) : (
-                              <>
-                                <span style={{ fontSize: '1.1rem' }}>▶</span>
-                                <span>Join Now</span>
-                              </>
-                            )}
+                            🚀 Approve & Initialize Day
                           </button>
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-
-              {/* ── MANUAL CODE ENTRY (collapsible) ── */}
-              {(() => {
-                const hasActive = eventRegistry.some(e => e.active !== false && !e.expired);
-                const open = hasActive ? showManualJoin : true;
-                return (
-                  <div>
-                    {hasActive && (
-                      <button
-                        onClick={() => setShowManualJoin(o => !o)}
-                        style={{
-                          width: '100%', padding: '11px 16px', borderRadius: '12px',
-                          border: '1px solid rgba(255,255,255,0.09)',
-                          background: 'rgba(255,255,255,0.03)',
-                          color: 'rgba(255,255,255,0.45)', fontWeight: '600', fontSize: '0.82rem',
-                          cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          justifyContent: 'center', gap: '8px',
-                        }}
-                      >
-                        <span>🔑 Enter a code manually</span>
-                        <span style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', fontSize: '0.7rem' }}>▼</span>
-                      </button>
-                    )}
-                    {open && (
-                      <div style={{
-                        marginTop: hasActive ? '10px' : '0',
-                        background: 'linear-gradient(135deg, rgba(20,65,161,0.2) 0%, rgba(41,182,246,0.07) 100%)',
-                        border: '1px solid rgba(41,182,246,0.18)', borderRadius: '16px', padding: '18px 16px',
-                      }}>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                          Enter the event code your coordinator shared with you.
-                        </p>
-                        <form id="vbt-join-form" onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <input type="text" value={eventJoinInput} onChange={(e) => setEventJoinInput(e.target.value)}
-                            placeholder="e.g. july6" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                            style={{ width: '100%', padding: '13px 16px', borderRadius: '12px',
-                              background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(41,182,246,0.2)',
-                              color: '#ffffff', fontSize: '1rem', outline: 'none',
-                              fontFamily: 'monospace', letterSpacing: '0.08em', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                            onFocus={(e) => { e.target.style.borderColor = 'var(--vbt-sky)'; e.target.style.boxShadow = '0 0 12px rgba(41,182,246,0.25)'; }}
-                            onBlur={(e)  => { e.target.style.borderColor = 'rgba(41,182,246,0.2)'; e.target.style.boxShadow = 'none'; }}
-                          />
-                          {eventJoinError && (
-                            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '10px 14px' }}>
-                              <p style={{ color: '#f87171', fontSize: '0.82rem', margin: 0 }}>&#9888; {eventJoinError}</p>
-                              <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
-                            </div>
-                          )}
-                          <button type="submit" disabled={eventJoinLoading !== false}
-                            style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-                              background: eventJoinLoading === 'manual' ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
-                              color: '#ffffff', fontWeight: '800', fontSize: '0.95rem',
-                              cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
-                              boxShadow: '0 4px 20px rgba(20,65,161,0.4)', letterSpacing: '0.03em' }}>
-                            {eventJoinLoading === 'manual' ? 'Joining...' : 'Enter Service'}
-                          </button>
-                        </form>
+                      ))
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-light)', borderRadius: '16px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        No incoming service requests found.
                       </div>
                     )}
                   </div>
-                );
-              })()}
+                </section>
 
-              {/* Quick stats */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {[
-                  { icon: '&#128101;', value: '100+', label: 'Kids' },
-                  { icon: '&#127918;', value: '6', label: 'Stations' },
-                  { icon: '&#9889;', value: 'Live', label: 'Sync' }
-                ].map(s => (
-                  <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid var(--border-light)', borderRadius: '14px',
-                    padding: '12px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.2rem', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: s.icon }} />
-                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--vbt-sky)', lineHeight: 1 }}>{s.value}</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                {/* 📅 SECTION: ACTIVE EVENTS */}
+                <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>📅</span>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                      Active Services & Camps
+                    </h3>
                   </div>
-                ))}
-              </div>
 
-              {/* Public Actions (Request Service is open to everyone) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                <button 
-                  onClick={() => { 
-                    setShowServiceRequestModal(true); 
-                    setRequestSuccess(false); 
-                    setServiceRequestStep(1);
-                    setServiceRequestForm({ 
-                      serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
-                      serviceTopic: '', targetGender: 'Mix', targetAgeGrade: '', participantsCount: '',
-                      alreadySplitTeams: 'no', teamsCount: '', needSpecificServantsCount: 'no',
-                      servantsCount: '', servantsAvailableHelping: 'yes',
-                      contactName: '', contactNumber: '', churchName: '' 
-                    }); 
-                  }}
-                  style={{ 
-                    width: '100%', 
-                    padding: '13px', 
-                    borderRadius: '12px',
-                    border: '1px solid rgba(167,139,250,0.3)', 
-                    background: 'rgba(167,139,250,0.08)', 
-                    color: '#c4b5fd',
-                    fontWeight: '800', 
-                    fontSize: '0.9rem', 
-                    cursor: 'pointer',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '8px',
-                    boxShadow: '0 4px 15px rgba(167,139,250,0.1)'
-                  }}
-                >
-                  ⛪ Request VBT Service
-                </button>
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {eventRegistry.filter(e => e.active !== false && !e.expired && e.code !== 'june26').map(ev => (
+                      <div 
+                        key={ev.code} 
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff' }}>
+                            {ev.name || ev.code}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                            Code: **{ev.code}** · Date: **{ev.date || 'TBD'}**
+                          </div>
+                        </div>
 
-              {/* VBT Coordinator/Head Access */}
-              {currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator') ? (
-                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#c4b5fd', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      ⚙️ Coordinator Controls
-                    </span>
-                    <button
-                      onClick={handleLogout}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.25)',
-                        color: '#f87171',
-                        borderRadius: '6px',
-                        padding: '3px 8px',
-                        fontSize: '0.68rem',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Exit Admin
-                    </button>
+                        <button
+                          onClick={() => handleQuickJoin(ev.code)}
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            borderRadius: '12px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #1441a1 0%, #3b82f6 100%)',
+                            color: '#ffffff',
+                            fontWeight: '800',
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          📺 Enter Remote Dashboard
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>
-                    Welcome back, **{currentUser.name || 'Admin'}**! You have global dashboard control.
-                  </p>
+                </section>
+
+                {/* ⚙️ SECTION: QUICK ACTIONS */}
+                <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#c4b5fd', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    ⚙️ Create New Days
+                  </span>
                   <button onClick={seedJuly6Service}
                     style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
                       background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
@@ -5218,8 +5157,235 @@ export default function App() {
                       background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
                     + Create New Service Day
                   </button>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      color: '#f87171',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🚪 Exit Admin Portal
+                  </button>
+                </section>
+                
+                {/* Bottom safe area spacer */}
+                <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
+              </>
+            ) : (
+              /* ── STANDARD VISITOR HOMEPAGE ── */
+              <>
+                {/* Hero */}
+                <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
+                  <h1 style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff',
+                    fontFamily: 'var(--font-title)', lineHeight: '1.1', marginBottom: '10px', letterSpacing: '-0.02em' }}>
+                    Games That{' '}
+                    <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Inspire</span>
+                  </h1>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 auto', maxWidth: '320px' }}>
+                    Dynamic sports &amp; Bible reflections for kids &mdash; coordinated in real-time.
+                  </p>
+                </section>
+
+                {/* ── QUICK JOIN (active events from registry) ── */}
+                {(() => {
+                  const activeEvents = eventRegistry.filter(e => e.active !== false && !e.expired && e.code !== 'june26');
+                  if (activeEvents.length === 0) return null;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {activeEvents.map(ev => {
+                        const isToday = ev.date && (() => {
+                          try {
+                            const d = new Date(ev.date);
+                            const now = new Date();
+                            return d.toDateString() === now.toDateString();
+                          } catch { return false; }
+                        })();
+                        return (
+                          <div key={ev.code} style={{
+                            background: 'linear-gradient(135deg, rgba(20,65,161,0.45) 0%, rgba(41,182,246,0.18) 100%)',
+                            border: `1px solid ${isToday ? 'rgba(74,222,128,0.5)' : 'rgba(41,182,246,0.35)'}`,
+                            borderRadius: '20px', padding: '20px',
+                            boxShadow: isToday ? '0 0 24px rgba(74,222,128,0.15), 0 8px 32px rgba(20,65,161,0.25)' : '0 8px 32px rgba(20,65,161,0.2)',
+                            position: 'relative', overflow: 'hidden',
+                          }}>
+                            {/* Glow accent */}
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+                              background: isToday ? 'linear-gradient(90deg, #4ade80, #60a5fa)' : 'linear-gradient(90deg, #1441a1, #60a5fa)' }} />
+
+                            {/* Live badge */}
+                            {isToday && (
+                              <div style={{ position: 'absolute', top: '14px', right: '16px',
+                                display: 'flex', alignItems: 'center', gap: '5px',
+                                background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)',
+                                borderRadius: '20px', padding: '3px 10px' }}>
+                                <span className="live-dot" style={{ width: '5px', height: '5px', background: '#4ade80' }} />
+                                <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Today</span>
+                              </div>
+                            )}
+
+                            <div style={{ marginBottom: '14px', paddingRight: isToday ? '60px' : '0' }}>
+                              <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700',
+                                textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>
+                                {ev.eventType === 'camp' ? '⛺ Camp' : '⚡ Service'} · {ev.code.toUpperCase()}
+                              </div>
+                              <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-0.01em' }}>
+                                {ev.name || ev.code}
+                              </div>
+                              {ev.date && (
+                                <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px' }}>
+                                  📅 {new Date(ev.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => handleQuickJoin(ev.code)}
+                              disabled={eventJoinLoading !== false}
+                              style={{
+                                width: '100%', padding: '15px', borderRadius: '14px', border: 'none',
+                                background: isToday
+                                  ? 'linear-gradient(135deg, #166534 0%, #4ade80 100%)'
+                                  : 'linear-gradient(135deg, #1441a1 0%, #60a5fa 100%)',
+                                color: '#ffffff', fontWeight: '800', fontSize: '1.05rem',
+                                cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
+                                boxShadow: isToday ? '0 4px 20px rgba(74,222,128,0.35)' : '0 4px 20px rgba(20,65,161,0.4)',
+                                letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', gap: '8px',
+                                transition: 'opacity 0.2s, transform 0.15s',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                            >
+                              {eventJoinLoading === ev.code ? (
+                                <span>Joining…</span>
+                              ) : (
+                                <>
+                                  <span style={{ fontSize: '1.1rem' }}>▶</span>
+                                  <span>Join Now</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Enter manually */}
+                {(() => {
+                  const hasActive = eventRegistry.some(e => e.active !== false && !e.expired && e.code !== 'june26');
+                  const [open, setOpen] = useState(!hasActive);
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {hasActive && (
+                        <button onClick={() => setOpen(!open)}
+                          style={{ width: '100%', padding: '13px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)',
+                            background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          🔑 Enter a code manually {open ? '▲' : '▼'}
+                        </button>
+                      )}
+                      {open && (
+                        <div style={{
+                          marginTop: hasActive ? '10px' : '0',
+                          background: 'linear-gradient(135deg, rgba(20,65,161,0.2) 0%, rgba(41,182,246,0.07) 100%)',
+                          border: '1px solid rgba(41,182,246,0.18)', borderRadius: '16px', padding: '18px 16px',
+                        }}>
+                          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                            Enter the event code your coordinator shared with you.
+                          </p>
+                          <form id="vbt-join-form" onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <input type="text" value={eventJoinInput} onChange={(e) => setEventJoinInput(e.target.value)}
+                              placeholder="e.g. july6" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                              style={{ width: '100%', padding: '13px 16px', borderRadius: '12px',
+                                background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(41,182,246,0.2)',
+                                color: '#ffffff', fontSize: '1rem', outline: 'none',
+                                fontFamily: 'monospace', letterSpacing: '0.08em', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                              onFocus={(e) => { e.target.style.borderColor = 'var(--vbt-sky)'; e.target.style.boxShadow = '0 0 12px rgba(41,182,246,0.25)'; }}
+                              onBlur={(e)  => { e.target.style.borderColor = 'rgba(41,182,246,0.2)'; e.target.style.boxShadow = 'none'; }}
+                            />
+                            {eventJoinError && (
+                              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '10px 14px' }}>
+                                <p style={{ color: '#f87171', fontSize: '0.82rem', margin: 0 }}>&#9888; {eventJoinError}</p>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
+                              </div>
+                            )}
+                            <button type="submit" disabled={eventJoinLoading !== false}
+                              style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
+                                background: eventJoinLoading === 'manual' ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
+                                color: '#ffffff', fontWeight: '800', fontSize: '0.95rem',
+                                cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 4px 20px rgba(20,65,161,0.4)', letterSpacing: '0.03em' }}>
+                              {eventJoinLoading === 'manual' ? 'Joining...' : 'Enter Service'}
+                            </button>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Quick stats */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {[
+                    { icon: '&#128101;', value: '100+', label: 'Kids' },
+                    { icon: '&#127918;', value: '6', label: 'Stations' },
+                    { icon: '&#9889;', value: 'Live', label: 'Sync' }
+                  ].map(s => (
+                    <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--border-light)', borderRadius: '14px',
+                      padding: '12px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.2rem', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: s.icon }} />
+                      <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--vbt-sky)', lineHeight: 1 }}>{s.value}</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                    </div>
+                  ))}
                 </div>
-              ) : (
+
+                {/* Public Actions (Request Service is open to everyone) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                  <button 
+                    onClick={() => { 
+                      setShowServiceRequestModal(true); 
+                      setRequestSuccess(false); 
+                      setServiceRequestStep(1);
+                      setServiceRequestForm({ 
+                        serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
+                        serviceTopic: '', targetGender: 'Mix', targetAgeGrade: '', participantsCount: '',
+                        alreadySplitTeams: 'no', teamsCount: '', needSpecificServantsCount: 'no',
+                        servantsCount: '', servantsAvailableHelping: 'yes',
+                        contactName: '', contactNumber: '', churchName: '' 
+                      }); 
+                    }}
+                    style={{ 
+                      width: '100%', 
+                      padding: '13px', 
+                      borderRadius: '12px',
+                      border: '1px solid rgba(167,139,250,0.3)', 
+                      background: 'rgba(167,139,250,0.08)', 
+                      color: '#c4b5fd',
+                      fontWeight: '800', 
+                      fontSize: '0.9rem', 
+                      cursor: 'pointer',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '8px',
+                      boxShadow: '0 4px 15px rgba(167,139,250,0.1)'
+                    }}
+                  >
+                    ⛪ Request VBT Service
+                  </button>
+                </div>
+
                 <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '16px' }}>
                   <button
                     onClick={() => setShowGlobalAdminLogin(true)}
@@ -5244,11 +5410,11 @@ export default function App() {
                     🔑 VBT Heads & Coordinators Login
                   </button>
                 </div>
-              )}
 
-              {/* Bottom safe area spacer */}
-              <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
-            </>
+                {/* Bottom safe area spacer */}
+                <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
+              </>
+            )
           ) : (
             /* Create New Event Form */
             <div className="glass-ticket animate-fade" style={{ padding: '28px', width: '100%', maxWidth: '750px' }}>
