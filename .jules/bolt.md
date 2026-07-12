@@ -1,0 +1,3 @@
+## 2024-07-12 - Regex parsing on Interval Tick
+**Learning:** Functions like `parseTimeToMs` and `isTimeSlotActive` used a Regex `match()` operation inside `App.jsx` utility functions that ran continuously on interval state changes for every element in a large array (`campData.matchups`). Because `App.jsx` handles frequent timer state updates, O(N) regex evaluation created significant GC thrashing and CPU load.
+**Action:** Extract string/regex processing to a module-level memoization cache (`timeParseCache`). This turns an O(N) regex evaluation on every UI tick into a fast O(1) object lookup, drastically reducing GC thrashing.

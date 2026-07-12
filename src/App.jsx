@@ -148,6 +148,24 @@ import ServiceTab from './components/ServiceTab';
 // Replace this placeholder with your actual key to connect browser push notifications.
 const WEBPUSH_VAPID_KEY = "BBWNlIKCRTY40ybSED7bBc5AUlRT7IHvZ0EajhdPVnxDcuSnZ7_3I50nXF79S6QG8cRcqr3UCIVBcC-v4Yvc3RU"; 
 
+// ─── OPTIMIZATION: TIME PARSE CACHING ───────────────────────────────────────
+const timeParseCache = {};
+function getParsedTime(timeStr) {
+  if (!timeStr) return null;
+  const trimmed = timeStr.trim();
+  if (timeParseCache[trimmed]) return timeParseCache[trimmed];
+  const match = trimmed.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return null;
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const isPM = match[3].toUpperCase() === 'PM';
+  const hours24 = isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
+  const result = { hours24, minutes };
+  timeParseCache[trimmed] = result;
+  return result;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 const FALLBACK_SERVANT_ASSIGNMENTS = {
   // Team Leaders
   'andrew': 'team_red_1',
@@ -1818,22 +1836,17 @@ export default function App() {
 
   const isTimeSlotActive = (timeStr, blockName, matchupDay, now = new Date()) => {
     try {
-      let timePart = timeStr.trim();
-      const match = timePart.match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return false;
+      const parsed = getParsedTime(timeStr);
+      if (!parsed) return false;
       
       if (matchupDay) {
         const currentDay = getEventCurrentDay(now);
         if (matchupDay !== currentDay) return false;
       }
       
-      const hours = parseInt(match[1]);
-      const minutes = parseInt(match[2]);
-      const isPM = match[3].toUpperCase() === 'PM';
-      
       const eventTime = new Date();
-      eventTime.setHours(isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours));
-      eventTime.setMinutes(minutes);
+      eventTime.setHours(parsed.hours24);
+      eventTime.setMinutes(parsed.minutes);
       eventTime.setSeconds(0);
 
       const shift = getEffectiveTimeShift(now);
@@ -1850,15 +1863,12 @@ export default function App() {
 
   const parseTimeToMs = (timeStr, now = new Date()) => {
     try {
-      const match = timeStr.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return 0;
-      const hours = parseInt(match[1]);
-      const minutes = parseInt(match[2]);
-      const isPM = match[3].toUpperCase() === 'PM';
+      const parsed = getParsedTime(timeStr);
+      if (!parsed) return 0;
       
       const date = new Date(now);
-      date.setHours(isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours));
-      date.setMinutes(minutes);
+      date.setHours(parsed.hours24);
+      date.setMinutes(parsed.minutes);
       date.setSeconds(0);
       date.setMilliseconds(0);
       return date.getTime();
