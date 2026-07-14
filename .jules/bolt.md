@@ -1,0 +1,3 @@
+## 2024-03-24 - [Cache Expensive Operations in Render Loops]
+**Learning:** During interval ticks or render cycles where large arrays (e.g. `campData.matchups`) are filtered or mapped over iteratively, performing regex matching (such as time string parsing) directly inside the loop becomes a massive CPU bottleneck on mobile devices.
+**Action:** When working on large monolithic React components like `App.jsx` with many time-based effects, ensure string parsing/regex functions (`parseTimeToMs`, `isTimeSlotActive`) use module-level caches (`timeRegexCache = new Map()`) instead of repeated evaluation.
