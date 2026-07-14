@@ -271,6 +271,27 @@ const faqsList = [
   }
 ];
 
+// ─── OPTIMIZATIONS ────────────────────────────────────────────────────────────
+// Memoize regex time parsing to optimize hundreds of render-loop evaluations
+const timeRegexCache = new Map();
+function getParsedTime(timeStr) {
+  if (!timeStr) return null;
+  const t = timeStr.trim();
+  if (timeRegexCache.has(t)) return timeRegexCache.get(t);
+
+  const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  let res = null;
+  if (match) {
+    res = {
+      hours: parseInt(match[1], 10),
+      minutes: parseInt(match[2], 10),
+      isPM: match[3].toUpperCase() === 'PM'
+    };
+  }
+  timeRegexCache.set(t, res);
+  return res;
+}
+
 // Bell chime functions — delegate to chimes.js (plays real WAV files with oscillator fallback)
 function playBellChime() {
   playChime('announcement'); // → Chord2.wav from akx/Notifications (CC0)
@@ -1818,18 +1839,15 @@ export default function App() {
 
   const isTimeSlotActive = (timeStr, blockName, matchupDay, now = new Date()) => {
     try {
-      let timePart = timeStr.trim();
-      const match = timePart.match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return false;
+      const parsedTime = getParsedTime(timeStr);
+      if (!parsedTime) return false;
       
       if (matchupDay) {
         const currentDay = getEventCurrentDay(now);
         if (matchupDay !== currentDay) return false;
       }
       
-      const hours = parseInt(match[1]);
-      const minutes = parseInt(match[2]);
-      const isPM = match[3].toUpperCase() === 'PM';
+      const { hours, minutes, isPM } = parsedTime;
       
       const eventTime = new Date();
       eventTime.setHours(isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours));
@@ -1850,11 +1868,10 @@ export default function App() {
 
   const parseTimeToMs = (timeStr, now = new Date()) => {
     try {
-      const match = timeStr.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return 0;
-      const hours = parseInt(match[1]);
-      const minutes = parseInt(match[2]);
-      const isPM = match[3].toUpperCase() === 'PM';
+      const parsedTime = getParsedTime(timeStr);
+      if (!parsedTime) return 0;
+
+      const { hours, minutes, isPM } = parsedTime;
       
       const date = new Date(now);
       date.setHours(isPM ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours));
