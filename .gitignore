@@ -37,3 +37,4 @@ credentials.json
 graphify-out/
 .gstack/
 scratch/
+.firebase/
