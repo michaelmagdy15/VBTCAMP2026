@@ -141,6 +141,7 @@ export default function InteractiveMap({
         {mapConfig?.customMapUrl ? (
           <div className="custom-map-screenshot-container" style={{ position: 'relative', width: '100%', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(41, 182, 246, 0.15)', background: 'rgba(7, 10, 19, 0.45)' }}>
             <img 
+              loading="lazy" // ⚡ Bolt Optimization: Defer loading of custom map screenshot until it's rendered to reduce initial payload.
               src={mapConfig.customMapUrl} 
               alt="Custom Map Key Layout" 
               style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 12 }} 
