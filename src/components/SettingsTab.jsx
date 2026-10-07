@@ -2,9 +2,11 @@ import React from 'react';
 import { Settings, Plus, Minus, Calendar, Clock3, AlertCircle } from 'lucide-react';
 import ScheduleBuilder from './ScheduleBuilder';
 import DynamicConfigurator from './DynamicConfigurator';
+import { deleteServiceRequest, updateServiceRequestStatus, addAnnouncement } from '../firebase';
 
 export default function SettingsTab({
   currentUser,
+  setShowMoreDrawer = () => {},
   isDarkMode,
   settingsSubTab,
   eventConfig,
@@ -14,17 +16,30 @@ export default function SettingsTab({
   campState,
   campData,
   editKidCount,
+  setEditKidCount = () => {},
   editDaysCount,
+  setEditDaysCount = () => {},
   editTeamRed,
+  setEditTeamRed = () => {},
   editTeamWhite,
+  setEditTeamWhite = () => {},
   editTeamBlack,
+  setEditTeamBlack = () => {},
   editTeamBlue,
+  setEditTeamBlue = () => {},
   editStations,
+  setEditStations = () => {},
   editBigGameName,
+  setEditBigGameName = () => {},
   editBigGameLocation,
+  setEditBigGameLocation = () => {},
   editReflectionName,
+  setEditReflectionName = () => {},
   editReflectionLocation,
+  setEditReflectionLocation = () => {},
   editDefaultMatchupSortMode,
+  setEditDefaultMatchupSortMode = () => {},
+  defaultCampState = {},
   editEventConfig,
   globalServants,
   editAttending,

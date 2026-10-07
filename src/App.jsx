@@ -1,7 +1,7 @@
 import { useServiceTimer } from './utils/useServiceTimer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Trophy, 
@@ -36,7 +36,9 @@ import {
   Package,
   Navigation,
   MoreHorizontal,
-  Menu
+  Menu,
+  QrCode,
+  User
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -108,6 +110,14 @@ import LogisticsPanel from './components/LogisticsPanel';
 import LogisticsTab from './components/LogisticsTab';
 import FeedMessage from './components/FeedMessage';
 import ScheduleExporter from './components/ScheduleExporter';
+import MemberProfileModal from './components/MemberProfileModal';
+import CommunityTab from './components/CommunityTab';
+import WeeklyServicesTab from './components/WeeklyServicesTab';
+import QRScannerModal from './components/QRScannerModal';
+import { useMemberProfile } from './utils/useMemberProfile';
+import { createOrGetMemberProfile, updateMemberPublicProfile } from './services/memberService';
+
+
 const lazyWithRetry = (componentImport) => {
   return React.lazy(async () => {
     try {
@@ -917,6 +927,23 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState(() => {
+    const evCode = localStorage.getItem('vbt_current_event');
+    if (!evCode) return null;
+    const saved = localStorage.getItem(`vbt_user_${evCode}`);
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const memberId = currentUser?.memberId || currentUser?.id || null;
+  const isCurrentAdmin = currentUser?.role === 'admin' || currentUser?.role === 'coordinator';
+  const {
+    publicProfile: currentMemberPublicProfile,
+    privateProfile: currentMemberPrivateProfile,
+    updatePublic: updateCurrentMemberPublic,
+    updatePrivate: updateCurrentMemberPrivate,
+  } = useMemberProfile(memberId, currentUser?.communityId || 'vbt_main', isCurrentAdmin);
+
   useEffect(() => {
     syncServerTimeOffset();
 
@@ -933,6 +960,13 @@ export default function App() {
               if (phone) {
                 await setDoc(doc(db, 'vbt_uid_map', user.uid), { phoneNumber: phone.trim() });
                 console.log(`[Auth] Auto-registered UID map: ${user.uid} -> ${phone}`);
+                // Background sync permanent member profile
+                createOrGetMemberProfile('vbt_main', {
+                  memberId: user.uid,
+                  phoneNumber: phone.trim(),
+                  firstName: parsed.firstName || parsed.name || '',
+                  role: parsed.role || 'member',
+                }).catch((syncErr) => console.warn('[Auth] Member profile sync warning:', syncErr));
               }
             } catch (e) {
               console.error("[Auth] Failed to bind UID mapping:", e);
@@ -1003,13 +1037,6 @@ export default function App() {
     )).sort();
   }, [campData]);
 
-  // Authentication State
-  const [currentUser, setCurrentUser] = useState(() => {
-    const evCode = localStorage.getItem('vbt_current_event');
-    if (!evCode) return null;
-    const saved = localStorage.getItem(`vbt_user_${evCode}`);
-    return saved ? JSON.parse(saved) : null;
-  });
   const [loginRole, setLoginRole] = useState('leader'); // 'leader' | 'admin' | 'referee'
   const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -1600,6 +1627,10 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('scoreboard');
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedProfileMember, setSelectedProfileMember] = useState(null);
+  const [showSelectedMemberModal, setShowSelectedMemberModal] = useState(false);
+  const [showQRScannerModal, setShowQRScannerModal] = useState(false);
   const [infoSubTab, setInfoSubTab] = useState('map');
   const [settingsSubTab, setSettingsSubTab] = useState('config');
   const [auditLogFilter, setAuditLogFilter] = useState('All');
@@ -2761,7 +2792,10 @@ export default function App() {
       grade,
       assignedTeams: assignedTeams || [],
       assignedGames: assignedGames || [],
-      uiMode: resolvedUiMode
+      uiMode: resolvedUiMode,
+      memberId: authenticatedUser.memberId || id || '',
+      communityId: authenticatedUser.communityId || 'vbt_main',
+      memberProfile: authenticatedUser.memberProfile || null
     };
     
     setCurrentUser(user);
@@ -3350,7 +3384,7 @@ export default function App() {
   };
   const handleTimerReset = async () => {
     await setTimerState(currentEventCode, { startedAt: null, isPaused: false, pausedAt: null, totalPausedMs: 0 });
-    setRotationSecondsLeft(null); setShowRotateNow(false);
+    setShowRotateNow(false);
   };
 
   // WhatsApp deep link
@@ -6875,6 +6909,7 @@ export default function App() {
           globalServants={globalServants} 
           onLogin={handleLogin}
           onLogout={handleLeaveEvent}
+          onOpenProfile={() => setShowProfileModal(true)}
           currentUser={currentUser}
           loginError={loginError}
           setLoginError={setLoginError}
@@ -7167,7 +7202,31 @@ export default function App() {
             </div>
           </div>
           
-          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Quick Attendance QR Scanner */}
+              {currentUser && (
+                <button
+                  onClick={() => setShowQRScannerModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
+                    borderRadius: '10px',
+                    background: 'rgba(6, 182, 212, 0.15)',
+                    border: '1px solid rgba(6, 182, 212, 0.35)',
+                    color: '#22d3ee',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  title="Scan attendance QR code"
+                >
+                  <QrCode size={14} />
+                  <span style={{ display: 'inline' }}>Scan QR</span>
+                </button>
+              )}
 
               {/* User Avatar */}
               <button
@@ -8077,17 +8136,31 @@ export default function App() {
             campState={campState}
             campData={campData}
             editKidCount={editKidCount}
+            setEditKidCount={setEditKidCount}
             editDaysCount={editDaysCount}
+            setEditDaysCount={setEditDaysCount}
             editTeamRed={editTeamRed}
+            setEditTeamRed={setEditTeamRed}
             editTeamWhite={editTeamWhite}
+            setEditTeamWhite={setEditTeamWhite}
             editTeamBlack={editTeamBlack}
+            setEditTeamBlack={setEditTeamBlack}
             editTeamBlue={editTeamBlue}
+            setEditTeamBlue={setEditTeamBlue}
             editStations={editStations}
+            setEditStations={setEditStations}
             editBigGameName={editBigGameName}
+            setEditBigGameName={setEditBigGameName}
             editBigGameLocation={editBigGameLocation}
+            setEditBigGameLocation={setEditBigGameLocation}
             editReflectionName={editReflectionName}
+            setEditReflectionName={setEditReflectionName}
             editReflectionLocation={editReflectionLocation}
+            setEditReflectionLocation={setEditReflectionLocation}
             editDefaultMatchupSortMode={editDefaultMatchupSortMode}
+            setEditDefaultMatchupSortMode={setEditDefaultMatchupSortMode}
+            defaultCampState={defaultCampState}
+            setShowMoreDrawer={setShowMoreDrawer}
             editEventConfig={editEventConfig}
             globalServants={globalServants}
             editAttending={editAttending}
@@ -8190,6 +8263,30 @@ export default function App() {
             handleGameChange={handleGameChange}
             handleRemoveGame={handleRemoveGame}
             handleAddGame={handleAddGame}
+          />
+        )}
+
+        {/* Tab: Community Directory */}
+        {currentTab === 'community' && (
+          <CommunityTab
+            currentUser={currentUser}
+            isAdmin={isCurrentAdmin}
+            onSelectMember={(member) => {
+              setSelectedProfileMember(member);
+              setShowSelectedMemberModal(true);
+            }}
+            onOpenMyProfile={() => setShowProfileModal(true)}
+          />
+        )}
+
+        {/* Tab: Weekly Services & Gatherings */}
+        {currentTab === 'services' && (
+          <WeeklyServicesTab
+            currentUser={currentUser}
+            currentUserProfile={currentMemberPublicProfile}
+            isAdmin={isCurrentAdmin}
+            isLeader={currentUser?.role === 'leader' || isCurrentAdmin}
+            communityId={currentUser?.communityId || 'vbt_main'}
           />
         )}
         </React.Suspense>
@@ -8374,6 +8471,8 @@ export default function App() {
             {/* Navigation List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
               {[
+                { id: 'services', label: 'Weekly Gatherings & QR', icon: QrCode },
+                { id: 'community', label: 'Community & Members', icon: Users },
                 { id: 'service', label: 'Live Service & Setup', icon: BookOpen },
                 { id: 'schedule', label: 'Schedule Builder', icon: Calendar },
                 { id: 'scoreboard', label: 'Live Scoreboard', icon: Trophy },
@@ -8449,7 +8548,7 @@ export default function App() {
 
               <button
                 onClick={() => {
-                  setShowOfflineBackupModal(true);
+                  setShowBackupModal(true);
                   setShowAdminMenu(false);
                 }}
                 style={{
@@ -8675,6 +8774,127 @@ export default function App() {
                   <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
                 </button>
               </div>
+
+              {/* My Community Profile */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setShowMoreDrawer(false);
+                  setShowProfileModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '14px 16px',
+                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  borderRadius: '12px',
+                  color: '#38bdf8',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.95rem',
+                  fontWeight: '700',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <User size={18} />
+                <span>My Community Profile</span>
+              </button>
+
+              {/* Community Directory */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('community');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Users size={18} color="var(--vbt-sky)" />
+                <span>Community Directory & Members</span>
+              </button>
+
+              {/* Weekly Services & Gatherings */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('services');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Calendar size={18} color="#22d3ee" />
+                <span>Weekly Services & Gatherings</span>
+              </button>
+
+              {/* Quick Scan QR Attendance */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setShowMoreDrawer(false);
+                  setShowQRScannerModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(6, 182, 212, 0.1)',
+                  border: '1px solid rgba(6, 182, 212, 0.25)',
+                  borderRadius: '12px',
+                  color: '#22d3ee',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <QrCode size={18} color="#22d3ee" />
+                <span>Scan Attendance QR Code</span>
+              </button>
+
               {/* Leader specific: My Team */}
               {currentUser.role === 'leader' && (
                 <button
@@ -9149,6 +9369,43 @@ export default function App() {
       {/* ═══ QUICK JOIN FORM MODAL (SELF CHECK-IN WIZARD) ════════════════════════════ */}
       {renderQuickJoinFormModal()}
 
+      {/* ═══ COMMUNITY MEMBER PROFILE MODAL ══════════════════════ */}
+      <MemberProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        publicProfile={currentMemberPublicProfile}
+        privateProfile={currentMemberPrivateProfile}
+        onSavePublic={updateCurrentMemberPublic}
+        onSavePrivate={updateCurrentMemberPrivate}
+        isAdmin={isCurrentAdmin}
+      />
+
+      {/* ═══ SELECTED COMMUNITY MEMBER PROFILE MODAL ══════════════ */}
+      {selectedProfileMember && (
+        <MemberProfileModal
+          isOpen={showSelectedMemberModal}
+          onClose={() => {
+            setShowSelectedMemberModal(false);
+            setSelectedProfileMember(null);
+          }}
+          publicProfile={selectedProfileMember}
+          privateProfile={null}
+          onSavePublic={async (updates) => {
+            await updateMemberPublicProfile('vbt_main', selectedProfileMember.id, updates, isCurrentAdmin);
+            setSelectedProfileMember(prev => (prev ? { ...prev, ...updates } : null));
+          }}
+          onSavePrivate={async () => {}}
+          isAdmin={isCurrentAdmin}
+        />
+      )}
+
+      {/* ═══ COMMUNITY ATTENDANCE QR SCANNER MODAL ══════════════ */}
+      <QRScannerModal
+        isOpen={showQRScannerModal}
+        onClose={() => setShowQRScannerModal(false)}
+        currentUserProfile={currentMemberPublicProfile}
+        communityId={currentUser?.communityId || 'vbt_main'}
+      />
 
       {/* ═══ SERVANTS DIRECTORY MODAL ════════════════════════ */}
       {showServantDirectoryModal && (

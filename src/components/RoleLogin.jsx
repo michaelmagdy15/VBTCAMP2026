@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Shield, Phone, User, LogOut, Loader2 } from 'lucide-react';
-import { db, addAnnouncement, auth } from '../firebase';
+import { useState } from 'react';
+import { Phone, User, LogOut, Loader2 } from 'lucide-react';
+import { db, addAnnouncement, auth, DEFAULT_COMMUNITY_ID } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { createOrGetMemberProfile } from '../services/memberService';
+
 
 // ─── Theme Tokens (glassmorphism) ─────────────────────────────
 const T = {
@@ -174,6 +176,7 @@ export default function RoleLogin({
   eventConfig,
   onLogin,
   onLogout,
+  onOpenProfile,
   currentUser,
   loginError,
   setLoginError,
@@ -267,6 +270,25 @@ export default function RoleLogin({
         }
       }
 
+      // Synchronize / create permanent community member profile
+      try {
+        const memberUid = auth.currentUser?.uid || cleanPhone;
+        const profileRes = await createOrGetMemberProfile(DEFAULT_COMMUNITY_ID, {
+          memberId: memberUid,
+          phoneNumber: cleanPhone,
+          firstName: cleanFirstName || userObj.firstName || '',
+          lastName: userObj.lastName || '',
+          role: userObj.role || 'member',
+        });
+        if (profileRes?.publicProfile) {
+          userObj.memberId = memberUid;
+          userObj.communityId = DEFAULT_COMMUNITY_ID;
+          userObj.memberProfile = profileRes.publicProfile;
+        }
+      } catch (memberErr) {
+        console.warn('[Login] Community member profile creation warning:', memberErr);
+      }
+
       // Log the user in
       onLogin(userObj);
     } catch (err) {
@@ -303,15 +325,40 @@ export default function RoleLogin({
               <span style={S.badgeRole}>{displayRole}</span>
             </div>
           </div>
-          <button
-            style={S.logoutBtn}
-            onClick={onLogout}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)')}
-          >
-            <LogOut size={15} />
-            Logout
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onOpenProfile && (
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  color: '#38bdf8',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <User size={15} />
+                Profile
+              </button>
+            )}
+            <button
+              style={S.logoutBtn}
+              onClick={onLogout}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)')}
+            >
+              <LogOut size={15} />
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     );

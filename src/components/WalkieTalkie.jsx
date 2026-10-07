@@ -557,9 +557,15 @@ function WalkieTalkieInner({ eventCode, currentUser, onSpeakingChange }) {
 
   const channelColor = getChannelColor(activeChannel);
   
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Calculate if lock is stale (older than 35s)
   const isLockStale = channelLock.timestamp 
-    ? (Date.now() - channelLock.timestamp.toMillis() > 35000) 
+    ? (now - channelLock.timestamp.toMillis() > 35000) 
     : false;
     
   const isSomeoneElseSpeaking = channelLock.isBusy && !isLockStale && channelLock.currentSpeakerUid !== mySessionId;

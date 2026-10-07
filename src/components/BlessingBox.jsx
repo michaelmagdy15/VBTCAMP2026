@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, Send, CheckCircle2 } from 'lucide-react';
 import { addAnnouncement } from '../firebase';
 import confetti from 'canvas-confetti';
@@ -34,7 +34,7 @@ export default function BlessingBox({ currentUser, activeEventCode, campData }) 
   }, [campData]);
 
   // Set default team
-  useMemo(() => {
+  useEffect(() => {
     if (teamCodes.length > 0 && !selectedTeam) {
       setSelectedTeam(teamCodes[0]);
     }

@@ -26,9 +26,33 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/vbt_servants/$(getUserPhone())).data;
     }
 
-    // Helper to check if the user is an admin
+    // Helper to check if the user is an admin via legacy servant document
     function isAdmin() {
       return hasServantData() && getUserData().role == 'admin';
+    }
+
+    // Helper to check if user is a community admin (checks either legacy servant record or community member record)
+    function isCommunityAdmin(communityId) {
+      return isAdmin() || (
+        isAuthenticated() &&
+        exists(/databases/$(database)/documents/vbt_communities/$(communityId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/vbt_communities/$(communityId)/members/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Helper to check if user has a leadership role in community
+    function isCommunityLeader(communityId) {
+      return isCommunityAdmin(communityId) || (
+        isAuthenticated() && (
+          (hasServantData() && (getUserData().role == 'leader' || getUserData().role == 'service_leader' || getUserData().role == 'coordinator')) ||
+          (
+            exists(/databases/$(database)/documents/vbt_communities/$(communityId)/members/$(request.auth.uid)) &&
+            (
+              get(/databases/$(database)/documents/vbt_communities/$(communityId)/members/$(request.auth.uid)).data.role in ['admin', 'coordinator', 'team_leader', 'game_leader', 'service_leader']
+            )
+          )
+        )
+      );
     }
 
     // Match root UID maps (only the owner can write their own mapping)
@@ -60,6 +84,100 @@ service cloud.firestore {
     match /vbt_locations/{locationId} {
       allow read: if true;
       allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // Match permanent community layer
+    match /vbt_communities/{communityId} {
+      // Community metadata & config is readable by everyone
+      allow read: if true;
+      allow write: if isAuthenticated() && isCommunityAdmin(communityId);
+
+      // Members collection (public profiles)
+      match /members/{memberId} {
+        // Authenticated members can view member directory
+        allow read: if isAuthenticated();
+        
+        // Creation allowed for admin or the user themselves
+        allow create: if isAuthenticated() && (
+          isCommunityAdmin(communityId) ||
+          request.auth.uid == memberId
+        );
+
+        // Updates allowed: admin can change anything; user can edit allowed self-profile fields but NOT role/status
+        allow update: if isAuthenticated() && (
+          isCommunityAdmin(communityId) || (
+            request.auth.uid == memberId &&
+            request.resource.data.role == resource.data.role &&
+            request.resource.data.status == resource.data.status &&
+            (!('legacyServantPhone' in resource.data) || request.resource.data.legacyServantPhone == resource.data.legacyServantPhone)
+          )
+        );
+
+        // Delete allowed only by admin
+        allow delete: if isAuthenticated() && isCommunityAdmin(communityId);
+
+        // Confidential private profile subcollection
+        match /private/{docId} {
+          // Strictly restricted to user themselves or admin
+          allow read: if isAuthenticated() && (
+            isCommunityAdmin(communityId) ||
+            request.auth.uid == memberId
+          );
+
+          // Creation & update: member can update their own private details, but CANNOT modify pastoral notes
+          allow write: if isAuthenticated() && (
+            isCommunityAdmin(communityId) || (
+              request.auth.uid == memberId &&
+              (
+                !exists(resource) ||
+                !('pastoralNotes' in request.resource.data) ||
+                request.resource.data.pastoralNotes == resource.data.pastoralNotes
+              )
+            )
+          );
+        }
+      }
+
+      // Services subcollection (recurring weekly services & meetings)
+      match /services/{serviceId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && isCommunityAdmin(communityId);
+
+        // Attendance subcollection
+        match /attendance/{attendanceId} {
+          allow read: if isAuthenticated();
+          // Check-in allowed by user themselves (QR or self check-in) or community leader
+          allow create, update: if isAuthenticated() && (
+            isCommunityLeader(communityId) ||
+            request.auth.uid == request.resource.data.memberId
+          );
+          allow delete: if isAuthenticated() && isCommunityAdmin(communityId);
+        }
+      }
+
+      // Short-lived QR check-in sessions
+      match /qr_sessions/{sessionId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && isCommunityLeader(communityId);
+      }
+
+      // Serving opportunities
+      match /serving_opportunities/{opportunityId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && isCommunityLeader(communityId);
+
+        // Opportunity applications / commitments
+        match /applications/{applicationId} {
+          allow read: if isAuthenticated() && (
+            isCommunityLeader(communityId) ||
+            request.auth.uid == applicationId
+          );
+          allow write: if isAuthenticated() && (
+            isCommunityLeader(communityId) ||
+            request.auth.uid == applicationId
+          );
+        }
+      }
     }
 
     // Match all collections nested under an event

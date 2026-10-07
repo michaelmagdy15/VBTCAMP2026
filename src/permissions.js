@@ -98,14 +98,11 @@ export function canEditTokens(user) {
  */
 export function canPostAnnouncement(user) {
   const role = getPermissionLevel(user);
-  const name = user?.name?.toLowerCase().trim() || '';
   return role === ROLES.COORDINATOR || 
          role === ROLES.TEAM_LEADER || 
          role === ROLES.SERVICE_LEADER || 
          role === ROLES.SERVICE_DAY_LEADER ||
-         role === 'media' ||
-         name === 'michael mitry' ||
-         name === 'michael_mitry';
+         role === 'media';
 }
 
 // ─── Config ──────────────────────────────────────────────────
@@ -124,13 +121,10 @@ export function canEditConfig(user) {
  */
 export function canSendPing(user) {
   const role = getPermissionLevel(user);
-  const name = user?.name?.toLowerCase().trim() || '';
   return role === ROLES.COORDINATOR || 
          role === ROLES.SERVICE_LEADER || 
          role === ROLES.SERVICE_DAY_LEADER ||
-         role === 'media' ||
-         name === 'michael mitry' ||
-         name === 'michael_mitry';
+         role === 'media';
 }
 
 // ─── Alerts ──────────────────────────────────────────────────
@@ -140,13 +134,10 @@ export function canSendPing(user) {
  */
 export function canCreateAlert(user) {
   const role = getPermissionLevel(user);
-  const name = user?.name?.toLowerCase().trim() || '';
   return role === ROLES.COORDINATOR || 
          role === ROLES.SERVICE_LEADER || 
          role === ROLES.SERVICE_DAY_LEADER ||
-         role === 'media' ||
-         name === 'michael mitry' ||
-         name === 'michael_mitry';
+         role === 'media';
 }
 
 // ─── Editable Scopes ─────────────────────────────────────────

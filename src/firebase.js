@@ -24,12 +24,12 @@ import { getAuth, signInAnonymously, signInWithEmailAndPassword } from 'firebase
 // VBT data is isolated in the dedicated 'db-vbt' database.
 // Other databases (db-gyms, db-inzanathletics, db-shockgym, etc.) are untouched.
 const firebaseConfig = {
-  projectId: "faa-test-guide-v2",
-  appId: "1:492280162134:web:08307e50672d6ae12d98f7",  // VBT Web App
-  apiKey: "AIzaSyAUvzDIKoTvtbMEWaP1pDSyNfqpS3_11wI",
-  authDomain: "faa-test-guide-v2.firebaseapp.com",
-  storageBucket: "faa-test-guide-v2.firebasestorage.app",
-  messagingSenderId: "492280162134"
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "faa-test-guide-v2",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:492280162134:web:08307e50672d6ae12d98f7",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAUvzDIKoTvtbMEWaP1pDSyNfqpS3_11wI",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "faa-test-guide-v2.firebaseapp.com",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "faa-test-guide-v2.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "492280162134"
 };
 
 // Initialize Firebase
@@ -40,7 +40,7 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })
-}, 'db-vbt');
+}, import.meta.env.VITE_FIREBASE_DATABASE_ID || 'db-vbt');
 
 export const auth = getAuth(app);
 
@@ -95,7 +95,9 @@ export async function getEventRegistry() {
     if (!navigator.onLine) {
       try {
         docSnap = await getDoc(docRef, { source: 'cache' });
-      } catch(e) {}
+      } catch (_err) {
+        // Cache entry not found or unavailable
+      }
     } else {
       try {
         docSnap = await Promise.race([
@@ -378,10 +380,10 @@ export async function updateAnnouncementReactions(eventCode, id, reactions) {
 // ─────────────────────────────────────────────
 
 // URL of the deployed Cloud Run notification service
-// This will be updated automatically after the first deploy
-export const NOTIFY_SERVICE_URL = 'https://vbt-notify-service-430356395102.europe-west1.run.app';
-
-export const VAPID_PUBLIC_KEY = 'BE7Vwn_moGbtJ4gXEFj61BnvQ5HEnbmaaLneCm-65ITNq2CyzcdxtwqfrfyDar_EjMT8IpP1B_AmnPxk9NDYeTw';
+export const NOTIFY_SERVICE_URL = import.meta.env.VITE_NOTIFY_SERVICE_URL || 'https://vbt-notify-service-430356395102.europe-west1.run.app';
+export const NOTIFY_API_KEY = import.meta.env.VITE_NOTIFY_API_KEY || 'vbt_secret_camp_2026_key';
+export const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BE7Vwn_moGbtJ4gXEFj61BnvQ5HEnbmaaLneCm-65ITNq2CyzcdxtwqfrfyDar_EjMT8IpP1B_AmnPxk9NDYeTw';
+export const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || 'vbt_main';
 
 /**
  * Subscribe this browser to Web Push and register with the notify service.
@@ -421,7 +423,7 @@ export async function subscribeToWebPush(uid, name, role) {
       method : 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'x-api-key': 'vbt_secret_camp_2026_key'
+        'x-api-key': NOTIFY_API_KEY
       },
       body   : JSON.stringify({ uid, name, role, subscription }),
     });
@@ -445,7 +447,7 @@ export async function sendWebPushNotification(title, body, type = 'announcement'
       method : 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'x-api-key': 'vbt_secret_camp_2026_key'
+        'x-api-key': NOTIFY_API_KEY
       },
       body   : JSON.stringify({ title, body, type }),
     });
