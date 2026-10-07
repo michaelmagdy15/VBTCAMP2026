@@ -1,0 +1,3 @@
+## 2024-05-24 - React.memo with Firebase onSnapshot
+**Learning:** Firebase `onSnapshot` recreates objects on every update. Standard shallow equality in `React.memo` will fail to prevent re-renders when passing snapshot objects as props. Using `JSON.stringify` in the custom equality function is a common workaround but a performance anti-pattern.
+**Action:** Always write custom equality functions for `React.memo` when dealing with Firebase snapshot objects. Instead of `JSON.stringify`, manually compare the specific nested fields that are expected to change (e.g., joining array values to strings for quick comparison) to maximize performance.
