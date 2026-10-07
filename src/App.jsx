@@ -38,7 +38,10 @@ import {
   MoreHorizontal,
   Menu,
   QrCode,
-  User
+  User,
+  Home,
+  Heart,
+  Sparkles
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -116,6 +119,11 @@ import WeeklyServicesTab from './components/WeeklyServicesTab';
 import QRScannerModal from './components/QRScannerModal';
 import { useMemberProfile } from './utils/useMemberProfile';
 import { createOrGetMemberProfile, updateMemberPublicProfile } from './services/memberService';
+import CommunityHomeDashboard from './components/CommunityHomeDashboard';
+import ServeMarketplaceTab from './components/ServeMarketplaceTab';
+import TeamsHubTab from './components/TeamsHubTab';
+import PrayerWallTab from './components/PrayerWallTab';
+import GrowthPathwaysTab from './components/GrowthPathwaysTab';
 
 
 const lazyWithRetry = (componentImport) => {
@@ -7203,6 +7211,31 @@ export default function App() {
           </div>
           
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Quick Home Hub Button */}
+              {currentUser && (
+                <button
+                  onClick={() => setCurrentTab('home')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '5px 10px',
+                    borderRadius: '10px',
+                    background: currentTab === 'home' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                    border: currentTab === 'home' ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: currentTab === 'home' ? '#60a5fa' : '#94a3b8',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  title="VBT Community Home"
+                >
+                  <Home size={14} />
+                  <span style={{ display: 'inline' }}>Home</span>
+                </button>
+              )}
+
               {/* Quick Attendance QR Scanner */}
               {currentUser && (
                 <button
@@ -8266,6 +8299,20 @@ export default function App() {
           />
         )}
 
+        {/* Tab: VBT Community Home Hub */}
+        {currentTab === 'home' && (
+          <CommunityHomeDashboard
+            currentUser={currentUser}
+            currentUserProfile={currentMemberPublicProfile}
+            isAdmin={isCurrentAdmin}
+            isLeader={currentUser?.role === 'leader' || isCurrentAdmin}
+            communityId={currentUser?.communityId || 'vbt_main'}
+            onNavigateTab={(tabId) => setCurrentTab(tabId)}
+            onOpenQRScanner={() => setShowQRScannerModal(true)}
+            onOpenProfile={() => setShowProfileModal(true)}
+          />
+        )}
+
         {/* Tab: Community Directory */}
         {currentTab === 'community' && (
           <CommunityTab
@@ -8282,6 +8329,50 @@ export default function App() {
         {/* Tab: Weekly Services & Gatherings */}
         {currentTab === 'services' && (
           <WeeklyServicesTab
+            currentUser={currentUser}
+            currentUserProfile={currentMemberPublicProfile}
+            isAdmin={isCurrentAdmin}
+            isLeader={currentUser?.role === 'leader' || isCurrentAdmin}
+            communityId={currentUser?.communityId || 'vbt_main'}
+          />
+        )}
+
+        {/* Tab: Serve Marketplace */}
+        {currentTab === 'serve' && (
+          <ServeMarketplaceTab
+            currentUser={currentUser}
+            currentUserProfile={currentMemberPublicProfile}
+            isAdmin={isCurrentAdmin}
+            isLeader={currentUser?.role === 'leader' || isCurrentAdmin}
+            communityId={currentUser?.communityId || 'vbt_main'}
+          />
+        )}
+
+        {/* Tab: Teams & Small Groups Hub */}
+        {currentTab === 'teams' && (
+          <TeamsHubTab
+            currentUser={currentUser}
+            currentUserProfile={currentMemberPublicProfile}
+            isAdmin={isCurrentAdmin}
+            isLeader={currentUser?.role === 'leader' || isCurrentAdmin}
+            communityId={currentUser?.communityId || 'vbt_main'}
+          />
+        )}
+
+        {/* Tab: Prayer Wall & Testimonies */}
+        {currentTab === 'prayer' && (
+          <PrayerWallTab
+            currentUser={currentUser}
+            currentUserProfile={currentMemberPublicProfile}
+            isAdmin={isCurrentAdmin}
+            isLeader={currentUser?.role === 'leader' || isCurrentAdmin}
+            communityId={currentUser?.communityId || 'vbt_main'}
+          />
+        )}
+
+        {/* Tab: Servant Growth & Training Pathways */}
+        {currentTab === 'growth' && (
+          <GrowthPathwaysTab
             currentUser={currentUser}
             currentUserProfile={currentMemberPublicProfile}
             isAdmin={isCurrentAdmin}
@@ -8471,8 +8562,13 @@ export default function App() {
             {/* Navigation List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
               {[
+                { id: 'home', label: 'VBT Home Hub', icon: Home },
                 { id: 'services', label: 'Weekly Gatherings & QR', icon: QrCode },
                 { id: 'community', label: 'Community & Members', icon: Users },
+                { id: 'serve', label: 'Serve Marketplace', icon: Heart },
+                { id: 'teams', label: 'Teams & Groups Hub', icon: Shield },
+                { id: 'prayer', label: 'Prayer & Testimonies', icon: Sparkles },
+                { id: 'growth', label: 'Growth & Pathways', icon: Award },
                 { id: 'service', label: 'Live Service & Setup', icon: BookOpen },
                 { id: 'schedule', label: 'Schedule Builder', icon: Calendar },
                 { id: 'scoreboard', label: 'Live Scoreboard', icon: Trophy },
@@ -8805,6 +8901,36 @@ export default function App() {
                 <span>My Community Profile</span>
               </button>
 
+              {/* VBT Home Hub */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('home');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: currentTab === 'home' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                  border: currentTab === 'home' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Home size={18} color="#60a5fa" />
+                <span>VBT Home Hub</span>
+              </button>
+
               {/* Community Directory */}
               <button
                 className="more-drawer-item"
@@ -8893,6 +9019,126 @@ export default function App() {
               >
                 <QrCode size={18} color="#22d3ee" />
                 <span>Scan Attendance QR Code</span>
+              </button>
+
+              {/* Serve Marketplace */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('serve');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Heart size={18} color="#f43f5e" />
+                <span>Serve Marketplace & Opportunities</span>
+              </button>
+
+              {/* Teams & Groups Hub */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('teams');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Shield size={18} color="#38bdf8" />
+                <span>Teams & Fellowship Groups</span>
+              </button>
+
+              {/* Prayer Wall & Testimonies */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('prayer');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Sparkles size={18} color="#fbbf24" />
+                <span>Prayer Wall & Testimonies</span>
+              </button>
+
+              {/* Growth & Pathways */}
+              <button
+                className="more-drawer-item"
+                onClick={() => {
+                  setCurrentTab('growth');
+                  setShowMoreDrawer(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginBottom: '4px'
+                }}
+              >
+                <Award size={18} color="#a855f7" />
+                <span>Servant Growth & Training</span>
               </button>
 
               {/* Leader specific: My Team */}

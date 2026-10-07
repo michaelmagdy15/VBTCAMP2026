@@ -82,6 +82,8 @@ export default function QRScannerModal({
     }
   }, [stopCamera, currentUserProfile, communityId]);
 
+  const tickRef = useRef(null);
+
   // Frame processing loop with jsQR
   const tick = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -106,8 +108,14 @@ export default function QRScannerModal({
       }
     }
 
-    animationFrameId.current = requestAnimationFrame(tick);
+    animationFrameId.current = requestAnimationFrame(() => {
+      if (tickRef.current) tickRef.current();
+    });
   }, [handleQRCodeDetected]);
+
+  useEffect(() => {
+    tickRef.current = tick;
+  });
 
   // Start camera stream
   const startCamera = useCallback(async () => {
