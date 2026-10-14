@@ -260,4 +260,25 @@ describe('CommunityHome Component Suite', () => {
 
     expect(html).toContain('Launch / Clone Service Event');
   });
+
+  it('renders the Native Mobile App Shell, Momentum Scroll Viewport, Segmented Control, and Standalone Install Banner', () => {
+    const html = renderToString(
+      <CommunityHome
+        currentUser={mockUser}
+        activities={mockActivities}
+        opportunities={mockOpportunities}
+      />
+    );
+
+    expect(html).toContain('vbt-native-shell');
+    expect(html).toContain('native-scroll-viewport');
+    expect(html).toContain('native-home-segmented-control');
+    expect(html).toContain('segment-tab-week');
+    expect(html).toContain('segment-tab-serve');
+    expect(html).toContain('segment-tab-pulse');
+    expect(html).toContain('segment-tab-tools');
+    expect(html).toContain('install-app-banner');
+    expect(html).toContain('Get the Fullscreen VBT Mobile App');
+  });
 });
+

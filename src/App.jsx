@@ -6007,7 +6007,10 @@ export default function App() {
 
         {showServiceRequestModal && (
           <div
-            className="more-drawer-overlay"
+            className="more-drawer-overlay items-end sm:items-center p-0 sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowServiceRequestModal(false);
+            }}
             style={{
               position: 'fixed',
               top: 0, left: 0, right: 0, bottom: 0,
@@ -6016,29 +6019,27 @@ export default function App() {
               WebkitBackdropFilter: 'blur(12px)',
               zIndex: 1500,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '16px'
+              justifyContent: 'center'
             }}
           >
             <div
-              className="glass-panel"
+              className="glass-panel vbt-sheet-animate rounded-t-3xl sm:rounded-3xl"
               style={{
                 width: '100%',
                 maxWidth: '560px',
-                maxHeight: '90vh',
+                maxHeight: '92vh',
                 overflowY: 'auto',
-                padding: '28px',
+                padding: '24px 24px calc(28px + env(safe-area-inset-bottom, 0px))',
                 position: 'relative',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
-                borderRadius: '24px',
-                background: 'rgba(15, 23, 42, 0.95)',
+                background: 'rgba(15, 23, 42, 0.98)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '20px'
               }}
             >
+              <div className="vbt-sheet-grabber sm:hidden" aria-hidden="true" />
               {/* Close Button */}
               <button
                 onClick={() => setShowServiceRequestModal(false)}
@@ -6493,7 +6494,13 @@ export default function App() {
         
         {showGlobalAdminLogin && (
           <div
-            className="more-drawer-overlay"
+            className="more-drawer-overlay items-end sm:items-center p-0 sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowGlobalAdminLogin(false);
+                setGlobalAdminLoginError('');
+              }
+            }}
             style={{
               position: 'fixed',
               top: 0, left: 0, right: 0, bottom: 0,
@@ -6502,27 +6509,25 @@ export default function App() {
               WebkitBackdropFilter: 'blur(12px)',
               zIndex: 1500,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '16px'
+              justifyContent: 'center'
             }}
           >
             <div
-              className="glass-panel animate-fade"
+              className="glass-panel vbt-sheet-animate rounded-t-3xl sm:rounded-3xl"
               style={{
                 width: '100%',
-                maxWidth: '400px',
-                padding: '28px',
+                maxWidth: '420px',
+                padding: '24px 24px calc(28px + env(safe-area-inset-bottom, 0px))',
                 position: 'relative',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
-                borderRadius: '24px',
-                background: 'rgba(15, 23, 42, 0.95)',
+                background: 'rgba(15, 23, 42, 0.98)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '20px'
               }}
             >
+              <div className="vbt-sheet-grabber sm:hidden" aria-hidden="true" />
               <button
                 onClick={() => {
                   setShowGlobalAdminLogin(false);

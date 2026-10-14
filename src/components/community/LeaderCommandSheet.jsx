@@ -122,6 +122,7 @@ export default function LeaderCommandSheet({
   const [showFullscreenQR, setShowFullscreenQR] = useState(false);
   const [copiedBriefing, setCopiedBriefing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(null);
 
   const eventCode = useMemo(() => {
     return (
@@ -206,43 +207,54 @@ export default function LeaderCommandSheet({
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div className="relative w-full max-w-2xl rounded-t-3xl sm:rounded-3xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl text-white overflow-hidden max-h-[92vh] flex flex-col">
-        {/* Top Grab Handle for Mobile */}
-        <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3 sm:hidden" />
+      <div className="vbt-sheet-animate relative w-full max-w-2xl rounded-t-3xl sm:rounded-3xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl text-white overflow-hidden max-h-[92vh] flex flex-col">
+        {/* Top Grab Handle & Header with Swipe-Down-to-Dismiss */}
+        <div
+          onTouchStart={(e) => setTouchStartY(e.touches?.[0]?.clientY ?? null)}
+          onTouchEnd={(e) => {
+            const endY = e.changedTouches?.[0]?.clientY ?? null;
+            if (touchStartY !== null && endY !== null && endY - touchStartY > 65) {
+              onClose?.();
+            }
+            setTouchStartY(null);
+          }}
+        >
+          <div className="vbt-sheet-grabber mt-3 sm:hidden" aria-hidden="true" />
 
-        {/* Header */}
-        <div className="px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-800 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500/20 to-cyan-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
-              <Zap className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2
-                  id="leader-command-sheet-title"
-                  className="text-base sm:text-lg font-black tracking-tight text-white"
-                >
-                  Servant &amp; Leader Command Hub
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                  1-Tap Flow
-                </span>
+          {/* Header */}
+          <div className="px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500/20 to-cyan-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                <Zap className="w-5 h-5" />
               </div>
-              <p className="text-xs text-slate-300">
-                Everything you need before, during, and after service in one place
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2
+                    id="leader-command-sheet-title"
+                    className="text-base sm:text-lg font-black tracking-tight text-white"
+                  >
+                    Servant &amp; Leader Command Hub
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                    1-Tap Flow
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Everything you need before, during, and after service in one place
+                </p>
+              </div>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close command hub"
-            data-testid="close-command-sheet-btn"
-            className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close command hub"
+              data-testid="close-command-sheet-btn"
+              className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* 3-Mode Context Tabs: Before (Prep) | During (Live) | After (Care & Share) */}

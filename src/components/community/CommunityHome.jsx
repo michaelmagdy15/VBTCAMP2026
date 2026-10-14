@@ -50,14 +50,123 @@ import CommunityMemoryWall from './CommunityMemoryWall';
 import WeeklyRitualBanner from './WeeklyRitualBanner';
 import { useCommunityData } from '../../services/communityAdapterService';
 import { DEFAULT_COMMUNITY_ID } from '../../firebase';
+import { triggerHaptic, isStandaloneApp, isIOSDevice } from '../../utils/haptics';
 
 /**
- * Join with Code Modal Drawer
+ * Native Bottom Sheet: Install VBT App to Home Screen (iOS / Android Standalone Guide)
+ */
+function NativeInstallSheet({ isOpen, onClose, isIOS }) {
+  const [touchStartY, setTouchStartY] = useState(null);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="install-app-sheet-title"
+      data-testid="native-install-sheet"
+      className="fixed inset-0 z-[1350] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/85 backdrop-blur-md"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div
+        className="vbt-sheet-animate relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl p-6 pb-8 sm:p-7 text-white"
+        onTouchStart={(e) => setTouchStartY(e.touches?.[0]?.clientY ?? null)}
+        onTouchEnd={(e) => {
+          const endY = e.changedTouches?.[0]?.clientY ?? null;
+          if (touchStartY !== null && endY !== null && endY - touchStartY > 65) {
+            triggerHaptic('light');
+            onClose?.();
+          }
+          setTouchStartY(null);
+        }}
+      >
+        <div className="vbt-sheet-grabber sm:hidden" aria-hidden="true" />
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close install guide"
+          className="absolute top-5 right-5 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3.5 mt-2 mb-4">
+          <img
+            src="/Final VBT Re-Branding 2026-02 (3).png"
+            alt="VBT App Icon"
+            className="w-13 h-13 rounded-2xl bg-slate-950 p-1.5 border border-cyan-500/40 shadow-lg shrink-0 object-contain"
+          />
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+              Fullscreen Native Mode
+            </span>
+            <h3 id="install-app-sheet-title" className="text-lg font-black tracking-tight text-white mt-1">
+              Install VBT Mobile App
+            </h3>
+            <p className="text-xs text-slate-300">
+              Launch from your Home Screen with zero browser bars &amp; instant court alerts
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 my-4">
+          <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-start gap-3">
+            <span className="w-7 h-7 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-300 font-black text-xs flex items-center justify-center shrink-0">
+              1
+            </span>
+            <div>
+              <p className="text-xs font-bold text-white">
+                {isIOS
+                  ? 'Tap the "Share" button (⬆️) at the bottom of Safari'
+                  : 'Tap the browser menu (⋮) in the top corner'}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isIOS
+                  ? 'Located in your iPhone or iPad bottom navigation bar'
+                  : 'Or tap "Install App" directly if prompted by Chrome'}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-start gap-3">
+            <span className="w-7 h-7 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-xs flex items-center justify-center shrink-0">
+              2
+            </span>
+            <div>
+              <p className="text-xs font-bold text-white">
+                Select &ldquo;Add to Home Screen&rdquo; (➕)
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Tap &ldquo;Add&rdquo; in the top-right corner — the VBT icon will appear on your phone just like a native App Store app!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full min-h-[46px] py-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 text-white font-black text-sm shadow-lg shadow-cyan-600/30 cursor-pointer"
+        >
+          Got It
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Join with Code Native Bottom Sheet Drawer
  */
 function JoinCodeModal({ isOpen, onClose, onJoinCode }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -73,17 +182,20 @@ function JoinCodeModal({ isOpen, onClose, onJoinCode }) {
     e?.preventDefault?.();
     const cleanCode = code.trim().toLowerCase().replace(/\s+/g, '_');
     if (!cleanCode) {
+      triggerHaptic('warning');
       setError('Please enter a valid activity or event code.');
       return;
     }
     setError('');
     setLoading(true);
     try {
+      triggerHaptic('success');
       if (typeof onJoinCode === 'function') {
         await onJoinCode(cleanCode);
       }
       onClose?.();
     } catch (err) {
+      triggerHaptic('error');
       setError(err?.message || 'Could not verify event code. Please try again.');
     } finally {
       setLoading(false);
@@ -95,12 +207,25 @@ function JoinCodeModal({ isOpen, onClose, onJoinCode }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="join-code-title"
-      className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[1200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-700/80 shadow-2xl p-6 sm:p-7 text-white">
+      <div
+        className="vbt-sheet-animate relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl p-6 pb-8 sm:p-7 text-white"
+        onTouchStart={(e) => setTouchStartY(e.touches?.[0]?.clientY ?? null)}
+        onTouchEnd={(e) => {
+          const endY = e.changedTouches?.[0]?.clientY ?? null;
+          if (touchStartY !== null && endY !== null && endY - touchStartY > 65) {
+            triggerHaptic('light');
+            onClose?.();
+          }
+          setTouchStartY(null);
+        }}
+      >
+        <div className="vbt-sheet-grabber sm:hidden" aria-hidden="true" />
+
         <button
           type="button"
           onClick={onClose}
@@ -110,7 +235,7 @@ function JoinCodeModal({ isOpen, onClose, onJoinCode }) {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 mt-1">
           <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
             <KeyRound className="w-6 h-6" />
           </div>
@@ -140,7 +265,7 @@ function JoinCodeModal({ isOpen, onClose, onJoinCode }) {
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. VBT2026 or FRIDAY"
+              placeholder="e.g. JULY6 or FRIDAY"
               autoFocus
               className="w-full px-4 py-3.5 rounded-xl bg-slate-950/80 border border-slate-700 focus:border-cyan-400 text-white font-mono text-base tracking-widest uppercase outline-none transition-all placeholder:text-slate-600"
             />
@@ -171,9 +296,10 @@ function JoinCodeModal({ isOpen, onClose, onJoinCode }) {
 /**
  * CommunityHome Component
  *
- * Top-level Orchestrator for the VBT Community Homepage Redesign.
- * Connects header, welcome hero, weekly rhythms, serving opportunities,
- * community pulse, role dashboards, contextual modals, and live activity entry.
+ * Top-level Native-Feel Orchestrator for the VBT Community Homepage.
+ * Features a locked 100dvh app shell on mobile, momentum scroll container with
+ * Pull-to-Refresh, iOS-style Segmented Control to prevent endless scrolling,
+ * tactile haptic feedback, and swipeable bottom sheets.
  */
 export default function CommunityHome({
   currentUser = null,
@@ -198,6 +324,54 @@ export default function CommunityHome({
   // Navigation & View state: 'home' | 'community' | 'serve' | 'schedule' | 'profile'
   const [currentTab, setCurrentTab] = useState(initialTab || 'home');
 
+  // Mobile Segmented Control state on Home tab: 'week' | 'serve' | 'pulse' | 'tools'
+  const [homeSegment, setHomeSegment] = useState('week');
+
+  // Native Pull-to-Refresh state
+  const [pullStartY, setPullStartY] = useState(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Native Standalone App Install prompt & banner state
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(() => isStandaloneApp());
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(false);
+  const [isInstallSheetOpen, setIsInstallSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    setIsStandalone(isStandaloneApp());
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setDeferredInstallPrompt(null);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleTriggerInstallApp = useCallback(async () => {
+    triggerHaptic('medium');
+    if (deferredInstallPrompt && typeof deferredInstallPrompt.prompt === 'function') {
+      try {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        setDeferredInstallPrompt(null);
+        return;
+      } catch {
+        // Fall through to visual guide sheet
+      }
+    }
+    setIsInstallSheetOpen(true);
+  }, [deferredInstallPrompt]);
+
   // Modal states
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [checkInActivity, setCheckInActivity] = useState(null);
@@ -213,6 +387,7 @@ export default function CommunityHome({
   const [commandSheetTab, setCommandSheetTab] = useState('live');
 
   const handleOpenCommandSheet = useCallback((tab = 'live') => {
+    triggerHaptic('light');
     setCommandSheetTab(tab);
     setIsCommandSheetOpen(true);
   }, []);
@@ -296,15 +471,67 @@ export default function CommunityHome({
 
   // Handle Tab Navigation
   const handleSelectTab = useCallback((tabId) => {
+    triggerHaptic('selection');
     setCurrentTab(tabId);
-    // Smooth scroll to relevant section if on mobile/home
-    if (typeof window !== 'undefined') {
+    const viewport = typeof document !== 'undefined' ? document.querySelector('.vbt-native-scroll-viewport') : null;
+    if (viewport && typeof viewport.scrollTo === 'function') {
+      viewport.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, []);
 
+  // Handle Mobile Segmented Control switch on Home tab
+  const handleSelectHomeSegment = useCallback((segId) => {
+    triggerHaptic('selection');
+    setHomeSegment(segId);
+  }, []);
+
+  // Touch Pull-to-Refresh handlers on the native scroll viewport
+  const handleViewportTouchStart = useCallback((e) => {
+    const el = e.currentTarget;
+    if (el && el.scrollTop <= 2 && !isRefreshing) {
+      setPullStartY(e.touches?.[0]?.clientY ?? null);
+    } else {
+      setPullStartY(null);
+    }
+  }, [isRefreshing]);
+
+  const handleViewportTouchMove = useCallback((e) => {
+    if (pullStartY === null || isRefreshing) return;
+    const currentY = e.touches?.[0]?.clientY ?? pullStartY;
+    const delta = currentY - pullStartY;
+    if (delta > 0 && e.currentTarget.scrollTop <= 2) {
+      setPullDistance(Math.min(92, Math.round(delta * 0.48)));
+    } else {
+      setPullDistance(0);
+    }
+  }, [pullStartY, isRefreshing]);
+
+  const handleViewportTouchEnd = useCallback(async () => {
+    if (pullDistance >= 54 && !isRefreshing) {
+      setIsRefreshing(true);
+      setPullDistance(52);
+      triggerHaptic('medium');
+      try {
+        if (typeof hookData.refresh === 'function') {
+          await hookData.refresh();
+        }
+      } finally {
+        setTimeout(() => {
+          setIsRefreshing(false);
+          setPullDistance(0);
+        }, 450);
+      }
+    } else {
+      setPullDistance(0);
+    }
+    setPullStartY(null);
+  }, [pullDistance, isRefreshing, hookData]);
+
   // Attendance check-in trigger
   const handleOpenCheckIn = useCallback((activity = null) => {
+    triggerHaptic('light');
     setCheckInActivity(activity || primaryUpcomingActivity);
     setIsCheckInOpen(true);
   }, [primaryUpcomingActivity]);
@@ -325,6 +552,7 @@ export default function CommunityHome({
   // Handle Activity Select / Live entry
   const handleOpenActivity = useCallback(
     (act) => {
+      triggerHaptic('medium');
       const code = act?.eventCode || act?.code || act?.id;
       if (code && typeof onEnterActivity === 'function') {
         onEnterActivity(code);
@@ -348,6 +576,7 @@ export default function CommunityHome({
 
   // Check-in success handler
   const handleCheckInSuccess = useCallback(() => {
+    triggerHaptic('success');
     setIsCheckInOpen(false);
     if (typeof hookData.refresh === 'function') {
       hookData.refresh();
@@ -364,7 +593,7 @@ export default function CommunityHome({
   return (
     <div
       data-testid="community-home-root"
-      className="vbt-community-home-container w-full min-h-screen bg-slate-950 text-slate-100 flex flex-col relative selection:bg-cyan-500/30 selection:text-cyan-200"
+      className="vbt-community-home-container vbt-native-shell w-full min-h-screen bg-slate-950 text-slate-100 flex flex-col relative selection:bg-cyan-500/30 selection:text-cyan-200"
       style={{
         background: 'radial-gradient(circle at 50% 0%, #0d1b3e 0%, #060914 80%, #03050a 100%)',
         fontFamily: "var(--font-body, 'Inter', -apple-system, sans-serif)",
@@ -374,84 +603,157 @@ export default function CommunityHome({
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
       <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-cyan-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
-      {/* TOP COMMUNITY HEADER */}
+      {/* FIXED TOP NATIVE APP HEADER */}
       <CommunityHeader
         currentUser={currentUser}
         communityName={communityName}
         isOffline={isOffline}
         unreadCount={0}
         onOpenNotifications={onOpenNotifications}
-        onOpenProfile={onOpenProfile || (() => setCurrentTab('profile'))}
+        onOpenProfile={onOpenProfile || (() => handleSelectTab('profile'))}
         onOpenAuth={onOpenAdminLogin}
       />
 
-      {/* LIVE EVENT HIGHLIGHT BANNER (If any live camp/gathering is ongoing) */}
-      {activeEvents.length > 0 && (
-        <section
-          data-testid="live-activity-banner"
-          className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 pt-4"
-        >
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-rose-950/60 via-slate-900/90 to-amber-950/50 border border-rose-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 animate-pulse">
-                <Radio className="w-5 h-5 text-rose-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white animate-pulse">
-                    LIVE NOW
-                  </span>
-                  <h2 className="text-sm sm:text-base font-black text-white">
-                    {activeEvents[0].name || activeEvents[0].title || 'Active VBT Gathering'}
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-300">
-                  Live scoreboard, court challenges, and logistics are active!
+      {/* NATIVE MOMENTUM SCROLL VIEWPORT (Independent scroll + Pull-to-Refresh) */}
+      <main
+        data-testid="native-scroll-viewport"
+        onTouchStart={handleViewportTouchStart}
+        onTouchMove={handleViewportTouchMove}
+        onTouchEnd={handleViewportTouchEnd}
+        className="vbt-native-scroll-viewport flex-1 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 lg:pb-12 space-y-4 sm:space-y-6"
+      >
+        {/* NATIVE PULL-TO-REFRESH INDICATOR */}
+        {(pullDistance > 12 || isRefreshing) && (
+          <div
+            data-testid="pull-to-refresh-indicator"
+            style={{ height: `${Math.max(36, pullDistance)}px` }}
+            className="flex items-center justify-center transition-all duration-150 overflow-hidden"
+          >
+            <div className="px-3.5 py-1.5 rounded-full bg-slate-900/95 border border-cyan-500/40 shadow-lg flex items-center gap-2 text-xs font-bold text-cyan-300">
+              <span className={isRefreshing ? 'animate-spin' : ''}>
+                {isRefreshing ? '🔄' : pullDistance >= 54 ? '⚡' : '↓'}
+              </span>
+              <span>
+                {isRefreshing
+                  ? 'Syncing live community data...'
+                  : pullDistance >= 54
+                  ? 'Release to refresh'
+                  : 'Pull down to refresh'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* STANDALONE FULLSCREEN APP INSTALL BANNER (When running in mobile browser tab) */}
+        {!isStandalone && !installBannerDismissed && (
+          <div
+            data-testid="install-app-banner"
+            className="lg:hidden p-3 rounded-2xl bg-gradient-to-r from-blue-950/90 via-slate-900/95 to-cyan-950/90 border border-cyan-500/35 shadow-md flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src="/Final VBT Re-Branding 2026-02 (3).png"
+                alt="VBT Icon"
+                className="w-9 h-9 rounded-xl bg-slate-950 p-1 border border-cyan-500/30 shrink-0 object-contain"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-black text-white truncate">
+                  Get the Fullscreen VBT Mobile App
+                </p>
+                <p className="text-[11px] text-slate-300 truncate">
+                  Remove browser bars &amp; enable instant court alerts
                 </p>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                data-testid="banner-door-qr-btn"
-                onClick={() => handleOpenCommandSheet('live')}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                title="Show scannable Door QR for arriving servants"
+                data-testid="install-app-cta-btn"
+                onClick={handleTriggerInstallApp}
+                className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs cursor-pointer shadow-sm"
               >
-                <QrCode className="w-4 h-4" />
-                <span>Door QR</span>
+                Install
               </button>
-
               <button
                 type="button"
-                data-testid="banner-whatsapp-brief-btn"
-                onClick={() => handleOpenCommandSheet('care')}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                title="Copy or share servant briefing to WhatsApp"
+                aria-label="Dismiss install banner"
+                onClick={() => setInstallBannerDismissed(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white cursor-pointer"
               >
-                <Share2 className="w-4 h-4" />
-                <span>WhatsApp Brief</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onEnterActivity?.(activeEvents[0].code || activeEvents[0].id)}
-                className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-rose-900/40 flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <span>Enter Live Room</span>
-                <ArrowRight className="w-4 h-4" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
-        </section>
-      )}
+        )}
 
-      {/* MAIN CONTENT CONTAINER */}
-      <main className="flex-1 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-12 space-y-6">
+        {/* LIVE EVENT HIGHLIGHT BANNER (If any live camp/gathering is ongoing) */}
+        {activeEvents.length > 0 && (
+          <section
+            data-testid="live-activity-banner"
+            className="w-full"
+          >
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-rose-950/60 via-slate-900/90 to-amber-950/50 border border-rose-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 animate-pulse">
+                  <Radio className="w-5 h-5 text-rose-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white animate-pulse">
+                      LIVE NOW
+                    </span>
+                    <h2 className="text-sm sm:text-base font-black text-white">
+                      {activeEvents[0].name || activeEvents[0].title || 'Active VBT Gathering'}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Live scoreboard, court challenges, and logistics are active!
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  data-testid="banner-door-qr-btn"
+                  onClick={() => handleOpenCommandSheet('live')}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Show scannable Door QR for arriving servants"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Door QR</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="banner-whatsapp-brief-btn"
+                  onClick={() => handleOpenCommandSheet('care')}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Copy or share servant briefing to WhatsApp"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>WhatsApp Brief</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    onEnterActivity?.(activeEvents[0].code || activeEvents[0].id);
+                  }}
+                  className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-rose-900/40 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <span>Enter Live Room</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* VIEW: HOME TAB */}
         {isHomeTab && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* SERVANT & LEADER 1-TAP COCKPIT STRIP (When signed in) */}
             {currentUser && currentUser.role !== 'guest' && (
               <section
@@ -493,7 +795,10 @@ export default function CommunityHome({
                   <button
                     type="button"
                     data-testid="cockpit-tuesday-hub-btn"
-                    onClick={() => setIsServantMeetingModeOpen(true)}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setIsServantMeetingModeOpen(true);
+                    }}
                     className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
                   >
                     <Calendar className="w-3.5 h-3.5" />
@@ -529,39 +834,102 @@ export default function CommunityHome({
               onOpenServe={() => handleSelectTab('serve')}
             />
 
-            {/* RESPONSIVE 2-COLUMN GRID (Desktop: 2-col, Tablet: 2-col This Week + Serve, Mobile: 1-col) */}
+            {/* NATIVE iOS SEGMENTED CONTROL (Mobile/Tablet <1024px: Eliminates 4,000px Webpage Scroll) */}
+            <div
+              data-testid="native-home-segmented-control"
+              className="lg:hidden sticky top-2 z-30"
+            >
+              <div className="vbt-segmented-control" role="tablist" aria-label="Home sections">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeSegment === 'week'}
+                  data-testid="segment-tab-week"
+                  onClick={() => handleSelectHomeSegment('week')}
+                  className={`vbt-segmented-pill ${homeSegment === 'week' ? 'active' : ''}`}
+                >
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span>This Week</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeSegment === 'serve'}
+                  data-testid="segment-tab-serve"
+                  onClick={() => handleSelectHomeSegment('serve')}
+                  className={`vbt-segmented-pill ${homeSegment === 'serve' ? 'active' : ''}`}
+                >
+                  <Heart className="w-3.5 h-3.5 shrink-0" />
+                  <span>Serve</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeSegment === 'pulse'}
+                  data-testid="segment-tab-pulse"
+                  onClick={() => handleSelectHomeSegment('pulse')}
+                  className={`vbt-segmented-pill ${homeSegment === 'pulse' ? 'active' : ''}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span>Pulse</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeSegment === 'tools'}
+                  data-testid="segment-tab-tools"
+                  onClick={() => handleSelectHomeSegment('tools')}
+                  className={`vbt-segmented-pill ${homeSegment === 'tools' ? 'active' : ''}`}
+                >
+                  <Zap className="w-3.5 h-3.5 shrink-0" />
+                  <span>Quick Hub</span>
+                </button>
+              </div>
+            </div>
+
+            {/* RESPONSIVE 2-COLUMN GRID (Desktop: 2-col full dashboard; Mobile: Focused Active Segment) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-              {/* PRIMARY COLUMN (Desktop: 7 of 12 cols, Tablet: full width) */}
+              {/* PRIMARY COLUMN (Desktop: 7 of 12 cols) */}
               <div className="lg:col-span-7 xl:col-span-8 space-y-6">
                 {/* THIS WEEK'S RHYTHM CARD */}
-                <div id="weekly-rhythm-section">
-                    <WeeklyRhythmCard
-                      activities={activities}
-                      currentUser={currentUser}
-                      onCheckIn={handleOpenCheckIn}
-                      onOpenActivity={handleOpenActivity}
-                      onScanQR={() => handleOpenCheckIn()}
-                      isOffline={isOffline}
-                    />
-                  </div>
+                <div
+                  id="weekly-rhythm-section"
+                  className={homeSegment === 'week' ? 'block vbt-segment-animate' : 'hidden lg:block'}
+                >
+                  <WeeklyRhythmCard
+                    activities={activities}
+                    currentUser={currentUser}
+                    onCheckIn={handleOpenCheckIn}
+                    onOpenActivity={handleOpenActivity}
+                    onScanQR={() => handleOpenCheckIn()}
+                    isOffline={isOffline}
+                  />
+                </div>
 
-                  {/* SERVING OPPORTUNITIES MARKETPLACE CARD */}
-                  <div id="serving-marketplace-section">
-                    <ServingOpportunitiesCard
-                      opportunities={opportunities}
-                      memberAvailability={memberContext?.availability}
-                      currentUser={currentUser}
-                      onExpressInterest={handleExpressInterest}
-                      onSetAvailability={() => setIsPassportOpen(true)}
-                      onOpenServePage={() => handleSelectTab('serve')}
-                      isOffline={isOffline}
-                      maxItems={3}
-                    />
-                  </div>
+                {/* SERVING OPPORTUNITIES MARKETPLACE CARD */}
+                <div
+                  id="serving-marketplace-section"
+                  className={homeSegment === 'serve' ? 'block vbt-segment-animate' : 'hidden lg:block'}
+                >
+                  <ServingOpportunitiesCard
+                    opportunities={opportunities}
+                    memberAvailability={memberContext?.availability}
+                    currentUser={currentUser}
+                    onExpressInterest={handleExpressInterest}
+                    onSetAvailability={() => setIsPassportOpen(true)}
+                    onOpenServePage={() => handleSelectTab('serve')}
+                    isOffline={isOffline}
+                    maxItems={3}
+                  />
+                </div>
               </div>
 
-              {/* SECONDARY SIDEBAR / RAIL (Desktop: 5 of 12 cols) */}
-              <aside className="lg:col-span-5 xl:col-span-4 space-y-6">
+              {/* SECONDARY SIDEBAR / RAIL (Desktop: 5 of 12 cols; Mobile: 'tools' segment) */}
+              <aside
+                className={`lg:col-span-5 xl:col-span-4 space-y-6 ${
+                  homeSegment === 'tools' ? 'block vbt-segment-animate' : 'hidden lg:block'
+                }`}
+              >
                 {/* ROLE DASHBOARD (When logged in) */}
                 {currentUser && currentUser.role !== 'guest' && (
                   <div data-testid="role-dashboard-container">
@@ -620,7 +988,10 @@ export default function CommunityHome({
                     {/* Enter Code */}
                     <button
                       type="button"
-                      onClick={() => setIsJoinCodeOpen(true)}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setIsJoinCodeOpen(true);
+                      }}
                       className="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-750 active:bg-slate-850 border border-slate-700/80 text-left transition-all flex flex-col gap-1 cursor-pointer"
                     >
                       <KeyRound className="w-4 h-4 text-cyan-400" />
@@ -642,7 +1013,10 @@ export default function CommunityHome({
                     {/* Request VBT Service */}
                     <button
                       type="button"
-                      onClick={() => onRequestService?.()}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        onRequestService?.();
+                      }}
                       className="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-750 active:bg-slate-850 border border-slate-700/80 text-left transition-all flex flex-col gap-1 cursor-pointer"
                     >
                       <Building className="w-4 h-4 text-purple-400" />
@@ -653,7 +1027,10 @@ export default function CommunityHome({
                     {/* Find Your Place */}
                     <button
                       type="button"
-                      onClick={() => setIsFindYourPlaceOpen(true)}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setIsFindYourPlaceOpen(true);
+                      }}
                       className="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-750 active:bg-slate-850 border border-slate-700/80 text-left transition-all flex flex-col gap-1 cursor-pointer"
                     >
                       <Compass className="w-4 h-4 text-emerald-400" />
@@ -666,7 +1043,10 @@ export default function CommunityHome({
                   <div className="pt-2 border-t border-slate-800/80">
                     <button
                       type="button"
-                      onClick={() => onOpenAdminLogin?.()}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        onOpenAdminLogin?.();
+                      }}
                       className="w-full py-2.5 px-3 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <span className="flex items-center gap-2">
@@ -682,7 +1062,10 @@ export default function CommunityHome({
                     <div>
                       <button
                         type="button"
-                        onClick={onCreateNewEvent}
+                        onClick={() => {
+                          triggerHaptic('medium');
+                          onCreateNewEvent();
+                        }}
                         className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-900/40 to-indigo-900/40 hover:from-blue-900/60 hover:to-indigo-900/60 border border-blue-500/30 text-blue-200 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
                       >
                         <span className="flex items-center gap-2">
@@ -729,7 +1112,10 @@ export default function CommunityHome({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setIsFindYourPlaceOpen(true)}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setIsFindYourPlaceOpen(true);
+                      }}
                       className="w-full min-h-[42px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
                     >
                       <Sparkles className="w-4 h-4" />
@@ -741,8 +1127,11 @@ export default function CommunityHome({
               </aside>
             </div>
 
-            {/* FULL-WIDTH COMMUNITY CULTURE & PULSE SECTION */}
-            <div id="community-pulse-section" className="pt-2">
+            {/* FULL-WIDTH COMMUNITY CULTURE & PULSE SECTION (Mobile: 'pulse' segment; Desktop: always shown) */}
+            <div
+              id="community-pulse-section"
+              className={`pt-2 ${homeSegment === 'pulse' ? 'block vbt-segment-animate' : 'hidden lg:block'}`}
+            >
               <CommunityPulse
                 announcements={announcements}
                 scripture={scripture}
@@ -1086,6 +1475,13 @@ export default function CommunityHome({
         onOpenCareDashboard={() => setIsHealthDashboardOpen(true)}
         onOpenVolunteerPass={() => setIsPassportOpen(true)}
         onOpenCheckIn={(act) => handleOpenCheckIn(act)}
+      />
+
+      {/* MODAL: NATIVE STANDALONE APP INSTALL SHEET */}
+      <NativeInstallSheet
+        isOpen={isInstallSheetOpen}
+        onClose={() => setIsInstallSheetOpen(false)}
+        isIOS={isIOSDevice()}
       />
     </div>
   );
