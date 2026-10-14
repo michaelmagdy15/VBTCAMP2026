@@ -86,7 +86,7 @@ export function buildServantBriefingText({
     `2️⃣ Wear your VBT Servant Shirt`,
     `3️⃣ Scan the Door QR or enter code *${codeStr}* in the VBT App to check in & view your station`,
     `━━━━━━━━━━━━━━━━━━━━`,
-    `🌐 Open App: ${(typeof window !== 'undefined' && !window.location.origin.includes('faa-test-guide-v2')) ? window.location.origin : 'https://vbt-sports-team.web.app'}/?event=${encodeURIComponent(codeStr)}&checkin=1`
+    `🌐 Open App: ${typeof window !== 'undefined' ? window.location.origin : 'https://vbt-sports-team.web.app'}/?event=${encodeURIComponent(codeStr)}&checkin=1`
   );
 
   return lines.join('\n');
@@ -146,7 +146,7 @@ export default function LeaderCommandSheet({
   }, [activeActivity, activities]);
 
   const checkInUrl = useMemo(() => {
-    const origin = (typeof window !== 'undefined' && !window.location.origin.includes('faa-test-guide-v2')) ? window.location.origin : 'https://vbt-sports-team.web.app';
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://vbt-sports-team.web.app';
     return `${origin}/?event=${encodeURIComponent(eventCode)}&checkin=1`;
   }, [eventCode]);
 
