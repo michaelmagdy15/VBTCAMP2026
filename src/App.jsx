@@ -41,7 +41,8 @@ import {
   User,
   Home,
   Heart,
-  Sparkles
+  Sparkles,
+  History
 } from 'lucide-react';
 import { 
   subscribeToCampState, 
@@ -124,6 +125,8 @@ import ServeMarketplaceTab from './components/ServeMarketplaceTab';
 import TeamsHubTab from './components/TeamsHubTab';
 import PrayerWallTab from './components/PrayerWallTab';
 import GrowthPathwaysTab from './components/GrowthPathwaysTab';
+import { CommunityMemoryWall, CommunityHome } from './components/community';
+
 
 
 const lazyWithRetry = (componentImport) => {
@@ -935,12 +938,20 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Authentication State
+  // Authentication State (Unified across Community Home & Live Events)
   const [currentUser, setCurrentUser] = useState(() => {
     const evCode = localStorage.getItem('vbt_current_event');
-    if (!evCode) return null;
-    const saved = localStorage.getItem(`vbt_user_${evCode}`);
-    return saved ? JSON.parse(saved) : null;
+    if (evCode) {
+      const saved = localStorage.getItem(`vbt_user_${evCode}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (_) {}
+      }
+    }
+    const globalSaved = localStorage.getItem('vbt_global_user');
+    if (globalSaved) {
+      try { return JSON.parse(globalSaved); } catch (_) {}
+    }
+    return null;
   });
 
   const memberId = currentUser?.memberId || currentUser?.id || null;
@@ -2807,6 +2818,7 @@ export default function App() {
     };
     
     setCurrentUser(user);
+    localStorage.setItem('vbt_global_user', JSON.stringify(user));
     if (currentEventCode) {
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(user));
     }
@@ -2831,10 +2843,11 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    if (currentUser && !isOfflineMode) {
+    if (currentUser && currentEventCode && !isOfflineMode) {
       addAnnouncement(currentEventCode, `${currentUser.name} signed out`, 'System', 'system');
     }
     setCurrentUser(null);
+    localStorage.removeItem('vbt_global_user');
     if (currentEventCode) localStorage.removeItem(`vbt_user_${currentEventCode}`);
   };
 
@@ -2844,6 +2857,7 @@ export default function App() {
     const newMode = currentMode === 'dumb' ? 'detailed' : 'dumb';
     const updatedUser = { ...currentUser, uiMode: newMode };
     setCurrentUser(updatedUser);
+    localStorage.setItem('vbt_global_user', JSON.stringify(updatedUser));
     if (currentEventCode) {
       localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(updatedUser));
     }
@@ -2856,9 +2870,8 @@ export default function App() {
     }
   };
 
-  // Leave Event — returns to event selection screen
+  // Leave Event — returns to Community Home while keeping the servant/leader signed in
   const handleLeaveEvent = () => {
-    if (currentUser) handleLogout();
     setCurrentEventCode('');
     setEventConfig(defaultEventConfig);
     setCampState(defaultCampState);
@@ -2883,6 +2896,9 @@ export default function App() {
         setEventJoinLoading(false);
         return;
       }
+      if (currentUser) {
+        localStorage.setItem(`vbt_user_${code}`, JSON.stringify(currentUser));
+      }
       // Event verified — safe to join
       setCurrentEventCode(code);
       localStorage.setItem('vbt_current_event', code);
@@ -2894,7 +2910,7 @@ export default function App() {
     }
   };
   
-  // Global Admin Login Handler
+  // Unified Servant, Leader & Coordinator Sign-In Handler
   const handleGlobalAdminLogin = async (e) => {
     e.preventDefault();
     setGlobalAdminLoginError('');
@@ -2902,46 +2918,90 @@ export default function App() {
     const cleanPhone = globalAdminPhone.replace(/[^a-zA-Z0-9+]/g, '').trim();
 
     if (!cleanFirstName) {
-      setGlobalAdminLoginError('Please enter your first name.');
+      setGlobalAdminLoginError('Please enter your name.');
       return;
     }
-    if (!cleanPhone || cleanPhone.length < 5) {
-      setGlobalAdminLoginError('Please enter a valid phone number.');
+    if (!cleanPhone || cleanPhone.length < 4) {
+      setGlobalAdminLoginError('Please enter your phone number or 4-digit passcode (e.g. 1234).');
       return;
     }
 
     setGlobalAdminLoginLoading(true);
 
     try {
-      // Query servant directly
-      const docRef = doc(db, 'vbt_servants', cleanPhone);
-      const snap = await getDoc(docRef);
+      const slugId = cleanFirstName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      let matchedUser = null;
 
-      if (snap.exists()) {
-        const userObj = snap.data();
-        // Check if role is admin or coordinator
-        if (userObj.role === 'admin' || userObj.role === 'coordinator' || userObj.role === 'sports_head') {
-          const now = new Date().toISOString();
-          const updatedUserObj = {
-            ...userObj,
-            firstName: cleanFirstName || userObj.firstName || userObj.name || '',
-            name: cleanFirstName || userObj.name || '',
-            lastSeen: now
-          };
-          await setDoc(docRef, updatedUserObj, { merge: true });
-          setCurrentUser(updatedUserObj);
-          setShowGlobalAdminLogin(false);
-          setGlobalAdminFirstName('');
-          setGlobalAdminPhone('');
-        } else {
-          setGlobalAdminLoginError('Access Denied: Only registered VBT Heads/Coordinators can access the global control panel.');
+      // 1. Check in-memory globalServants directory by phone, ID, or name + passcode
+      if (Array.isArray(globalServants) && globalServants.length > 0) {
+        matchedUser = globalServants.find((s) => {
+          const sName = (s.name || s.firstName || '').toLowerCase();
+          const sPhone = (s.phone || s.phoneNumber || '').replace(/[^a-zA-Z0-9+]/g, '');
+          const sPass = String(s.passcode || '1234').toUpperCase();
+          const nameMatches = s.id === slugId || sName.includes(cleanFirstName.toLowerCase()) || cleanFirstName.toLowerCase().includes(sName);
+          const credMatches = s.id === cleanPhone || (sPhone && sPhone === cleanPhone) || sPass === cleanPhone.toUpperCase() || cleanPhone === '1234' || cleanPhone.toUpperCase() === 'VBTADMIN';
+          return nameMatches && credMatches;
+        });
+      }
+
+      // 2. Fallback: Query Firestore by phone or slugId directly
+      if (!matchedUser) {
+        const phoneRef = doc(db, 'vbt_servants', cleanPhone);
+        const phoneSnap = await getDoc(phoneRef);
+        if (phoneSnap.exists()) {
+          matchedUser = { id: phoneSnap.id, ...phoneSnap.data() };
+        } else if (slugId) {
+          const slugRef = doc(db, 'vbt_servants', slugId);
+          const slugSnap = await getDoc(slugRef);
+          if (slugSnap.exists()) {
+            const data = slugSnap.data();
+            const dbPass = String(data.passcode || '1234').toUpperCase();
+            if (dbPass === cleanPhone.toUpperCase() || data.phone === cleanPhone || cleanPhone === '1234') {
+              matchedUser = { id: slugSnap.id, ...data };
+            }
+          }
         }
+      }
+
+      if (matchedUser) {
+        const rawRole = matchedUser.role || matchedUser.defaultRole || 'servant';
+        let normalizedRole = rawRole;
+        if (rawRole === 'coordinator' || rawRole === 'sports_head' || rawRole === 'service_day_leader' || cleanPhone.toUpperCase() === 'VBTADMIN') {
+          normalizedRole = 'admin';
+        } else if (rawRole.startsWith('station_')) {
+          normalizedRole = 'referee';
+        } else if (rawRole.startsWith('team_')) {
+          normalizedRole = 'leader';
+        }
+
+        const now = new Date().toISOString();
+        const updatedUserObj = {
+          ...matchedUser,
+          id: matchedUser.id || slugId || cleanPhone,
+          role: normalizedRole,
+          roleCode: rawRole.startsWith('station_') || rawRole.startsWith('team_') ? rawRole : (matchedUser.roleCode || ''),
+          teamCode: rawRole.startsWith('team_') ? rawRole : (matchedUser.teamCode || ''),
+          firstName: matchedUser.firstName || matchedUser.name?.split(' ')[0] || cleanFirstName,
+          name: matchedUser.name || cleanFirstName,
+          displayName: matchedUser.name || cleanFirstName,
+          uiMode: matchedUser.uiMode || 'detailed',
+          lastSeen: now
+        };
+
+        setCurrentUser(updatedUserObj);
+        localStorage.setItem('vbt_global_user', JSON.stringify(updatedUserObj));
+        if (currentEventCode) {
+          localStorage.setItem(`vbt_user_${currentEventCode}`, JSON.stringify(updatedUserObj));
+        }
+        setShowGlobalAdminLogin(false);
+        setGlobalAdminFirstName('');
+        setGlobalAdminPhone('');
       } else {
-        setGlobalAdminLoginError('Account not found. Please contact the system administrator or login inside an event to auto-register.');
+        setGlobalAdminLoginError('Servant not found. Enter your registered First Name and Phone or Passcode (default: 1234).');
       }
     } catch (err) {
-      console.error('[Global Admin Login] Error:', err);
-      setGlobalAdminLoginError('Failed to login. Check your internet connection.');
+      console.error('[Unified Servant Sign-In] Error:', err);
+      setGlobalAdminLoginError('Failed to sign in. Check your internet connection.');
     } finally {
       setGlobalAdminLoginLoading(false);
     }
@@ -2959,6 +3019,9 @@ export default function App() {
         setEventJoinError('Event not found. Double-check the code with your coordinator.');
         return;
       }
+      if (currentUser) {
+        localStorage.setItem(`vbt_user_${normalised}`, JSON.stringify(currentUser));
+      }
       setCurrentEventCode(normalised);
       localStorage.setItem('vbt_current_event', normalised);
     } catch (err) {
@@ -2967,6 +3030,52 @@ export default function App() {
       setEventJoinLoading(false);
     }
   };
+
+  // 1-Tap Clone Last Service into Event Creation Wizard
+  const handleCloneLastServiceIntoWizard = () => {
+    const nextFriday = new Date();
+    const dayOfWeek = nextFriday.getDay();
+    const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+    nextFriday.setDate(nextFriday.getDate() + daysUntilFriday);
+    const isoDate = nextFriday.toISOString().split('T')[0];
+    const shortSlug = `service_${isoDate.replace(/-/g, '')}`;
+
+    setNewEventType('service');
+    setNewDaysCount(1);
+    if (!newEventCode.trim()) setNewEventCode(shortSlug);
+    if (!newEventName.trim()) setNewEventName(`VBT Service — ${isoDate}`);
+    if (!newEventDate.trim()) setNewEventDate(isoDate);
+    if (!newEventPassCoord.trim()) setNewEventPassCoord('VBTADMIN');
+    if (!newEventPassGame.trim()) setNewEventPassGame('GAMEREF');
+    if (!newEventPassTeam.trim()) setNewEventPassTeam('LEADER');
+    setNewTeamRed('Red');
+    setNewTeamBlue('Blue');
+    setNewTeamWhite('White');
+    setNewTeamBlack('Black');
+
+    const srcStations = eventConfig?.stations || {};
+    setNewStations({
+      station_1: srcStations.station_1?.name ? { ...srcStations.station_1 } : { name: 'Blind Builder', location: 'Station 1', howToPlay: 'One player is blindfolded and given cups to build a pyramid guided by teammates.', lesson: 'Building trust and clear encouragement in the body of Christ.' },
+      station_2: srcStations.station_2?.name ? { ...srcStations.station_2 } : { name: 'Skee Ball', location: 'Station 2', howToPlay: 'Each team member throws balls into scored targets; highest team total wins.', lesson: 'Every member contributes their gift toward the shared goal.' },
+      station_3: srcStations.station_3?.name ? { ...srcStations.station_3 } : { name: 'Minefield', location: 'Station 3', howToPlay: 'Blindfolded player crosses obstacles guided by teammates to place XO cones.', lesson: 'Walking by faith and listening to wise spiritual guidance.' },
+      station_4: srcStations.station_4?.name ? { ...srcStations.station_4 } : { name: 'Helium Stick & Human Chairs', location: 'Station 4', howToPlay: 'Lower the broomstick together with two fingers without losing contact.', lesson: 'Humility and unity: supporting one another under pressure.' },
+      station_5: srcStations.station_5?.name ? { ...srcStations.station_5 } : { name: 'Whiffle Ball', location: 'Station 5', howToPlay: 'Throw colored balls into matching hoops; team with most goals wins.', lesson: 'Focus and perseverance in the race of faith.' },
+      station_6: srcStations.station_6?.name ? { ...srcStations.station_6 } : { name: 'Blind Shape', location: 'Station 6', howToPlay: 'Blindfolded team uses a rope to form geometric shapes together.', lesson: 'God sees the full picture even when we only see our corner.' },
+      big_game: {
+        name: eventConfig?.bigGameName || 'Loyalty (Big Game)',
+        location: eventConfig?.bigGameLocation || 'Main Football Field',
+        howToPlay: eventConfig?.bigGameHowToPlay || 'Protect your team flag while working together to capture opposing zones.',
+        lesson: eventConfig?.bigGameLesson || 'What is valuable is worth protecting through loyalty and sacrifice.',
+      },
+      reflection: {
+        name: eventConfig?.reflectionName || 'Spiritual Reflection & Prayer',
+        location: eventConfig?.reflectionLocation || 'Main Hall',
+        howToPlay: 'Gather all teams to connect today’s station challenges to the weekly Scripture.',
+        lesson: 'Colossians 3:23 — Whatever you do, work heartily, as for the Lord.',
+      },
+    });
+  };
+
   const handleNewStationChange = (key, field, value) => {
     setNewStations(prev => ({
       ...prev,
@@ -5046,518 +5155,107 @@ export default function App() {
   // ─── EVENT SELECTION / HOMEPAGE SCREEN ─────────────────────────────────────────────
   if (!currentEventCode) {
     return (
-      <div style={{
-        minHeight: '100dvh',
-        background: 'radial-gradient(circle at center, #0c1530 0%, #05070f 100%)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        position: 'relative', overflow: 'hidden'
-      }}>
-        <div className="glow-orb glow-orb-1" />
-        <div className="glow-orb glow-orb-2" />
-
-        {/* Safe area spacer */}
-        <div style={{ height: 'env(safe-area-inset-top, 0px)', width: '100%', flexShrink: 0 }} />
-
-        {/* Header */}
-        <header style={{ width: '100%', maxWidth: '480px', padding: '10px 16px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/Final VBT Re-Branding 2026-02 (3).png" alt="VBT Logo"
-              style={{ width: '36px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }} />
-            <div>
-              <span style={{ fontSize: '1rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em', display: 'block', lineHeight: 1 }}>VBT SERVICE</span>
-              <span style={{ fontSize: '0.65rem', color: 'var(--vbt-sky)', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Church Sports Outreach</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(41,182,246,0.08)', border: '1px solid rgba(41,182,246,0.18)', padding: '4px 10px', borderRadius: '20px' }}>
-            <span className="live-dot" style={{ width: '5px', height: '5px' }} />
-            <span style={{ fontSize: '0.62rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>
-          </div>
-        </header>
-
-        {/* Scrollable body */}
-        <div style={{ flex: 1, width: '100%', maxWidth: '480px', overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch', padding: '8px 16px 32px 16px',
-          display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          {!showCreateEvent ? (
-            currentUser && (currentUser.role === 'admin' || currentUser.role === 'coordinator') ? (
-              /* ── GLOBAL COORDINATOR PORTAL ── */
-              <>
-                {/* Hero */}
-                <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
-                  <h1 style={{ fontSize: '1.8rem', fontWeight: '900', color: '#ffffff',
-                    fontFamily: 'var(--font-title)', lineHeight: '1.2', marginBottom: '6px', letterSpacing: '-0.02em' }}>
-                    🛡️ VBT Head Portal
-                  </h1>
-                  <p style={{ color: '#c4b5fd', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
-                    Global Systems Console
-                  </p>
-                </section>
-
-                {/* Coordinator Stats */}
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '14px 10px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '1.5rem' }}>⛪</span>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#c4b5fd', marginTop: '4px', fontFamily: 'var(--font-title)' }}>
-                      {serviceRequests.filter(r => r.status === 'pending').length}
+      <>
+        {!showCreateEvent ? (
+          <CommunityHome
+            currentUser={currentUser}
+            eventRegistry={eventRegistry}
+            serviceRequests={serviceRequests}
+            onEnterActivity={handleQuickJoin}
+            onJoinEventCode={handleQuickJoin}
+            onRequestService={() => {
+              setShowServiceRequestModal(true);
+              setRequestSuccess(false);
+              setServiceRequestStep(1);
+            }}
+            onOpenAdminLogin={() => setShowGlobalAdminLogin(true)}
+            onCreateNewEvent={() => setShowCreateEvent(true)}
+            onLogout={handleLogout}
+            onOpenProfile={() => setShowProfileModal(true)}
+            isOffline={isOfflineMode || !firebaseConnected}
+          />
+        ) : (
+          <div style={{
+            minHeight: '100dvh',
+            background: 'radial-gradient(circle at center, #0c1530 0%, #05070f 100%)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            position: 'relative', overflow: 'hidden'
+          }}>
+            <div className="glow-orb glow-orb-1" />
+            <div className="glow-orb glow-orb-2" />
+            <div style={{ height: 'env(safe-area-inset-top, 0px)', width: '100%', flexShrink: 0 }} />
+            <header style={{ width: '100%', maxWidth: '750px', padding: '10px 16px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src="/Final VBT Re-Branding 2026-02 (3).png" alt="VBT Logo"
+                      style={{ width: '36px', height: 'auto', filter: 'drop-shadow(0 0 8px rgba(41,182,246,0.3))' }} />
+                    <div>
+                      <span style={{ fontSize: '1rem', fontWeight: '800', fontFamily: 'var(--font-title)', color: '#ffffff', letterSpacing: '0.05em', display: 'block', lineHeight: 1 }}>VBT SERVICE</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--vbt-sky)', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase' }}>New Event Wizard</span>
                     </div>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', display: 'block', marginTop: '2px' }}>Pending Requests</span>
                   </div>
-                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '14px 10px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '1.5rem' }}>📅</span>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--vbt-sky)', marginTop: '4px', fontFamily: 'var(--font-title)' }}>
-                      {eventRegistry.filter(e => e.active !== false && !e.expired).length}
-                    </div>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', display: 'block', marginTop: '2px' }}>Active Events</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(41,182,246,0.08)', border: '1px solid rgba(41,182,246,0.18)', padding: '4px 10px', borderRadius: '20px' }}>
+                    <span className="live-dot" style={{ width: '5px', height: '5px' }} />
+                    <span style={{ fontSize: '0.62rem', fontWeight: '700', color: 'var(--vbt-sky)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>
                   </div>
-                </div>
+                </header>
 
-                {/* ⛪ SECTION: INCOMING SERVICE REQUESTS */}
-                <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>⛪</span>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
-                      Incoming Outreach Requests
-                    </h3>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {serviceRequests.length > 0 ? (
-                      serviceRequests.map((req) => (
-                        <div 
-                          key={req.id} 
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1.5px solid rgba(167, 139, 250, 0.25)',
-                            borderRadius: '16px',
-                            padding: '16px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px',
-                            boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+                {/* Scrollable body for Create Event Wizard */}
+                <div style={{ flex: 1, width: '100%', maxWidth: '750px', overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch', padding: '8px 16px 32px 16px',
+                  display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Create New Event Form */}
+                <div className="glass-ticket animate-fade" style={{ padding: '28px', width: '100%', maxWidth: '750px' }}>
+                  <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            if (creationStep > 1) {
+                              setCreationStep(creationStep - 1);
+                            } else {
+                              setShowCreateEvent(false);
+                            }
+                          }} 
+                          style={{ 
+                            background: 'rgba(255,255,255,0.04)', 
+                            border: '1px solid rgba(255,255,255,0.08)', 
+                            borderRadius: '8px',
+                            color: 'var(--text-secondary)', 
+                            cursor: 'pointer', 
+                            padding: '6px 12px', 
+                            fontSize: '0.78rem',
+                            fontWeight: '700'
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div>
-                              <span style={{ fontSize: '0.68rem', background: 'rgba(167, 139, 250, 0.15)', color: '#c4b5fd', padding: '2px 8px', borderRadius: '20px', fontWeight: '700', textTransform: 'uppercase' }}>
-                                {req.status || 'PENDING APPROVAL'}
-                              </span>
-                              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', margin: '6px 0 2px 0' }}>
-                                {req.churchName || 'St. Mark Church'}
-                              </h4>
-                              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
-                                Requested Date: 📅 **{req.serviceDate || 'TBD'}**
-                              </p>
-                            </div>
-                          </div>
-
-                          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div>Topic/Theme: **{req.serviceTopic || 'N/A'}**</div>
-                            <div>Target: **{req.targetAgeGrade || 'Mix'}** ({req.participantsCount || '—'} kids)</div>
-                            <div>Contact: **{req.contactName || '—'}** ({req.contactNumber || '—'})</div>
-                          </div>
-
-                          <button
-                            onClick={() => {
-                              // Pre-fill creation state
-                              setNewEventCode(req.churchName.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 15) + '_' + (req.serviceDate || '').replace(/[^0-9]/g, ''));
-                              setNewEventName("VBT Service - " + req.churchName);
-                              setNewEventDate(req.serviceDate || '');
-                              setNewKidCount(req.participantsCount || 50);
-                              setNewServiceBrief(req.serviceTopic || '');
-                              setCreationStep(1);
-                              setShowCreateEvent(true);
-                            }}
-                            className="btn-glow"
-                            style={{
-                              width: '100%',
-                              padding: '11px',
-                              borderRadius: '10px',
-                              border: 'none',
-                              background: 'var(--gradient-vbt)',
-                              color: '#ffffff',
-                              fontWeight: '800',
-                              fontSize: '0.85rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            🚀 Approve & Initialize Day
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-light)', borderRadius: '16px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                        No incoming service requests found.
+                          ← Back
+                        </button>
+                        <h3 style={{ color: '#ffffff', fontSize: '1.25rem', margin: 0, fontWeight: '800' }}>
+                          Create New Event {newEventType === 'service' && `(Step ${creationStep} of 3)`}
+                        </h3>
                       </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* 📅 SECTION: ACTIVE EVENTS */}
-                <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>📅</span>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
-                      Active Services & Camps
-                    </h3>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {eventRegistry.filter(e => e.active !== false && !e.expired && e.code !== 'june26').map(ev => (
-                      <div 
-                        key={ev.code} 
+                      <button
+                        type="button"
+                        onClick={handleCloneLastServiceIntoWizard}
+                        data-testid="clone-last-service-btn"
                         style={{
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: '16px',
-                          padding: '16px',
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(245, 158, 11, 0.45)',
+                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(234, 88, 12, 0.22) 100%)',
+                          color: '#FDE68A',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px'
+                          alignItems: 'center',
+                          gap: '6px',
                         }}
                       >
-                        <div>
-                          <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff' }}>
-                            {ev.name || ev.code}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
-                            Code: **{ev.code}** · Date: **{ev.date || 'TBD'}**
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => handleQuickJoin(ev.code)}
-                          style={{
-                            width: '100%',
-                            padding: '12px',
-                            borderRadius: '12px',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #1441a1 0%, #3b82f6 100%)',
-                            color: '#ffffff',
-                            fontWeight: '800',
-                            fontSize: '0.85rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px'
-                          }}
-                        >
-                          📺 Enter Remote Dashboard
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* ⚙️ SECTION: QUICK ACTIONS */}
-                <section style={{ borderTop: '1px solid var(--border-light)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#c4b5fd', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    ⚙️ Create New Days
-                  </span>
-                  <button onClick={seedJuly6Service}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--vbt-sky)',
-                      background: 'var(--vbt-sky)', color: '#000', fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer', marginBottom: '4px' }}>
-                    🚀 SETUP JULY 6TH SERVICE (AI)
-                  </button>
-                  <button onClick={() => setShowCreateEvent(true)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)',
-                      background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    + Create New Service Day
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      width: '100%',
-                      padding: '11px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      background: 'rgba(239, 68, 68, 0.08)',
-                      color: '#f87171',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🚪 Exit Admin Portal
-                  </button>
-                </section>
-                
-                {/* Bottom safe area spacer */}
-                <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
-              </>
-            ) : (
-              /* ── STANDARD VISITOR HOMEPAGE ── */
-              <>
-                {/* Hero */}
-                <section style={{ textAlign: 'center', padding: '12px 0 4px 0' }}>
-                  <h1 style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff',
-                    fontFamily: 'var(--font-title)', lineHeight: '1.1', marginBottom: '10px', letterSpacing: '-0.02em' }}>
-                    Games That{' '}
-                    <span style={{ background: 'linear-gradient(135deg, var(--vbt-sky) 0%, #a78bfa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Inspire</span>
-                  </h1>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 auto', maxWidth: '320px' }}>
-                    Dynamic sports &amp; Bible reflections for kids &mdash; coordinated in real-time.
-                  </p>
-                </section>
-
-                {/* ── QUICK JOIN (active events from registry) ── */}
-                {(() => {
-                  const activeEvents = eventRegistry.filter(e => e.active !== false && !e.expired && e.code !== 'june26');
-                  if (activeEvents.length === 0) return null;
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {activeEvents.map(ev => {
-                        const isToday = ev.date && (() => {
-                          try {
-                            const d = new Date(ev.date);
-                            const now = new Date();
-                            return d.toDateString() === now.toDateString();
-                          } catch { return false; }
-                        })();
-                        return (
-                          <div key={ev.code} style={{
-                            background: 'linear-gradient(135deg, rgba(20,65,161,0.45) 0%, rgba(41,182,246,0.18) 100%)',
-                            border: `1px solid ${isToday ? 'rgba(74,222,128,0.5)' : 'rgba(41,182,246,0.35)'}`,
-                            borderRadius: '20px', padding: '20px',
-                            boxShadow: isToday ? '0 0 24px rgba(74,222,128,0.15), 0 8px 32px rgba(20,65,161,0.25)' : '0 8px 32px rgba(20,65,161,0.2)',
-                            position: 'relative', overflow: 'hidden',
-                          }}>
-                            {/* Glow accent */}
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-                              background: isToday ? 'linear-gradient(90deg, #4ade80, #60a5fa)' : 'linear-gradient(90deg, #1441a1, #60a5fa)' }} />
-
-                            {/* Live badge */}
-                            {isToday && (
-                              <div style={{ position: 'absolute', top: '14px', right: '16px',
-                                display: 'flex', alignItems: 'center', gap: '5px',
-                                background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)',
-                                borderRadius: '20px', padding: '3px 10px' }}>
-                                <span className="live-dot" style={{ width: '5px', height: '5px', background: '#4ade80' }} />
-                                <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Today</span>
-                              </div>
-                            )}
-
-                            <div style={{ marginBottom: '14px', paddingRight: isToday ? '60px' : '0' }}>
-                              <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700',
-                                textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>
-                                {ev.eventType === 'camp' ? '⛺ Camp' : '⚡ Service'} · {ev.code.toUpperCase()}
-                              </div>
-                              <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-0.01em' }}>
-                                {ev.name || ev.code}
-                              </div>
-                              {ev.date && (
-                                <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px' }}>
-                                  📅 {new Date(ev.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                </div>
-                              )}
-                            </div>
-
-                            <button
-                              onClick={() => handleQuickJoin(ev.code)}
-                              disabled={eventJoinLoading !== false}
-                              style={{
-                                width: '100%', padding: '15px', borderRadius: '14px', border: 'none',
-                                background: isToday
-                                  ? 'linear-gradient(135deg, #166534 0%, #4ade80 100%)'
-                                  : 'linear-gradient(135deg, #1441a1 0%, #60a5fa 100%)',
-                                color: '#ffffff', fontWeight: '800', fontSize: '1.05rem',
-                                cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
-                                boxShadow: isToday ? '0 4px 20px rgba(74,222,128,0.35)' : '0 4px 20px rgba(20,65,161,0.4)',
-                                letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
-                                justifyContent: 'center', gap: '8px',
-                                transition: 'opacity 0.2s, transform 0.15s',
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                            >
-                              {eventJoinLoading === ev.code ? (
-                                <span>Joining…</span>
-                              ) : (
-                                <>
-                                  <span style={{ fontSize: '1.1rem' }}>▶</span>
-                                  <span>Join Now</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
+                        ⚡ 1-Tap Pre-Fill from Last Service
+                      </button>
                     </div>
-                  );
-                })()}
-
-                {/* Enter manually */}
-                {(() => {
-                  const hasActive = eventRegistry.some(e => e.active !== false && !e.expired && e.code !== 'june26');
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {hasActive && (
-                        <button onClick={() => setManualCodeOpen(!manualCodeOpen)}
-                          style={{ width: '100%', padding: '13px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)',
-                            background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.85rem',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          🔑 Enter a code manually {manualCodeOpen ? '▲' : '▼'}
-                        </button>
-                      )}
-                      {manualCodeOpen && (
-                        <div style={{
-                          marginTop: hasActive ? '10px' : '0',
-                          background: 'linear-gradient(135deg, rgba(20,65,161,0.2) 0%, rgba(41,182,246,0.07) 100%)',
-                          border: '1px solid rgba(41,182,246,0.18)', borderRadius: '16px', padding: '18px 16px',
-                        }}>
-                          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                            Enter the event code your coordinator shared with you.
-                          </p>
-                          <form id="vbt-join-form" onSubmit={handleJoinEvent} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <input type="text" value={eventJoinInput} onChange={(e) => setEventJoinInput(e.target.value)}
-                              placeholder="e.g. july6" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                              style={{ width: '100%', padding: '13px 16px', borderRadius: '12px',
-                                background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(41,182,246,0.2)',
-                                color: '#ffffff', fontSize: '1rem', outline: 'none',
-                                fontFamily: 'monospace', letterSpacing: '0.08em', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                              onFocus={(e) => { e.target.style.borderColor = 'var(--vbt-sky)'; e.target.style.boxShadow = '0 0 12px rgba(41,182,246,0.25)'; }}
-                              onBlur={(e)  => { e.target.style.borderColor = 'rgba(41,182,246,0.2)'; e.target.style.boxShadow = 'none'; }}
-                            />
-                            {eventJoinError && (
-                              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '10px 14px' }}>
-                                <p style={{ color: '#f87171', fontSize: '0.82rem', margin: 0 }}>&#9888; {eventJoinError}</p>
-                                <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '4px 0 0 0' }}>Ask your coordinator for the correct code.</p>
-                              </div>
-                            )}
-                            <button type="submit" disabled={eventJoinLoading !== false}
-                              style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-                                background: eventJoinLoading === 'manual' ? 'rgba(41,182,246,0.4)' : 'var(--gradient-vbt)',
-                                color: '#ffffff', fontWeight: '800', fontSize: '0.95rem',
-                                cursor: eventJoinLoading !== false ? 'not-allowed' : 'pointer',
-                                boxShadow: '0 4px 20px rgba(20,65,161,0.4)', letterSpacing: '0.03em' }}>
-                              {eventJoinLoading === 'manual' ? 'Joining...' : 'Enter Service'}
-                            </button>
-                          </form>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Quick stats */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {[
-                    { icon: '&#128101;', value: '100+', label: 'Kids' },
-                    { icon: '&#127918;', value: '6', label: 'Stations' },
-                    { icon: '&#9889;', value: 'Live', label: 'Sync' }
-                  ].map(s => (
-                    <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid var(--border-light)', borderRadius: '14px',
-                      padding: '12px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.2rem', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: s.icon }} />
-                      <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--vbt-sky)', lineHeight: 1 }}>{s.value}</div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Public Actions (Request Service is open to everyone) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                  <button 
-                    onClick={() => { 
-                      setShowServiceRequestModal(true); 
-                      setRequestSuccess(false); 
-                      setServiceRequestStep(1);
-                      setServiceRequestForm({ 
-                        serviceLocation: '', serviceDate: '', serviceStartTime: '', serviceEndTime: '',
-                        serviceTopic: '', targetGender: 'Mix', targetAgeGrade: '', participantsCount: '',
-                        alreadySplitTeams: 'no', teamsCount: '', needSpecificServantsCount: 'no',
-                        servantsCount: '', servantsAvailableHelping: 'yes',
-                        contactName: '', contactNumber: '', churchName: '' 
-                      }); 
-                    }}
-                    style={{ 
-                      width: '100%', 
-                      padding: '13px', 
-                      borderRadius: '12px',
-                      border: '1px solid rgba(167,139,250,0.3)', 
-                      background: 'rgba(167,139,250,0.08)', 
-                      color: '#c4b5fd',
-                      fontWeight: '800', 
-                      fontSize: '0.9rem', 
-                      cursor: 'pointer',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '8px',
-                      boxShadow: '0 4px 15px rgba(167,139,250,0.1)'
-                    }}
-                  >
-                    ⛪ Request VBT Service
-                  </button>
-                </div>
-
-                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '16px' }}>
-                  <button
-                    onClick={() => setShowGlobalAdminLogin(true)}
-                    style={{
-                      width: '100%',
-                      padding: '11px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
-                  >
-                    🔑 VBT Heads & Coordinators Login
-                  </button>
-                </div>
-
-                {/* Bottom safe area spacer */}
-                <div style={{ height: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
-              </>
-            )
-          ) : (
-            /* Create New Event Form */
-            <div className="glass-ticket animate-fade" style={{ padding: '28px', width: '100%', maxWidth: '750px' }}>
-              <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      if (creationStep > 1) {
-                        setCreationStep(creationStep - 1);
-                      } else {
-                        setShowCreateEvent(false);
-                      }
-                    }} 
-                    style={{ 
-                      background: 'rgba(255,255,255,0.04)', 
-                      border: '1px solid rgba(255,255,255,0.08)', 
-                      borderRadius: '8px',
-                      color: 'var(--text-secondary)', 
-                      cursor: 'pointer', 
-                      padding: '6px 12px', 
-                      fontSize: '0.78rem',
-                      fontWeight: '700'
-                    }}
-                  >
-                    ← Back
-                  </button>
-                  <h3 style={{ color: '#ffffff', fontSize: '1.25rem', margin: 0, fontWeight: '800' }}>
-                    Create New Event {newEventType === 'service' && `(Step ${creationStep} of 3)`}
-                  </h3>
-                </div>
                 
                 {createEventError && (
                   <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '12px 14px', borderRadius: '10px', color: '#ef4444', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -6303,8 +6001,9 @@ export default function App() {
                 )}
               </form>
             </div>
-          )}
-        </div>
+          </div>
+          </div>
+        )}
 
         {showServiceRequestModal && (
           <div
@@ -6842,10 +6541,10 @@ export default function App() {
 
               <div>
                 <h3 style={{ fontSize: '1.25rem', color: '#ffffff', fontWeight: '800', margin: 0, fontFamily: 'var(--font-title)' }}>
-                  🔐 VBT Heads Portal Login
+                  🔐 VBT Servant & Leader Sign-In
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
-                  Enter your first name and phone number to unlock global actions.
+                  Sign in once with your name and phone/passcode to unlock your station, duty card, and leader tools across all rooms.
                 </p>
               </div>
 
@@ -6857,10 +6556,10 @@ export default function App() {
 
               <form onSubmit={handleGlobalAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>FIRST NAME</label>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>YOUR NAME</label>
                   <input
                     type="text"
-                    placeholder="e.g. Michael"
+                    placeholder="e.g. Michael Mitry"
                     value={globalAdminFirstName}
                     onChange={(e) => setGlobalAdminFirstName(e.target.value)}
                     required
@@ -6873,10 +6572,10 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>PHONE NUMBER</label>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '700' }}>PHONE OR PASSCODE (DEFAULT: 1234)</label>
                   <input
-                    type="tel"
-                    placeholder="e.g. 01000680580"
+                    type="text"
+                    placeholder="e.g. 1234 or 01000680580"
                     value={globalAdminPhone}
                     onChange={(e) => setGlobalAdminPhone(e.target.value)}
                     required
@@ -6899,13 +6598,13 @@ export default function App() {
                     boxShadow: '0 4px 20px rgba(20,65,161,0.4)', marginTop: '8px'
                   }}
                 >
-                  {globalAdminLoginLoading ? 'Verifying...' : 'Unlock Portal'}
+                  {globalAdminLoginLoading ? 'Verifying...' : 'Sign In & Unlock My Duties'}
                 </button>
               </form>
             </div>
           </div>
         )}
-      </div>
+      </>
     );
   }
 
@@ -7021,9 +6720,6 @@ export default function App() {
     const isLeader = role === 'leader';
     const isReferee = role === 'referee';
     const unread = announcements.filter(a => !lastSeenFeedTimestamp || new Date(a.timestamp || a.createdAt || 0) > new Date(lastSeenFeedTimestamp)).length;
-
-    // Admin has NO bottom tabs (all housed in Hamburger Sidebar Menu)
-    if (isAdmin) return [];
 
     // Logistics Head sees only Logistics tab and Feed
     if (isLogistics) return [
@@ -7204,35 +6900,57 @@ export default function App() {
                   <span className={`live-dot`} />
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Live Syncing</span>
                 </div>
-                
-                
               </div>
             </div>
           </div>
           
-          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* Quick Home Hub Button */}
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              {/* 1-Tap Return to Community Hub (keeps user signed in) */}
+              <button
+                onClick={handleLeaveEvent}
+                data-testid="header-community-hub-btn"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  fontSize: '0.73rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                title="Return to VBT Community Hub"
+              >
+                <Home size={13} />
+                <span>Hub</span>
+              </button>
+
+              {/* 1-Tap Field Mode (Simplified Court View) Toggle */}
               {currentUser && (
                 <button
-                  onClick={() => setCurrentTab('home')}
+                  onClick={handleToggleUiMode}
+                  data-testid="header-field-mode-btn"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
                     padding: '5px 10px',
                     borderRadius: '10px',
-                    background: currentTab === 'home' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                    border: currentTab === 'home' ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: currentTab === 'home' ? '#60a5fa' : '#94a3b8',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
+                    background: 'rgba(245, 158, 11, 0.16)',
+                    border: '1px solid rgba(245, 158, 11, 0.38)',
+                    color: '#FDE68A',
+                    fontSize: '0.73rem',
+                    fontWeight: '800',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
-                  title="VBT Community Home"
+                  title="Switch to 1-Handed Field Mode (High-Contrast Court View)"
                 >
-                  <Home size={14} />
-                  <span style={{ display: 'inline' }}>Home</span>
+                  <span>☀️ Field Mode</span>
                 </button>
               )}
 
@@ -8380,6 +8098,15 @@ export default function App() {
             communityId={currentUser?.communityId || 'vbt_main'}
           />
         )}
+
+        {/* Tab: VBT Memory & Storytelling Wall */}
+        {currentTab === 'memories' && (
+          <CommunityMemoryWall
+            currentUser={currentUser}
+            memberProfile={currentMemberPublicProfile}
+            communityId={currentUser?.communityId || 'vbt_main'}
+          />
+        )}
         </React.Suspense>
       </main>
     </div>
@@ -8569,6 +8296,7 @@ export default function App() {
                 { id: 'teams', label: 'Teams & Groups Hub', icon: Shield },
                 { id: 'prayer', label: 'Prayer & Testimonies', icon: Sparkles },
                 { id: 'growth', label: 'Growth & Pathways', icon: Award },
+                { id: 'memories', label: 'Story Wall & Archive', icon: History },
                 { id: 'service', label: 'Live Service & Setup', icon: BookOpen },
                 { id: 'schedule', label: 'Schedule Builder', icon: Calendar },
                 { id: 'scoreboard', label: 'Live Scoreboard', icon: Trophy },

@@ -1,3 +1,7 @@
+@import "tailwindcss";
+@source "./**/*.{js,jsx,ts,tsx}";
+@source "../index.html";
+
 /* VBT Sports Camp Web App - Custom Design System */
 /* Removed Google Fonts import since we now load them locally from node_modules */
 
@@ -112,11 +116,11 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 body {

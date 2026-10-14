@@ -31,6 +31,7 @@ import {
   recordModuleCompletion,
   awardCertification,
 } from '../services/trainingGrowthService';
+import ServantPassportModal from './community/ServantPassportModal';
 
 // ─────────────────────────────────────────────────────────────
 // Pathway Progression Levels Definition
@@ -893,6 +894,9 @@ export default function GrowthPathwaysTab({
   // Certificate Viewer modal state
   const [viewingCertificate, setViewingCertificate] = useState(null);
 
+  // Servant Passport modal state
+  const [showPassportModal, setShowPassportModal] = useState(false);
+
   // Admin Award Tool modal state
   const [showAdminAwardModal, setShowAdminAwardModal] = useState(false);
   const [communityMembers, setCommunityMembers] = useState([]);
@@ -1300,6 +1304,32 @@ export default function GrowthPathwaysTab({
               gap: '12px',
             }}
           >
+            <button
+              onClick={() => {
+                triggerHaptic('medium');
+                setShowPassportModal(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '12px',
+                background:
+                  'linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%)',
+                border: '1px solid rgba(56, 189, 248, 0.5)',
+                color: '#38bdf8',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 14px rgba(56, 189, 248, 0.25)',
+              }}
+            >
+              <Compass size={16} />
+              Servant Passport
+            </button>
+
             {isAdmin && (
               <button
                 onClick={() => {
@@ -3460,6 +3490,23 @@ export default function GrowthPathwaysTab({
           </div>
         </div>
       )}
+
+      {/* ───────────────────────────────────────────────────────── */}
+      {/* Servant Passport Modal (Requirement 5) */}
+      {/* ───────────────────────────────────────────────────────── */}
+      <ServantPassportModal
+        isOpen={showPassportModal}
+        onClose={() => setShowPassportModal(false)}
+        memberId={memberId}
+        currentUser={
+          currentUser || {
+            id: memberId,
+            displayName: memberName,
+            role: currentUserProfile?.role || 'volunteer',
+          }
+        }
+        communityId={communityId}
+      />
     </div>
   );
 }

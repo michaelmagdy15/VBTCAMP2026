@@ -21,6 +21,8 @@ import {
   RotateCw,
   Zap,
   Info,
+  History,
+  Compass,
 } from 'lucide-react';
 import {
   subscribeToUpcomingServices,
@@ -30,6 +32,8 @@ import {
 } from '../services/serviceMeetingService';
 import { subscribeToMembers } from '../services/memberService';
 import { DEFAULT_COMMUNITY_ID } from '../firebase';
+import { WeeklyRitualBanner, FindYourPlaceModal } from './community';
+
 
 // Role Badge and Styling Configurations
 const ROLE_CONFIG = {
@@ -250,6 +254,7 @@ export default function CommunityHomeDashboard({
   const [verseOffset, setVerseOffset] = useState(0);
   const [copiedVerse, setCopiedVerse] = useState(false);
   const [rsvpFeedback, setRsvpFeedback] = useState('');
+  const [showFindYourPlaceModal, setShowFindYourPlaceModal] = useState(false);
 
   // Local storage RSVP tracker initialized without triggering cascading render
   const [rsvpMap, setRsvpMap] = useState(() => {
@@ -457,8 +462,21 @@ export default function CommunityHomeDashboard({
   return (
     <div className="space-y-6 pb-24 text-slate-100 max-w-7xl mx-auto px-3 sm:px-6">
       {/* ──────────────────────────────────────────────────────────── */}
+      {/* 0. WEEKLY COMMUNITY RITUAL BANNER */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      <WeeklyRitualBanner
+        currentUser={currentUser}
+        currentUserProfile={currentUserProfile}
+        userRole={currentUserProfile?.role || (isAdmin ? 'admin' : isLeader ? 'leader' : 'member')}
+        userStatus={currentUserProfile?.status || 'normal'}
+        onNavigateTab={handleNavigate}
+        onOpenQRScanner={handleOpenScanner}
+      />
+
+      {/* ──────────────────────────────────────────────────────────── */}
       {/* 1. WELCOME BANNER & SERVANT BADGE */}
       {/* ──────────────────────────────────────────────────────────── */}
+
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 p-6 sm:p-8 border border-slate-800 shadow-2xl">
         {/* Ambient Decorative Lighting */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
@@ -542,6 +560,36 @@ export default function CommunityHomeDashboard({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ──────────────────────────────────────────────────────────── */}
+      {/* 1.5 FIND YOUR PLACE ONBOARDING CALLOUT */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/40 border border-cyan-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 shadow-inner">
+            <Compass className="w-6 h-6" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <span>Find Your Place in VBT</span>
+              <span className="text-[10px] font-semibold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-800/60">
+                2-Min Discovery
+              </span>
+            </h4>
+            <p className="text-xs text-slate-300 mt-0.5 max-w-xl">
+              Haven't found your serving group or sports station yet? Take our quick questionnaire to get tailored recommendations and connect with a coordinator.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowFindYourPlaceModal(true)}
+          className="px-5 py-2.5 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all shadow-lg shadow-cyan-500/20 active:scale-95 shrink-0 self-start sm:self-auto flex items-center gap-1.5"
+        >
+          <span>Find Your Place</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* ──────────────────────────────────────────────────────────── */}
@@ -973,7 +1021,7 @@ export default function CommunityHomeDashboard({
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           {/* Hub 1: Teams & Squads */}
           <button
             onClick={() => handleNavigate('teams')}
@@ -1049,6 +1097,25 @@ export default function CommunityHomeDashboard({
             </div>
             <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all" />
           </button>
+
+          {/* Hub 5: Story Wall & History */}
+          <button
+            onClick={() => handleNavigate('memories')}
+            className="flex items-center gap-3 p-4 rounded-2xl bg-slate-900/70 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 transition-all text-left group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+              <History className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">
+                Story Wall & History
+              </div>
+              <div className="text-[11px] text-slate-400 truncate">
+                Throwbacks, milestones & records
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all" />
+          </button>
         </div>
       </div>
 
@@ -1096,6 +1163,19 @@ export default function CommunityHomeDashboard({
         <Info className="w-3.5 h-3.5 text-cyan-400" />
         <span>VBT Sports Community App • Value Blessings Team &copy; 2026</span>
       </div>
+
+      {/* Find Your Place Guided Onboarding Modal */}
+      {showFindYourPlaceModal && (
+        <FindYourPlaceModal
+          isOpen={showFindYourPlaceModal}
+          onClose={() => setShowFindYourPlaceModal(false)}
+          currentUser={currentUser}
+          memberProfile={currentUserProfile}
+          communityId={communityId}
+          onNavigateToOpportunity={() => handleNavigate('serve')}
+          onNavigateToTraining={() => handleNavigate('growth')}
+        />
+      )}
     </div>
   );
 }
