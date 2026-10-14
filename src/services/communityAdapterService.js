@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db, DEFAULT_COMMUNITY_ID, getEventRegistry, getServants } from '../firebase';
 import {
   SERVICE_TYPES,
@@ -970,6 +970,222 @@ export function exportToCalendar(activity = {}, triggerDownload = false) {
 }
 
 // ─────────────────────────────────────────────
+// Passwordless 10-Second Servant Identity & Weekly Roll Call (Real Data Only)
+// ─────────────────────────────────────────────
+
+export const SERVANT_IDENTITY_STORAGE_KEY = 'vbt_servant_identity_v1';
+export const WEEKLY_ROLLCALL_STORAGE_KEY = 'vbt_weekly_rollcall_v1';
+
+/**
+ * Reads the servant/member identity saved on this device (zero-password onboarding).
+ * @returns {Object|null}
+ */
+export function getSavedServantProfile() {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(SERVANT_IDENTITY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.displayName) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Saves the servant/member identity locally and syncs to Firestore `members` collection.
+ * @param {string} [communityId=DEFAULT_COMMUNITY_ID]
+ * @param {Object} input
+ * @returns {Promise<Object>}
+ */
+export async function saveServantProfile(communityId = DEFAULT_COMMUNITY_ID, input = {}) {
+  const cleanName = String(input.displayName || input.name || '').trim();
+  if (!cleanName) {
+    throw new Error('Please enter your name.');
+  }
+  const firstName = cleanName.split(/\s+/)[0] || cleanName;
+  const slug = cleanName
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24);
+  const existing = getSavedServantProfile();
+  const uid = input.uid || input.id || existing?.uid || `servant_${slug || 'member'}_${Date.now().toString(36).slice(-4)}`;
+  const role = input.role || existing?.role || 'servant';
+  const station = input.station || input.teamCode || existing?.station || 'Sports & Court';
+  const phone = String(input.phone || existing?.phone || '').trim();
+
+  const profile = {
+    uid,
+    id: uid,
+    displayName: cleanName,
+    name: cleanName,
+    firstName,
+    initials: getServantInitials(cleanName),
+    role,
+    teamCode: station,
+    station,
+    phone,
+    isQuickClaimed: true,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(SERVANT_IDENTITY_STORAGE_KEY, JSON.stringify(profile));
+    } catch {
+      // Ignore storage quota issues
+    }
+  }
+
+  try {
+    if (db && typeof setDoc === 'function') {
+      const memberRef = doc(db, `vbt_communities/${communityId}/members`, uid);
+      await setDoc(memberRef, profile, { merge: true });
+    }
+  } catch (err) {
+    console.warn('[CommunityAdapter] Saved servant identity locally (Firestore sync deferred):', err);
+  }
+
+  return profile;
+}
+
+/**
+ * Clears the locally claimed servant identity on this device.
+ */
+export function clearSavedServantProfile() {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.removeItem(SERVANT_IDENTITY_STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
+/**
+ * Fetches real-time / real-data weekly roll call RSVPs for this week.
+ * Zero fake people or synthetic entries — only real servants & members who tapped RSVP.
+ *
+ * @param {string} [communityId=DEFAULT_COMMUNITY_ID]
+ * @param {string} [weekKey]
+ * @returns {Promise<Array<Object>>}
+ */
+export async function getWeeklyRollCall(communityId = DEFAULT_COMMUNITY_ID, weekKey = null) {
+  const effectiveWeek = weekKey || getNextDayOfWeekDate(5);
+  const byMember = new Map();
+
+  // 1. Read locally stored real RSVPs on this device first for instant offline/zero-latency display
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = window.localStorage.getItem(WEEKLY_ROLLCALL_STORAGE_KEY);
+      if (raw) {
+        const localList = JSON.parse(raw);
+        if (Array.isArray(localList)) {
+          for (const item of localList) {
+            if (item && item.memberId && item.name && (!item.weekKey || item.weekKey === effectiveWeek)) {
+              byMember.set(item.memberId, item);
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore localStorage parse error
+    }
+  }
+
+  // 2. Query Firestore `vbt_communities/${communityId}/weekly_rsvps`
+  try {
+    if (db && typeof getDocs === 'function') {
+      const rsvpCol = collection(db, `vbt_communities/${communityId}/weekly_rsvps`);
+      const snap = await getDocs(rsvpCol);
+      if (snap) {
+        const docs = Array.isArray(snap) ? snap : snap.docs || [];
+        for (const d of docs) {
+          const data = typeof d.data === 'function' ? d.data() : d;
+          if (!data || !data.name) continue;
+          if (data.weekKey && data.weekKey !== effectiveWeek) continue;
+          const mId = data.memberId || d.id;
+          byMember.set(mId, {
+            id: d.id || `${effectiveWeek}_${mId}`,
+            memberId: mId,
+            name: data.name,
+            firstName: String(data.name).trim().split(/\s+/)[0],
+            initials: data.initials || getServantInitials(data.name),
+            role: data.role || 'servant',
+            station: data.station || '',
+            status: data.status || 'friday',
+            weekKey: effectiveWeek,
+            updatedAt: data.updatedAt || new Date().toISOString(),
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[CommunityAdapter] Could not fetch remote weekly_rsvps, using local real cache:', err);
+  }
+
+  return Array.from(byMember.values()).sort((a, b) =>
+    String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  );
+}
+
+/**
+ * Submits a real 1-tap Weekly Roll Call RSVP (`friday` | `tuesday` | `both` | `unavailable`).
+ *
+ * @param {string} [communityId=DEFAULT_COMMUNITY_ID]
+ * @param {Object} params
+ * @returns {Promise<Object>}
+ */
+export async function submitWeeklyRollCall(
+  communityId = DEFAULT_COMMUNITY_ID,
+  { memberId, name, role = 'servant', station = '', status = 'friday', weekKey = null } = {}
+) {
+  const effectiveWeek = weekKey || getNextDayOfWeekDate(5);
+  const cleanName = String(name || 'Servant').trim();
+  const effectiveId = memberId || `servant_${cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+  const docId = `${effectiveWeek}_${effectiveId}`;
+
+  const entry = {
+    id: docId,
+    memberId: effectiveId,
+    name: cleanName,
+    firstName: cleanName.split(/\s+/)[0],
+    initials: getServantInitials(cleanName),
+    role,
+    station,
+    status,
+    weekKey: effectiveWeek,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = window.localStorage.getItem(WEEKLY_ROLLCALL_STORAGE_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      const filtered = Array.isArray(list)
+        ? list.filter((item) => !(item.memberId === effectiveId && item.weekKey === effectiveWeek))
+        : [];
+      filtered.unshift(entry);
+      window.localStorage.setItem(WEEKLY_ROLLCALL_STORAGE_KEY, JSON.stringify(filtered.slice(0, 100)));
+    } catch {
+      // Ignore storage error
+    }
+  }
+
+  try {
+    if (db && typeof setDoc === 'function') {
+      const ref = doc(db, `vbt_communities/${communityId}/weekly_rsvps`, docId);
+      await setDoc(ref, entry, { merge: true });
+    }
+  } catch (err) {
+    console.warn('[CommunityAdapter] Saved weekly RSVP locally (Firestore sync deferred):', err);
+  }
+
+  return { success: true, entry };
+}
+
+// ─────────────────────────────────────────────
 // React Hook: useCommunityData
 // ─────────────────────────────────────────────
 
@@ -997,17 +1213,19 @@ export function useCommunityData(communityId = DEFAULT_COMMUNITY_ID, currentUser
   const [newMembers, setNewMembers] = useState([]);
   const [celebrations, setCelebrations] = useState([]);
   const [prayers, setPrayers] = useState([]);
+  const [weeklyRollCall, setWeeklyRollCall] = useState([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [acts, opps, annData, ctx, servantsList] = await Promise.all([
+      const [acts, opps, annData, ctx, servantsList, rollCallList] = await Promise.all([
         getCommunityActivities(communityId, { realOnly }),
         getServingOpportunities(communityId, {}, { realOnly }),
         getCommunityAnnouncements(communityId, { realOnly }),
         getMemberContext(communityId, currentUser?.uid || currentUser?.id, currentUser),
         getServants().catch(() => []),
+        getWeeklyRollCall(communityId).catch(() => []),
       ]);
 
       setActivities(acts);
@@ -1015,6 +1233,7 @@ export function useCommunityData(communityId = DEFAULT_COMMUNITY_ID, currentUser
       setAnnouncements(annData.announcements || annData || []);
       setScripture(annData.scripture || WEEKLY_SCRIPTURE);
       setMemberContext(ctx);
+      setWeeklyRollCall(Array.isArray(rollCallList) ? rollCallList : []);
 
       // Real members from vbt_servants
       if (Array.isArray(servantsList) && servantsList.length > 0) {
@@ -1169,6 +1388,34 @@ export function useCommunityData(communityId = DEFAULT_COMMUNITY_ID, currentUser
     [communityId, memberContext, currentUser]
   );
 
+  const submitRsvp = useCallback(
+    async ({ memberId, name, role, station, status }) => {
+      const effectiveMemberId = memberId || currentUser?.uid || currentUser?.id;
+      const effectiveName = name || currentUser?.displayName || currentUser?.name || 'Servant';
+      const effectiveRole = role || currentUser?.role || 'servant';
+      const effectiveStation = station || currentUser?.teamCode || currentUser?.station || '';
+
+      const res = await submitWeeklyRollCall(communityId, {
+        memberId: effectiveMemberId,
+        name: effectiveName,
+        role: effectiveRole,
+        station: effectiveStation,
+        status,
+      });
+
+      if (res.success && res.entry) {
+        setWeeklyRollCall((prev) => {
+          const filtered = Array.isArray(prev)
+            ? prev.filter((item) => item.memberId !== res.entry.memberId)
+            : [];
+          return [res.entry, ...filtered];
+        });
+      }
+      return res;
+    },
+    [communityId, currentUser]
+  );
+
   return {
     activities,
     opportunities,
@@ -1177,6 +1424,7 @@ export function useCommunityData(communityId = DEFAULT_COMMUNITY_ID, currentUser
     newMembers,
     celebrations,
     prayers,
+    weeklyRollCall,
     memberContext,
     loading,
     error,
@@ -1184,6 +1432,8 @@ export function useCommunityData(communityId = DEFAULT_COMMUNITY_ID, currentUser
     refresh,
     checkIn,
     applyServing,
+    submitRsvp,
     exportToCalendar,
   };
 }
+

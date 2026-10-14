@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   Building,
   Share2,
+  UserCheck,
 } from 'lucide-react';
 import CommunityHeader from './CommunityHeader';
 import BottomNavigation from './BottomNavigation';
@@ -48,9 +49,231 @@ import LeaderCommandSheet from './LeaderCommandSheet';
 import TeamCultureFeed from './TeamCultureFeed';
 import CommunityMemoryWall from './CommunityMemoryWall';
 import WeeklyRitualBanner from './WeeklyRitualBanner';
-import { useCommunityData } from '../../services/communityAdapterService';
+import {
+  useCommunityData,
+  getSavedServantProfile,
+  saveServantProfile,
+  clearSavedServantProfile,
+} from '../../services/communityAdapterService';
 import { DEFAULT_COMMUNITY_ID } from '../../firebase';
 import { triggerHaptic, isStandaloneApp, isIOSDevice } from '../../utils/haptics';
+
+/**
+ * Native Bottom Sheet: 10-Second Passwordless Servant & Player Identity Claim
+ */
+function QuickIdentitySheet({ isOpen, onClose, initialProfile, onSaveIdentity, pendingActionLabel }) {
+  const [name, setName] = useState(initialProfile?.displayName || '');
+  const [role, setRole] = useState(initialProfile?.role || 'servant');
+  const [station, setStation] = useState(initialProfile?.station || 'Sports & Court');
+  const [phone, setPhone] = useState(initialProfile?.phone || '');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialProfile?.displayName || '');
+      setRole(initialProfile?.role || 'servant');
+      setStation(initialProfile?.station || 'Sports & Court');
+      setPhone(initialProfile?.phone || '');
+      setError('');
+    }
+  }, [isOpen, initialProfile]);
+
+  if (!isOpen) return null;
+
+  const stations = [
+    'Sports & Court',
+    'Football Station',
+    'Basketball / Volleyball',
+    'Court Referee',
+    'Media & Sound',
+    'Welcome & Hospitality',
+    'Safety & First Aid',
+  ];
+
+  const roles = [
+    { id: 'servant', label: '⚡ Church Servant' },
+    { id: 'team_leader', label: '🏆 Team Leader' },
+    { id: 'member', label: '🏀 Youth / Player' },
+  ];
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault?.();
+    if (!name.trim()) {
+      triggerHaptic('warning');
+      setError('Please enter your first and last name.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      triggerHaptic('success');
+      await onSaveIdentity?.({
+        displayName: name.trim(),
+        role,
+        station,
+        phone: phone.trim(),
+      });
+      onClose?.();
+    } catch (err) {
+      setError(err?.message || 'Could not save your pass. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quick-identity-sheet-title"
+      data-testid="quick-identity-sheet"
+      className="fixed inset-0 z-[1360] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/85 backdrop-blur-md"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div
+        className="vbt-sheet-animate relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl p-6 pb-8 sm:p-7 text-white max-h-[92vh] overflow-y-auto"
+        onTouchStart={(e) => setTouchStartY(e.touches?.[0]?.clientY ?? null)}
+        onTouchEnd={(e) => {
+          const endY = e.changedTouches?.[0]?.clientY ?? null;
+          if (touchStartY !== null && endY !== null && endY - touchStartY > 65) {
+            triggerHaptic('light');
+            onClose?.();
+          }
+          setTouchStartY(null);
+        }}
+      >
+        <div className="vbt-sheet-grabber sm:hidden" aria-hidden="true" />
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close identity sheet"
+          className="absolute top-5 right-5 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 mb-4 mt-1">
+          <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-500/35 flex items-center justify-center text-cyan-400 shrink-0">
+            <Award className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              10-Second Setup · No Password Needed
+            </span>
+            <h3 id="quick-identity-sheet-title" className="text-lg font-black tracking-tight text-white mt-1">
+              Claim Your VBT Digital Pass
+            </h3>
+            <p className="text-xs text-slate-300">
+              {pendingActionLabel || 'Saved on your phone for 1-tap check-in & station sign-ups'}
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-3 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="quick-claim-name" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+              Your Full Name *
+            </label>
+            <input
+              id="quick-claim-name"
+              data-testid="quick-claim-name-input"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Abanoub Magdy"
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 text-white text-sm font-bold outline-none transition-all placeholder:text-slate-500"
+            />
+          </div>
+
+          <div>
+            <span className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+              I am a...
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {roles.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('selection');
+                    setRole(r.id);
+                  }}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                    role === r.id
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm'
+                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+              Primary Station / Sport
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {stations.map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('selection');
+                    setStation(st);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    station === st
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="quick-claim-phone" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+              WhatsApp / Mobile (Optional)
+            </label>
+            <input
+              id="quick-claim-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="e.g. 012XXXXXXXX"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-all placeholder:text-slate-600"
+            />
+          </div>
+
+          <button
+            type="submit"
+            data-testid="save-quick-claim-btn"
+            disabled={saving}
+            className="w-full min-h-[46px] py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-black text-sm shadow-lg shadow-cyan-600/30 cursor-pointer transition-all"
+          >
+            {saving ? 'Saving Pass...' : 'Save My Pass & Continue ⚡'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Native Bottom Sheet: Install VBT App to Home Screen (iOS / Android Standalone Guide)
@@ -372,6 +595,15 @@ export default function CommunityHome({
     setIsInstallSheetOpen(true);
   }, [deferredInstallPrompt]);
 
+  // Passwordless 10-Second Servant Identity state (persisted on phone)
+  const [claimedIdentity, setClaimedIdentity] = useState(() => getSavedServantProfile());
+  const [isQuickIdentityOpen, setIsQuickIdentityOpen] = useState(false);
+  const [pendingRsvpStatus, setPendingRsvpStatus] = useState(null);
+  const [pendingActionLabel, setPendingActionLabel] = useState('');
+
+  // Effective user combines full admin/coordinator auth with 10s passwordless servant pass
+  const effectiveUser = currentUser || claimedIdentity;
+
   // Modal states
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [checkInActivity, setCheckInActivity] = useState(null);
@@ -393,7 +625,7 @@ export default function CommunityHome({
   }, []);
 
   // Community data hook (adapter)
-  const hookData = useCommunityData(communityId, currentUser);
+  const hookData = useCommunityData(communityId, effectiveUser);
 
   const activities = useMemo(() => {
     if (propActivities && Array.isArray(propActivities)) return propActivities;
@@ -409,6 +641,10 @@ export default function CommunityHome({
     if (propMemberContext) return propMemberContext;
     return hookData.memberContext || null;
   }, [propMemberContext, hookData.memberContext]);
+
+  const weeklyRollCall = useMemo(() => {
+    return hookData.weeklyRollCall || [];
+  }, [hookData.weeklyRollCall]);
 
   const announcements = useMemo(() => {
     return hookData.announcements || [];
@@ -583,6 +819,81 @@ export default function CommunityHome({
     }
   }, [hookData]);
 
+  // Save 10-second passwordless servant identity & run any pending RSVP action
+  const handleSaveQuickIdentity = useCallback(
+    async (profileInput) => {
+      const saved = await saveServantProfile(communityId, profileInput);
+      setClaimedIdentity(saved);
+      if (pendingRsvpStatus && typeof hookData.submitRsvp === 'function') {
+        await hookData.submitRsvp({
+          memberId: saved.uid,
+          name: saved.displayName,
+          role: saved.role,
+          station: saved.station,
+          status: pendingRsvpStatus,
+        });
+        setPendingRsvpStatus(null);
+      }
+      setPendingActionLabel('');
+    },
+    [communityId, pendingRsvpStatus, hookData]
+  );
+
+  // 1-Tap Weekly Roll Call RSVP handler
+  const handleTapRsvp = useCallback(
+    async (status) => {
+      triggerHaptic('medium');
+      if (!effectiveUser) {
+        setPendingRsvpStatus(status);
+        setPendingActionLabel('Enter your name once to confirm your spot for this week:');
+        setIsQuickIdentityOpen(true);
+        return;
+      }
+      if (typeof hookData.submitRsvp === 'function') {
+        await hookData.submitRsvp({
+          memberId: effectiveUser.uid || effectiveUser.id,
+          name: effectiveUser.displayName || effectiveUser.name || effectiveUser.firstName || 'Servant',
+          role: effectiveUser.role || 'servant',
+          station: effectiveUser.teamCode || effectiveUser.station || '',
+          status,
+        });
+      }
+    },
+    [effectiveUser, hookData]
+  );
+
+  // Current user's RSVP entry for this week
+  const myRsvpEntry = useMemo(() => {
+    if (!effectiveUser || !Array.isArray(weeklyRollCall)) return null;
+    const myId = effectiveUser.uid || effectiveUser.id;
+    return weeklyRollCall.find((item) => item.memberId === myId) || null;
+  }, [effectiveUser, weeklyRollCall]);
+
+  // Confirmed count & list (Friday or Tuesday)
+  const confirmedRollCall = useMemo(() => {
+    if (!Array.isArray(weeklyRollCall)) return [];
+    return weeklyRollCall.filter((item) => item.status !== 'unavailable');
+  }, [weeklyRollCall]);
+
+  // Deep-link URL query parameter auto-triggers (?checkin=1, ?serve=1, ?rsvp=friday, ?claim=1, ?meeting=1)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.location?.search) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkin') === '1' || params.get('checkin') === 'true') {
+      setIsCheckInOpen(true);
+    } else if (params.get('serve') === '1' || params.get('tab') === 'serve') {
+      setHomeSegment('serve');
+    } else if (params.get('meeting') === '1') {
+      setIsServantMeetingModeOpen(true);
+    } else if (params.get('rsvp') === 'friday' || params.get('claim') === '1') {
+      if (!effectiveUser) {
+        setPendingRsvpStatus('friday');
+        setPendingActionLabel('Confirm your spot for Friday VBT Service in 10 seconds:');
+        setIsQuickIdentityOpen(true);
+      }
+    }
+  }, [effectiveUser]);
+
   // Render content based on currentTab
   const isHomeTab = currentTab === 'home';
   const isCommunityTab = currentTab === 'community';
@@ -605,7 +916,7 @@ export default function CommunityHome({
 
       {/* FIXED TOP NATIVE APP HEADER */}
       <CommunityHeader
-        currentUser={currentUser}
+        currentUser={effectiveUser}
         communityName={communityName}
         isOffline={isOffline}
         unreadCount={0}
@@ -754,8 +1065,48 @@ export default function CommunityHome({
         {/* VIEW: HOME TAB */}
         {isHomeTab && (
           <div className="space-y-4 sm:space-y-6">
-            {/* SERVANT & LEADER 1-TAP COCKPIT STRIP (When signed in) */}
-            {currentUser && currentUser.role !== 'guest' && (
+            {/* 10-SECOND PASSWORDLESS SERVANT & PLAYER PASS CLAIM STRIP (When not signed in yet) */}
+            {!effectiveUser && (
+              <section
+                data-testid="quick-identity-claim-banner"
+                className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        No Password Needed
+                      </span>
+                      <span className="text-xs font-black text-white">
+                        Servant or Youth Member?
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Set your name &amp; station once on your phone for 1-tap Friday check-in and station sign-ups.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="open-quick-claim-btn"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setPendingActionLabel('');
+                    setIsQuickIdentityOpen(true);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer shrink-0 transition-all"
+                >
+                  <span>Set My Name (10s)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </section>
+            )}
+
+            {/* SERVANT & LEADER 1-TAP COCKPIT STRIP (When signed in or quick-claimed) */}
+            {effectiveUser && effectiveUser.role !== 'guest' && (
               <section
                 data-testid="servant-duty-cockpit"
                 className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 border border-cyan-500/35 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
@@ -767,16 +1118,25 @@ export default function CommunityHome({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                        {(currentUser.role || 'Servant').replace(/_/g, ' ')} Cockpit
+                        {(effectiveUser.role || 'Servant').replace(/_/g, ' ')} Cockpit
                       </span>
-                      {(currentUser.teamCode || currentUser.roleCode) && (
+                      {(effectiveUser.teamCode || effectiveUser.roleCode || effectiveUser.station) && (
                         <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          Assigned: {(currentUser.teamCode || currentUser.roleCode).replace(/_/g, ' ')}
+                          Assigned: {(effectiveUser.teamCode || effectiveUser.roleCode || effectiveUser.station).replace(/_/g, ' ')}
                         </span>
+                      )}
+                      {effectiveUser.isQuickClaimed && (
+                        <button
+                          type="button"
+                          onClick={() => setIsQuickIdentityOpen(true)}
+                          className="text-[10px] font-bold text-slate-400 hover:text-cyan-300 underline cursor-pointer"
+                        >
+                          Edit Pass
+                        </button>
                       )}
                     </div>
                     <h3 className="text-sm sm:text-base font-black text-white mt-1">
-                      Ready to serve, {currentUser.firstName || currentUser.displayName || currentUser.name || 'Servant'} — 1-Tap Field &amp; Meeting Controls
+                      Ready to serve, {effectiveUser.firstName || effectiveUser.displayName || effectiveUser.name || 'Servant'} — 1-Tap Field &amp; Meeting Controls
                     </h3>
                   </div>
                 </div>
@@ -820,7 +1180,7 @@ export default function CommunityHome({
 
             {/* WELCOME HERO */}
             <WelcomeHero
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               memberProfile={memberContext?.profile}
               upcomingActivity={primaryUpcomingActivity}
               pendingAssignment={pendingAssignment}
@@ -891,14 +1251,127 @@ export default function CommunityHome({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
               {/* PRIMARY COLUMN (Desktop: 7 of 12 cols) */}
               <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-                {/* THIS WEEK'S RHYTHM CARD */}
+                {/* THIS WEEK'S RHYTHM & 1-TAP LIVE ROLL CALL SECTION */}
                 <div
                   id="weekly-rhythm-section"
-                  className={homeSegment === 'week' ? 'block vbt-segment-animate' : 'hidden lg:block'}
+                  className={`space-y-4 ${homeSegment === 'week' ? 'block vbt-segment-animate' : 'hidden lg:block'}`}
                 >
+                  {/* 1-TAP WEEKLY ROLL CALL ("WHO'S IN THIS FRIDAY?") */}
+                  <div
+                    data-testid="weekly-roll-call-card"
+                    className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-blue-950/40 to-slate-900 border border-cyan-500/35 shadow-lg space-y-3.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          ⚡ This Week&apos;s Roll Call
+                        </span>
+                        <h3 className="text-sm font-black text-white">
+                          Are You Serving This Week?
+                        </h3>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-400">
+                        {confirmedRollCall.length > 0
+                          ? `${confirmedRollCall.length} Confirmed`
+                          : 'Tap below to confirm'}
+                      </span>
+                    </div>
+
+                    {/* 3 1-Tap RSVP Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        data-testid="rsvp-btn-friday"
+                        onClick={() => handleTapRsvp('friday')}
+                        className={`py-2.5 px-2.5 rounded-xl text-xs font-black border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          myRsvpEntry?.status === 'friday'
+                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20'
+                            : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-white'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Serving Friday</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        data-testid="rsvp-btn-tuesday"
+                        onClick={() => handleTapRsvp('tuesday')}
+                        className={`py-2.5 px-2.5 rounded-xl text-xs font-black border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          myRsvpEntry?.status === 'tuesday'
+                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/20'
+                            : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-white'
+                        }`}
+                      >
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Tue + Fri</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        data-testid="rsvp-btn-unavailable"
+                        onClick={() => handleTapRsvp('unavailable')}
+                        className={`py-2.5 px-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          myRsvpEntry?.status === 'unavailable'
+                            ? 'bg-amber-500/25 text-amber-200 border-amber-400'
+                            : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Can&apos;t Make It</span>
+                      </button>
+                    </div>
+
+                    {/* Real-Data Confirmed Servant Roster Pills */}
+                    {confirmedRollCall.length > 0 ? (
+                      <div className="pt-1 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {confirmedRollCall.slice(0, 8).map((person) => (
+                            <span
+                              key={person.id || person.memberId}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/90 border border-slate-800 text-[11px] font-bold text-slate-200"
+                            >
+                              <span className="w-4 h-4 rounded-full bg-cyan-500/25 text-cyan-300 text-[9px] font-black flex items-center justify-center">
+                                {person.initials || 'V'}
+                              </span>
+                              <span>{person.firstName || person.name}</span>
+                              {person.station && (
+                                <span className="text-[9px] text-amber-300 font-semibold">
+                                  · {person.station.split(' ')[0]}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+
+                        {myRsvpEntry && myRsvpEntry.status !== 'unavailable' && (
+                          <button
+                            type="button"
+                            data-testid="share-rsvp-whatsapp-btn"
+                            onClick={() => {
+                              const origin = typeof window !== 'undefined' ? window.location.origin : 'https://vbt-sports-team.web.app';
+                              const msg = `✅ I just confirmed for Friday VBT Service (${myRsvpEntry.station || 'Servant Team'})! 🏀⚡\nTap to confirm your spot in 10 seconds:\n${origin}/?rsvp=friday`;
+                              if (typeof window !== 'undefined') {
+                                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+                              }
+                            }}
+                            className="px-3 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-black flex items-center gap-1 cursor-pointer"
+                          >
+                            <Share2 className="w-3 h-3" />
+                            <span>Invite Team on WhatsApp</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        Be the first servant to confirm for this week — tap your status above!
+                      </p>
+                    )}
+                  </div>
+
                   <WeeklyRhythmCard
                     activities={activities}
-                    currentUser={currentUser}
+                    currentUser={effectiveUser}
                     onCheckIn={handleOpenCheckIn}
                     onOpenActivity={handleOpenActivity}
                     onScanQR={() => handleOpenCheckIn()}
@@ -914,7 +1387,7 @@ export default function CommunityHome({
                   <ServingOpportunitiesCard
                     opportunities={opportunities}
                     memberAvailability={memberContext?.availability}
-                    currentUser={currentUser}
+                    currentUser={effectiveUser}
                     onExpressInterest={handleExpressInterest}
                     onSetAvailability={() => setIsPassportOpen(true)}
                     onOpenServePage={() => handleSelectTab('serve')}
@@ -930,11 +1403,11 @@ export default function CommunityHome({
                   homeSegment === 'tools' ? 'block vbt-segment-animate' : 'hidden lg:block'
                 }`}
               >
-                {/* ROLE DASHBOARD (When logged in) */}
-                {currentUser && currentUser.role !== 'guest' && (
+                {/* ROLE DASHBOARD (When logged in or quick-claimed) */}
+                {effectiveUser && effectiveUser.role !== 'guest' && (
                   <div data-testid="role-dashboard-container">
                     <RoleDashboard
-                      currentUser={currentUser}
+                      currentUser={effectiveUser}
                       memberContext={memberContext}
                       onOpenVolunteerPass={() => setIsPassportOpen(true)}
                       onOpenServantMode={() => setIsServantMeetingModeOpen(true)}
@@ -1167,7 +1640,7 @@ export default function CommunityHome({
 
             <TeamCultureFeed
               communityId={communityId}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
             />
 
             <CommunityPulse
@@ -1181,7 +1654,7 @@ export default function CommunityHome({
 
             <CommunityMemoryWall
               communityId={communityId}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
             />
           </div>
         )}
@@ -1227,7 +1700,7 @@ export default function CommunityHome({
             <ServingOpportunitiesCard
               opportunities={opportunities}
               memberAvailability={memberContext?.availability}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               onExpressInterest={handleExpressInterest}
               onSetAvailability={() => setIsPassportOpen(true)}
               isOffline={isOffline}
@@ -1257,7 +1730,7 @@ export default function CommunityHome({
 
             <WeeklyRhythmCard
               activities={activities}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               onCheckIn={handleOpenCheckIn}
               onOpenActivity={handleOpenActivity}
               onScanQR={() => handleOpenCheckIn()}
@@ -1285,10 +1758,10 @@ export default function CommunityHome({
               </button>
             </div>
 
-            {currentUser ? (
+            {effectiveUser ? (
               <div className="space-y-6">
                 <RoleDashboard
-                  currentUser={currentUser}
+                  currentUser={effectiveUser}
                   memberContext={memberContext}
                   onOpenVolunteerPass={() => setIsPassportOpen(true)}
                   onOpenServantMode={() => setIsServantMeetingModeOpen(true)}
@@ -1296,15 +1769,45 @@ export default function CommunityHome({
                   onOpenSafetyManager={() => setIsSafetyManagerOpen(true)}
                   onOpenSmartAssignment={() => setIsSmartAssignmentOpen(true)}
                   onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
-                  onOpenProfile={onOpenProfile}
-                  onLogout={onLogout}
+                  onOpenProfile={() => setIsQuickIdentityOpen(true)}
+                  onLogout={() => {
+                    clearSavedServantProfile();
+                    setClaimedIdentity(null);
+                    onLogout?.();
+                  }}
                   isOffline={isOffline}
                 />
 
-                <div className="flex justify-center pt-4">
+                <div className="flex flex-wrap justify-center gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={onLogout}
+                    onClick={() => {
+                      setPendingRsvpStatus(null);
+                      setPendingActionLabel(null);
+                      setIsQuickIdentityOpen(true);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:text-white hover:bg-cyan-500/25 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Edit My Servant / Player Pass</span>
+                  </button>
+                  {!currentUser && (
+                    <button
+                      type="button"
+                      onClick={onOpenAdminLogin}
+                      className="px-5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span>Coordinator Admin Login</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearSavedServantProfile();
+                      setClaimedIdentity(null);
+                      onLogout?.();
+                    }}
                     className="px-6 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:text-white hover:bg-rose-500/25 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />
@@ -1314,16 +1817,28 @@ export default function CommunityHome({
               </div>
             ) : (
               <div className="p-8 rounded-3xl bg-slate-900 border border-slate-800 text-center space-y-4">
-                <Shield className="w-12 h-12 text-slate-500 mx-auto" />
-                <h2 className="text-xl font-black text-white">Sign In to View Profile</h2>
+                <Shield className="w-12 h-12 text-cyan-400 mx-auto" />
+                <h2 className="text-xl font-black text-white">Claim Your Servant or Player Pass</h2>
                 <p className="text-sm text-slate-400 max-w-sm mx-auto">
-                  Access your serving history, servant passport, and coordinator permissions.
+                  Enter your name and station in 10 seconds to unlock 1-tap attendance check-in, weekly RSVP, and your servant passport.
                 </p>
-                <div className="flex justify-center gap-3">
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingRsvpStatus(null);
+                      setPendingActionLabel(null);
+                      setIsQuickIdentityOpen(true);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg cursor-pointer"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>⚡ Claim Pass (No Password)</span>
+                  </button>
                   <button
                     type="button"
                     onClick={onOpenAdminLogin}
-                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-2"
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer"
                   >
                     <LogIn className="w-4 h-4" />
                     <span>Coordinator & Admin Login</span>
@@ -1339,7 +1854,7 @@ export default function CommunityHome({
       <BottomNavigation
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
         unreadCount={0}
       />
 
@@ -1347,7 +1862,7 @@ export default function CommunityHome({
       <AttendanceCheckInCard
         isOpen={isCheckInOpen}
         onClose={() => setIsCheckInOpen(false)}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
         activeService={checkInActivity || primaryUpcomingActivity}
         onCheckInSuccess={handleCheckInSuccess}
         communityId={communityId}
@@ -1365,14 +1880,14 @@ export default function CommunityHome({
       <FindYourPlaceModal
         isOpen={isFindYourPlaceOpen}
         onClose={() => setIsFindYourPlaceOpen(false)}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
       />
 
       {/* MODAL: SERVANT PASSPORT */}
       <ServantPassportModal
         isOpen={isPassportOpen}
         onClose={() => setIsPassportOpen(false)}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
       />
 
       {/* MODAL: TUESDAY SERVANT MEETING MODE */}
@@ -1399,7 +1914,7 @@ export default function CommunityHome({
               <ServantMeetingMode
                 isOpen={isServantMeetingModeOpen}
                 onClose={() => setIsServantMeetingModeOpen(false)}
-                currentUser={currentUser}
+                currentUser={effectiveUser}
               />
             </div>
           </div>
@@ -1429,7 +1944,7 @@ export default function CommunityHome({
             <div className="p-4 sm:p-6 max-h-[80vh] overflow-y-auto">
               <CommunityHealthDashboard
                 communityId={communityId}
-                currentUser={currentUser}
+                currentUser={effectiveUser}
               />
             </div>
           </div>
@@ -1440,21 +1955,21 @@ export default function CommunityHome({
       <YouthSafetyManagerModal
         isOpen={isSafetyManagerOpen}
         onClose={() => setIsSafetyManagerOpen(false)}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
       />
 
       {/* MODAL: SMART ASSIGNMENT */}
       <SmartAssignmentModal
         isOpen={isSmartAssignmentOpen}
         onClose={() => setIsSmartAssignmentOpen(false)}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
       />
 
       {/* MODAL: VBT AI ASSISTANT */}
       <VbtAiAssistantModal
         isOpen={isAiAssistantOpen}
         onClose={() => setIsAiAssistantOpen(false)}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
       />
 
       {/* MODAL: UNIFIED 3-TAB SERVANT & LEADER COMMAND SHEET */}
@@ -1462,7 +1977,7 @@ export default function CommunityHome({
         isOpen={isCommandSheetOpen}
         onClose={() => setIsCommandSheetOpen(false)}
         initialTab={commandSheetTab}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
         activeActivity={primaryUpcomingActivity || activeEvents[0]}
         activities={activities}
         scripture={scripture}
@@ -1482,6 +1997,19 @@ export default function CommunityHome({
         isOpen={isInstallSheetOpen}
         onClose={() => setIsInstallSheetOpen(false)}
         isIOS={isIOSDevice()}
+      />
+
+      {/* MODAL: 10-SECOND PASSWORDLESS SERVANT & PLAYER IDENTITY SHEET */}
+      <QuickIdentitySheet
+        isOpen={isQuickIdentityOpen}
+        onClose={() => {
+          setIsQuickIdentityOpen(false);
+          setPendingRsvpStatus(null);
+          setPendingActionLabel(null);
+        }}
+        initialProfile={effectiveUser}
+        onSaveIdentity={handleSaveQuickIdentity}
+        pendingActionLabel={pendingActionLabel}
       />
     </div>
   );

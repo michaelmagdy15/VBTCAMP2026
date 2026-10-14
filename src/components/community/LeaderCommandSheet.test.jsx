@@ -46,6 +46,8 @@ describe('LeaderCommandSheet & Briefing Builder Suite', () => {
     expect(html).toContain('VBT Service — Ard el Golf');
     expect(html).toContain('Code: july6');
     expect(html).toContain('Enter Live Scoreboard &amp; Radio');
+    expect(html).toContain('print-door-qr-poster-btn');
+    expect(html).toContain('Print Door Poster');
   });
 
   it('renders the Prep & Plan tab when initialTab="prep"', () => {
@@ -66,7 +68,7 @@ describe('LeaderCommandSheet & Briefing Builder Suite', () => {
     expect(html).toContain('My Servant Passport');
   });
 
-  it('renders the Share & Care tab with 1-Tap WhatsApp Briefing preview when initialTab="care"', () => {
+  it('renders the Share & Care tab with 3-Day WhatsApp Launch Campaign templates when initialTab="care"', () => {
     const html = renderToString(
       <LeaderCommandSheet
         isOpen={true}
@@ -77,7 +79,10 @@ describe('LeaderCommandSheet & Briefing Builder Suite', () => {
       />
     );
 
-    expect(html).toContain('1-Tap Servant Group Briefing');
+    expect(html).toContain('1-Tap Servant Group Briefing &amp; Launch Kit');
+    expect(html).toContain('campaign-tpl-tuesday');
+    expect(html).toContain('campaign-tpl-thursday');
+    expect(html).toContain('campaign-tpl-friday');
     expect(html).toContain('Send to WhatsApp Group');
     expect(html).toContain('Copy Briefing Text');
     expect(html).toContain('Pastoral Care &amp; Absent Follow-Up');
@@ -91,6 +96,7 @@ describe('LeaderCommandSheet & Briefing Builder Suite', () => {
       scripture: mockScripture,
       currentUser: mockUser,
       eventCode: 'july6',
+      templateType: 'friday_briefing',
     });
 
     expect(text).toContain('Value Blessings Team — Servant Briefing');
@@ -101,4 +107,32 @@ describe('LeaderCommandSheet & Briefing Builder Suite', () => {
     expect(text).toContain('Colossians 3:23');
     expect(text).toContain('event=july6&checkin=1');
   });
+
+  it('builds Tuesday Station Call and Thursday 24h Roll Call campaign templates with deep links', () => {
+    const tuesdayText = buildServantBriefingText({
+      communityName: 'Value Blessings Team',
+      activeActivity: mockActivity,
+      scripture: mockScripture,
+      currentUser: mockUser,
+      eventCode: 'july6',
+      templateType: 'tuesday_serve',
+    });
+
+    expect(tuesdayText).toContain('Tuesday Planning & Station Sign-Up');
+    expect(tuesdayText).toContain('?serve=1');
+
+    const thursdayText = buildServantBriefingText({
+      communityName: 'Value Blessings Team',
+      activeActivity: mockActivity,
+      scripture: mockScripture,
+      currentUser: mockUser,
+      eventCode: 'july6',
+      templateType: 'thursday_rsvp',
+    });
+
+    expect(thursdayText).toContain('24-Hour Friday Roll Call');
+    expect(thursdayText).toContain('?rsvp=friday');
+  });
 });
+
+

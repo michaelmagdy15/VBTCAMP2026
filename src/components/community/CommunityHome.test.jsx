@@ -224,7 +224,7 @@ describe('CommunityHome Component Suite', () => {
     expect(html).toContain('Sign Out of Profile');
   });
 
-  it('renders sign-in prompt on profile tab when guest', () => {
+  it('renders sign-in prompt and Quick-Claim Pass on profile tab when guest', () => {
     const html = renderToString(
       <CommunityHome
         currentUser={null}
@@ -232,7 +232,7 @@ describe('CommunityHome Component Suite', () => {
       />
     );
 
-    expect(html).toContain('Sign In to View Profile');
+    expect(html).toContain('Claim Your Servant or Player Pass');
     expect(html).toContain('Coordinator &amp; Admin Login');
   });
 
@@ -280,5 +280,25 @@ describe('CommunityHome Component Suite', () => {
     expect(html).toContain('install-app-banner');
     expect(html).toContain('Get the Fullscreen VBT Mobile App');
   });
+
+  it('renders the 10-Second Quick-Claim Pass banner when guest and the Live Weekly Roll Call RSVP card', () => {
+    const html = renderToString(
+      <CommunityHome
+        currentUser={null}
+        activities={mockActivities}
+        opportunities={mockOpportunities}
+      />
+    );
+
+    expect(html).toContain('quick-identity-claim-banner');
+    expect(html).toContain('Set My Name (10s)');
+    expect(html).toContain('weekly-roll-call-card');
+    expect(html).toContain('rsvp-btn-friday');
+    expect(html).toContain('rsvp-btn-tuesday');
+    expect(html).toContain('rsvp-btn-unavailable');
+    expect(html).toContain('Are You Serving This Week?');
+  });
 });
+
+
 

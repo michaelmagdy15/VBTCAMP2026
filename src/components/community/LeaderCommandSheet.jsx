@@ -35,6 +35,7 @@ export function buildServantBriefingText({
   activities = [],
   currentUser = null,
   eventCode = 'july6',
+  templateType = 'friday_briefing',
 }) {
   const primary = activeActivity || activities[0] || {
     title: 'VBT Service — Ard el Golf',
@@ -52,6 +53,38 @@ export function buildServantBriefingText({
       ? rawLoc.name || rawLoc.address || 'Main Church Court'
       : rawLoc || 'Main Church Court';
   const codeStr = primary.eventCode || primary.code || primary.id || eventCode || 'july6';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://vbt-sports-team.web.app';
+
+  if (templateType === 'tuesday_serve') {
+    return [
+      `🙌 *${communityName} — Tuesday Planning & Station Sign-Up*`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `📅 *Upcoming Service:* ${title} (${dateStr} · ${timeStr})`,
+      `📍 *Location:* ${locStr}`,
+      ``,
+      `🏀 *Claim Your Serving Station for This Week:*`,
+      `1️⃣ Tap the link below (no password needed!)`,
+      `2️⃣ Claim your name & pick your station (Sports, Referee, Media, or Welcome)`,
+      `3️⃣ Add the app to your Home Screen for Friday`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `⚡ *Pick Your Station (10s):* ${origin}/?serve=1`,
+    ].join('\n');
+  }
+
+  if (templateType === 'thursday_rsvp') {
+    return [
+      `🔥 *${communityName} — 24-Hour Friday Roll Call!*`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `📅 *Tomorrow:* ${title}`,
+      `🕒 *Time:* ${dateStr} · ${timeStr}`,
+      `📍 *Court:* ${locStr}`,
+      ``,
+      `✅ *Are you serving tomorrow?*`,
+      `Tap the link below and hit *"I'm Serving Friday"* so we can finalize court teams & stations tonight:`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `📲 *1-Tap Roll Call:* ${origin}/?rsvp=friday`,
+    ].join('\n');
+  }
 
   const lines = [
     `⛪ *${communityName} — Servant Briefing*`,
@@ -86,7 +119,7 @@ export function buildServantBriefingText({
     `2️⃣ Wear your VBT Servant Shirt`,
     `3️⃣ Scan the Door QR or enter code *${codeStr}* in the VBT App to check in & view your station`,
     `━━━━━━━━━━━━━━━━━━━━`,
-    `🌐 Open App: ${typeof window !== 'undefined' ? window.location.origin : 'https://vbt-sports-team.web.app'}/?event=${encodeURIComponent(codeStr)}&checkin=1`
+    `🌐 Open App: ${origin}/?event=${encodeURIComponent(codeStr)}&checkin=1`
   );
 
   return lines.join('\n');
@@ -123,6 +156,7 @@ export default function LeaderCommandSheet({
   const [copiedBriefing, setCopiedBriefing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
+  const [campaignTemplate, setCampaignTemplate] = useState('friday_briefing');
 
   const eventCode = useMemo(() => {
     return (
@@ -158,8 +192,9 @@ export default function LeaderCommandSheet({
       scripture,
       currentUser,
       eventCode,
+      templateType: campaignTemplate,
     });
-  }, [activeActivity, activities, scripture, currentUser, eventCode]);
+  }, [activeActivity, activities, scripture, currentUser, eventCode, campaignTemplate]);
 
   if (!isOpen) return null;
 
@@ -194,6 +229,48 @@ export default function LeaderCommandSheet({
     if (typeof window !== 'undefined') {
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const handlePrintDoorPoster = () => {
+    if (typeof window === 'undefined') return;
+    const svgEl = document.querySelector('[data-testid="leader-command-sheet"] svg');
+    const svgHtml = svgEl ? svgEl.outerHTML : '';
+    const printWin = window.open('', '_blank', 'width=800,height=950');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+    printWin.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>VBT Door Check-In Poster — ${eventTitle}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px 24px; color: #0f172a; }
+            .card { max-width: 560px; margin: 0 auto; border: 4px solid #0f172a; border-radius: 32px; padding: 36px 28px; }
+            .badge { display: inline-block; background: #0284c7; color: #fff; font-weight: 900; padding: 6px 16px; border-radius: 999px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+            h1 { font-size: 32px; font-weight: 900; margin: 16px 0 8px; }
+            p.sub { font-size: 16px; color: #475569; margin: 0 0 28px; font-weight: 600; }
+            .qr-wrap { display: inline-block; padding: 24px; border: 3px solid #e2e8f0; border-radius: 24px; margin-bottom: 24px; }
+            .qr-wrap svg { width: 280px !important; height: 280px !important; }
+            .code-box { font-family: monospace; font-size: 24px; font-weight: 900; background: #f1f5f9; padding: 12px 24px; border-radius: 16px; display: inline-block; margin-bottom: 16px; }
+            .url { font-size: 15px; font-weight: 700; color: #0284c7; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <span class="badge">Value Blessings Team · Faith · Sport · Service</span>
+            <h1>${eventTitle}</h1>
+            <p class="sub">Scan with your phone camera to check in &amp; see your station</p>
+            <div class="qr-wrap">${svgHtml}</div>
+            <div><span class="code-box">Passcode: ${eventCode.toUpperCase()}</span></div>
+            <p class="url">${checkInUrl}</p>
+          </div>
+          <script>setTimeout(() => { window.print(); }, 350);</script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   return (
@@ -504,6 +581,14 @@ export default function LeaderCommandSheet({
                       >
                         {showFullscreenQR ? 'Shrink QR' : 'Enlarge QR'}
                       </button>
+                      <button
+                        type="button"
+                        data-testid="print-door-qr-poster-btn"
+                        onClick={handlePrintDoorPoster}
+                        className="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-xs font-bold text-cyan-300 cursor-pointer transition-colors"
+                      >
+                        🖨️ Print Door Poster
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -623,16 +708,56 @@ export default function LeaderCommandSheet({
           {/* ─── TAB 3: SHARE & CARE (WHATSAPP BRIEFING & PASTORAL FOLLOW-UP) ─── */}
           {activeTab === 'care' && (
             <div data-testid="command-panel-care" className="space-y-4">
-              {/* 1-Tap WhatsApp Briefing Generator */}
+              {/* 1-Tap WhatsApp Briefing & 3-Day Launch Kit Generator */}
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-800/90 border border-emerald-500/35 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <MessageCircle className="w-4 h-4 text-emerald-400" />
                     <span className="text-xs font-black uppercase tracking-wider text-emerald-300">
-                      1-Tap Servant Group Briefing
+                      1-Tap Servant Group Briefing &amp; Launch Kit
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-400">Ready for WhatsApp</span>
+                </div>
+
+                {/* 3-Day Campaign Selector Pills */}
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    data-testid="campaign-tpl-tuesday"
+                    onClick={() => setCampaignTemplate('tuesday_serve')}
+                    className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                      campaignTemplate === 'tuesday_serve'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    1. Tue Station Call
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="campaign-tpl-thursday"
+                    onClick={() => setCampaignTemplate('thursday_rsvp')}
+                    className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                      campaignTemplate === 'thursday_rsvp'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    2. Thu 24h Roll Call
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="campaign-tpl-friday"
+                    onClick={() => setCampaignTemplate('friday_briefing')}
+                    className={`py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                      campaignTemplate === 'friday_briefing'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    3. Fri Door Brief
+                  </button>
                 </div>
 
                 <pre
