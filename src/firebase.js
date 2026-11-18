@@ -20,27 +20,29 @@ import {
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { getAuth, signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
 
-// Firebase config — project: crm-production (ID: faa-test-guide-v2)
-// VBT data is isolated in the dedicated 'db-vbt' database.
-// Other databases (db-gyms, db-inzanathletics, db-shockgym, etc.) are untouched.
+// Firebase config — project: VBT Spark (ID: vbt-camp-spark-26)
+// VBT data uses the dedicated standalone (default) Firestore database.
 const firebaseConfig = {
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "faa-test-guide-v2",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:492280162134:web:08307e50672d6ae12d98f7",
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAUvzDIKoTvtbMEWaP1pDSyNfqpS3_11wI",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "faa-test-guide-v2.firebaseapp.com",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "faa-test-guide-v2.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "492280162134"
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "vbt-camp-spark-26",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:54952183080:web:911cda03558fb2fd923c1d",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAPThwPuoj9XDhdZW9Qg44nPdm498o83l0",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vbt-camp-spark-26.firebaseapp.com",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "vbt-camp-spark-26.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "54952183080"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// 'db-vbt' is a dedicated Firestore database — completely separate from all other project databases.
 // Initialize with multi-tab offline persistence (modern v10+ syntax)
-export const db = initializeFirestore(app, {
+const vbtDbId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
+const firestoreSettings = {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })
-}, import.meta.env.VITE_FIREBASE_DATABASE_ID || 'db-vbt');
+};
+export const db = (vbtDbId && vbtDbId !== '(default)')
+  ? initializeFirestore(app, firestoreSettings, vbtDbId)
+  : initializeFirestore(app, firestoreSettings);
 
 export const auth = getAuth(app);
 
@@ -1586,7 +1588,8 @@ export let serverTimeOffsetMs = 0;
 export async function syncServerTimeOffset() {
   try {
     const start = Date.now();
-    const response = await fetch(`${NOTIFY_SERVICE_URL}/subscribe`, { method: 'OPTIONS' });
+    const targetUrl = typeof window !== 'undefined' ? window.location.origin : '/';
+    const response = await fetch(targetUrl, { method: 'HEAD', cache: 'no-store' });
     const serverDateHeader = response.headers.get('date');
     if (serverDateHeader) {
       const serverTime = new Date(serverDateHeader).getTime();
